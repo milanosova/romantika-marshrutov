@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}Романтика маршрутов{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_version }}">
+  {# Telegram's Mini App bridge, served from here: telegram.org is slow or unreachable from
+     some networks, and an app that cannot read initData shows «open it from the bot». #}
+  <script src="/static/vendor/telegram-web-app.js?v={{ asset_version }}"></script>
+  <script src="/static/tg.js?v={{ asset_version }}"></script>
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,108 @@
+# Run from the repository root:
+#   docker compose -f docker/compose.yml --project-directory . up -d
+# Production adds the VPS overlay:
+#   docker compose -f docker/compose.yml -f docker/compose.vps.yml --project-directory . up -d
+# `.env` (never committed) must define BOT_TOKEN, ADMIN_IDS, POSTGRES_PASSWORD, PUBLIC_BASE_URL.
+name: romantika
+
+x-app: &app
+  image: romantika:latest
+  env_file: .env
+  restart: unless-stopped
+  environment: &app-env
+    DATABASE_URL: postgresql+asyncpg://romantika:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/romantika
+    MEDIA_DIR: /media
+    BACKUPS_DIR: /backups
+    ENV: ${ENV:-prod}
+    TZ: Europe/Moscow
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: romantika
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: romantika
+      TZ: Europe/Moscow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U romantika -d romantika"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  migrate:
+    <<: *app
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: migrate
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  bot:
+    <<: *app
+    command: bot
+    volumes:
+      - media:/media
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    <<: *app
+    command: web
+    ports:
+      - "127.0.0.1:8010:8010"
+    volumes:
+      - media:/media:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8010/healthz', timeout=5).status == 200 else 1)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    <<: *app
+    command: worker
+    volumes:
+      - media:/media
+      - ./data/backups:/backups:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  backup:
+    <<: *app
+    command: backup
+    user: root
+    environment:
+      <<: *app-env
+      BACKUP_DIR: /backups
+      RETENTION_DAYS: ${RETENTION_DAYS:-30}
+      SCRATCH_DATABASE_URL: postgresql+asyncpg://romantika:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/romantika_verify
+      RUN_ON_START: ${BACKUP_ON_START:-0}
+    volumes:
+      - media:/media:ro
+      - ./data/backups:/backups
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  media:

@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Журнал сезона · {{ season.title }} · {{ name }}</title>
+<style>
+  @page {
+    size: A4; margin: 20mm 18mm 22mm;
+    @bottom-left { content: "Романтика маршрутов · " {{ season_css }}; font: 8.5pt "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; color: #8a8178; }
+    @bottom-right { content: {{ name_css }} " · " counter(page); font: 8.5pt "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; color: #8a8178; }
+  }
+  @page :first { @bottom-left { content: none; } @bottom-right { content: none; } }
+  :root { --ink: #23201c; --muted: #7a7268; --accent: #c8451f; --paper: #f8f3ea; --line: #e6ddd0; --star: #b8860b; --ok: #2f8f5b; }
+  html { font-size: 10.5pt; }
+  body { font-family: "DejaVu Sans", "Helvetica Neue", Arial, "Noto Color Emoji", "Apple Color Emoji", sans-serif; color: var(--ink); line-height: 1.5; margin: 0; }
+  h1, h2, h3, .serif { font-family: "DejaVu Serif", Georgia, "Times New Roman", serif; font-weight: normal; letter-spacing: -0.005em; }
+  h1 { font-size: 34pt; line-height: 1.05; margin: 0 0 6pt; }
+  h2 { font-size: 19pt; line-height: 1.2; margin: 0 0 4pt; }
+  h3 { font-size: 13pt; margin: 0 0 6pt; }
+  p { margin: 0 0 6pt; }
+  .eyebrow { font-size: 8.5pt; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10pt; }
+  .muted { color: var(--muted); }
+  .small { font-size: 9pt; }
+
+  /* --- title page ------------------------------------------------------------- */
+  .cover { page-break-after: always; }
+  .cover .rule { height: 2pt; background: var(--accent); width: 42pt; margin: 14pt 0 18pt; }
+  .cover .who { font-size: 14pt; margin: 0; }
+  .cover .dates { color: var(--muted); margin: 0 0 22pt; }
+  .totals { display: flex; gap: 10pt; margin: 0 0 18pt; }
+  .totals .t { flex: 1; background: var(--paper); border-radius: 8pt; padding: 10pt 12pt; }
+  .totals .n { font-family: "DejaVu Serif", Georgia, serif; font-size: 24pt; line-height: 1; }
+  .totals .n small { font-size: 12pt; color: var(--muted); }
+  .totals .l { font-size: 8.5pt; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 4pt; }
+  .spread { display: flex; flex-wrap: wrap; gap: 6pt; margin: 6pt 0 0; }
+  .cell { width: 74pt; height: 74pt; border: 1px solid var(--line); border-radius: 8pt; padding: 6pt 7pt; position: relative; }
+  .cell .num { font-size: 8pt; color: var(--muted); }
+  .cell .mark { position: absolute; right: 7pt; top: 4pt; font-size: 15pt; line-height: 1; }
+  .cell.star .mark { color: var(--star); } .cell.ok .mark { color: var(--ok); } .cell.frozen .mark { color: #4a7fb5; }
+  .cell.frozen { background: #eef4fa; border-color: #cfdcea; }
+  .cell .ttl { position: absolute; left: 7pt; right: 7pt; bottom: 6pt; font-size: 7.5pt; line-height: 1.2; color: var(--ink); overflow: hidden; max-height: 28pt; }
+  .cell.empty { background: repeating-linear-gradient(135deg, #fbf8f2 0 4pt, #f3ede3 4pt 8pt); border-style: dashed; }
+  .legend { font-size: 8.5pt; color: var(--muted); margin: 8pt 0 0; }
+  .cover .promise { margin-top: 26pt; padding-top: 12pt; border-top: 1px solid var(--line); font-size: 9.5pt; color: var(--muted); }
+
+  /* --- weeks ------------------------------------------------------------------ */
+  .week { page-break-inside: avoid; margin: 0 0 18pt; padding: 0 0 14pt; border-bottom: 1px solid var(--line); }
+  .week:last-of-type { border-bottom: 0; }
+  .week .head { display: flex; align-items: baseline; gap: 8pt; }
+  .week .head h2 { flex: 1; min-width: 0; font-size: 17pt; }
+  .week .badge { flex: none; width: 22pt; height: 22pt; border-radius: 50%; text-align: center; line-height: 22pt; font-size: 12pt; color: #fff; background: var(--ok); }
+  .week .badge.star { background: var(--star); }
+  .week .dates { color: var(--muted); font-size: 9pt; margin: 0 0 6pt 30pt; }
+  .week .entry { margin: 0 0 6pt 30pt; padding-left: 10pt; border-left: 2pt solid var(--paper); white-space: pre-wrap; }
+  .week .entry + .entry { margin-top: 8pt; }
+  .photos { display: flex; flex-wrap: wrap; gap: 6pt; margin: 8pt 0 0 30pt; }
+  .photos img { width: 31.5%; height: 118pt; object-fit: cover; border-radius: 6pt; }
+  .photos img:only-child { width: 64%; height: 180pt; }
+  .week .more { margin: 4pt 0 0 30pt; font-size: 8.5pt; color: var(--muted); }
+  .section { page-break-before: always; }
+  .section.soft { page-break-before: auto; margin-top: 22pt; }
+
+  /* --- lists ------------------------------------------------------------------ */
+  .chips span { display: inline-block; background: var(--paper); border: 1px solid var(--line); border-radius: 999pt; padding: 2pt 9pt; margin: 2pt 4pt 2pt 0; font-size: 9.5pt; }
+  ul.words { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 18pt; }
+  ul.words li { break-inside: avoid; margin: 0 0 6pt; padding-left: 10pt; border-left: 2pt solid var(--line); }
+  ul.words b { font-family: "DejaVu Serif", Georgia, serif; font-weight: normal; font-size: 11.5pt; }
+  ol.facts { padding-left: 16pt; margin: 0; }
+  ol.facts li { margin: 0 0 5pt; padding-left: 4pt; }
+  .wish { font-family: "DejaVu Serif", Georgia, serif; font-size: 13pt; line-height: 1.45; padding: 12pt 16pt; background: var(--paper); border-left: 3pt solid var(--accent); margin: 8pt 0; white-space: pre-wrap; }
+  .empty { color: var(--muted); font-style: italic; }
+  .end { margin-top: 30pt; padding-top: 10pt; border-top: 1px solid var(--line); font-size: 9.5pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <p class="eyebrow">Романтика маршрутов · журнал сезона</p>
+  <h1>{{ season.title }}</h1>
+  <div class="rule"></div>
+  <p class="who serif">{{ name }}</p>
+  <p class="dates">{{ starts }} — {{ ends }}{% if level_name %} · {{ level_name }}{% endif %}</p>
+
+  <div class="totals">
+    <div class="t"><div class="n">{{ view.weeks|length }} <small>/ {{ view.weeks_total }}</small></div><div class="l">{{ weeks_label }}</div></div>
+    <div class="t"><div class="n">{{ stars }}</div><div class="l">{{ stars_label }}</div></div>
+    <div class="t"><div class="n">{{ photos_total }}</div><div class="l">{{ photos_label }}</div></div>
+  </div>
+
+  <h3>Паспорт сезона</h3>
+  <div class="spread">
+    {% for cell in grid %}<div class="cell {{ cell.state }}"><span class="num">{{ cell.number }}</span>{% if cell.mark %}<span class="mark">{{ cell.mark }}</span>{% endif %}{% if cell.title %}<span class="ttl">{{ cell.title }}</span>{% endif %}</div>{% endfor %}
+  </div>
+  <p class="legend">★ максимум — задание на вечер · ✓ минимум — задание на пять минут{% if frozen %} · ❄ неделя закрыта заморозкой{% endif %} · пустая клетка — неделя прошла мимо</p>
+  {% if level_note %}<p class="small muted">Статус «{{ level_name }}»: {{ level_note }}.</p>{% endif %}
+
+  <p class="promise">Это не сертификат об окончании. Это чтобы было видно: три месяца прожиты, а не пролистаны.</p>
+</section>
+
+<section>
+  <p class="eyebrow">Недели</p>
+  {% if cards %}
+    {% for card in cards %}
+    <div class="week">
+      <div class="head"><span class="badge {{ 'star' if card.star }}">{{ '★' if card.star else '✓' }}</span><h2>Неделя {{ card.number }} · {{ card.title }}</h2></div>
+      <p class="dates">{{ card.dates }}</p>
+      {% for text in card.texts %}<div class="entry">{{ text }}</div>{% endfor %}
+      {% if not card.texts and not card.photos %}<p class="entry empty">Без слов: в этот раз только {{ 'фото или видео' if card.star else 'файл' }}.</p>{% endif %}
+      {% if card.photos %}<div class="photos">{% for src in card.photos %}<img src="{{ src }}" alt="">{% endfor %}</div>{% endif %}
+      {% if card.files_more %}<p class="more">{{ card.files_more_label }} в приложении: видео и то, что сюда не поместилось.</p>{% endif %}
+    </div>
+    {% endfor %}
+  {% else %}
+    <p class="empty">Пока пусто — здесь появятся твои недели и твои же слова о них.</p>
+  {% endif %}
+</section>
+
+{% if view.achievements %}
+<section class="section soft">
+  <p class="eyebrow">Ачивки</p>
+  <p class="chips">{% for label in view.achievements %}<span>{{ label }}</span>{% endfor %}</p>
+  <p class="small muted">Не за посещаемость, а за поступок.</p>
+</section>
+{% endif %}
+
+{% if view.season_words or view.words %}
+<section class="section">
+  <p class="eyebrow">Словарик сезона</p>
+  {% if view.season_words %}
+  <h3>Слова недели</h3>
+  <ul class="words">{% for w in view.season_words %}<li><b>{{ w.word }}</b>{% if w.word_ru %} <span class="muted">· {{ w.word_ru }}</span>{% endif %}{% if w.meaning %}<br>{{ w.meaning }}{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if view.words %}
+  <h3 style="margin-top:14pt">Твои слова</h3>
+  <ul class="words">{% for w in view.words %}<li><b>{{ w.word }}</b>{% if w.meaning %}<br>{{ w.meaning }}{% endif %}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if view.facts %}
+<section class="section soft">
+  <p class="eyebrow">Что мы узнали про {{ season.title_accusative or season.title }}</p>
+  <ol class="facts">{% for fact in view.facts %}<li>{{ fact.text }}</li>{% endfor %}</ol>
+</section>
+{% endif %}
+
+{% if view.wish %}
+<section class="section soft">
+  <p class="eyebrow">От Милы</p>
+  <p class="wish">{{ view.wish }}</p>
+</section>
+{% endif %}
+
+<p class="end">Здесь {{ season.title }} заканчивается. Страна следующего сезона уже в рандомайзере.<br>Романтика маршрутов · {{ starts }} — {{ ends }}</p>
+</body>
+</html>

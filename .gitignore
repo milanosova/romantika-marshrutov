@@ -1,23 +1,18 @@
-# Доступы — никогда не коммитим
-бот/токен.txt
-бот/админ.txt
-токен.txt
-админ.txt
-
-# Данные участников — только на своей машине
-бот/данные.sqlite
-*.sqlite
-
-# Мусор
-бот/бот.log
-*.log
-__pycache__/
-.DS_Store
-
-# Собранные журналы — там фото участников
-бот/журналы/
-журналы/
-
-# секреты стека на сервере
 .env
-данные/
+.env.*
+!.env.example
+*.sqlite
+*.dump
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+data/media/
+data/backups/
+data/postgres/
+journals/
+.DS_Store
+legacy/бот/__pycache__/
+.dev/

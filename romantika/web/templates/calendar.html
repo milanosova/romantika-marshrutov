@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Календарь цолькин{% endblock %}
+{% block body_class %}night{% endblock %}
+{% block content %}
+<header class="hero">
+  <p class="eyebrow">Романтика маршрутов{% if season %} · {{ season.title }}{% endif %}</p>
+  <h1>Твой день по цолькину</h1>
+  <p class="muted">Цолькин — священный календарь майя на 260 дней: 13 чисел и 20 знаков. Этот счёт в Гватемале ведут непрерывно до сих пор.</p>
+</header>
+
+<section class="card day">
+  <p class="eyebrow">Сегодня · {{ today.strftime('%d.%m.%Y') }}</p>
+  <h2>{{ today_tzolkin.number }} {{ today_tzolkin.sign.name }} <span class="muted">· {{ today_tzolkin.sign.symbol }}</span></h2>
+  <p class="advice">{{ today_tzolkin.sign.day_advice }}</p>
+</section>
+
+<section class="card">
+  <form id="birth" class="birth" autocomplete="off">
+    <label>День <select name="d" id="d"></select></label>
+    <label>Месяц <select name="m" id="m"></select></label>
+    <label>Год <select name="y" id="y"></select></label>
+    <button type="submit" class="btn">Узнать свой день</button>
+  </form>
+  <p class="note">Счёт дней настоящий — тот же, которым пользуются исследователи майя. А вот толкования дописаны уже в наше время, так что это игра, а не пророчество.</p>
+  <div id="result" class="result" hidden></div>
+</section>
+
+<section class="card">
+  <h2>Двадцать знаков</h2>
+  <ul class="signs" id="signs">
+    {% for s in payload.signs %}
+    <li><span>{{ s.emoji }}</span><span><span class="name">{{ s.name }}</span> <span class="muted">· {{ s.symbol }}</span><br><span class="muted">{{ s.short or s.meaning }}</span></span></li>
+    {% endfor %}
+  </ul>
+</section>
+
+<footer class="actions">
+  {% if settings.bot_username %}<a class="btn" href="https://t.me/{{ settings.bot_username }}">Открыть бота</a>{% endif %}
+</footer>
+{% endblock %}
+{% block scripts %}
+<script id="tzolkin-data" type="application/json">{{ payload | tojson }}</script>
+<script src="/static/calendar.js?v={{ asset_version }}" defer></script>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Админка · Романтика маршрутов{% endblock %}
+{% block body_class %}app-body{% endblock %}
+{% block content %}
+<div id="app" class="app admin">
+  <div id="screen" class="screen">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+  <nav class="tabbar" id="tabbar" hidden>
+    <button data-tab="week"><span class="ico">📊</span><span class="lbl">Неделя</span></button>
+    <button data-tab="people"><span class="ico">👥</span><span class="lbl">Люди</span></button>
+    <button data-tab="letters"><span class="ico">✉️</span><span class="lbl">Письма</span><span class="badge" hidden></span></button>
+    <button data-tab="content"><span class="ico">✏️</span><span class="lbl">Задания</span></button>
+    <button data-tab="more"><span class="ico">⋯</span><span class="lbl">Ещё</span></button>
+  </nav>
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-panel">
+      <div class="sheet-head"><button class="sheet-close" id="sheet-close" aria-label="Закрыть">✕</button><div id="sheet-title" class="sheet-title"></div></div>
+      <div id="sheet-body" class="sheet-body"></div>
+    </div>
+  </div>
+  <p id="toast" class="toast" hidden></p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/admin.js?v={{ asset_version }}" defer></script>{% endblock %}

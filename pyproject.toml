@@ -1,0 +1,91 @@
+[project]
+name = "romantika"
+version = "0.1.0"
+description = "Romantika Marshrutov: Telegram bot, Mini Apps and season journal"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "sqlalchemy[asyncio]>=2.0.36,<3",
+    "asyncpg>=0.30,<0.31",
+    "alembic>=1.14,<2",
+    "pydantic-settings>=2.6,<3",
+    "aiogram>=3.15,<4",
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.32,<1",
+    "jinja2>=3.1,<4",
+    "httpx>=0.27,<1",
+    "weasyprint>=63,<70",
+    "structlog>=24.4,<26",
+    "tzdata>=2024.2",
+    "aiohttp-socks>=0.9,<1",
+    "python-multipart>=0.0.32",
+]
+
+[project.optional-dependencies]
+dev = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3,<9",
+    "pytest-asyncio>=0.24,<1",
+    "testcontainers[postgres]>=4.8,<5",
+    "ruff>=0.8,<1",
+    "mypy>=1.13,<2",
+    "pypdf>=5.1,<6",
+    "pyyaml>=6,<7",
+    "types-pyyaml>=6.0.12.20260815",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["romantika"]
+
+# The season and tzolkin content is data the running app reads, so it has to travel inside
+# the wheel (the Docker image installs the package, not the repository). It keeps living in
+# `data/` at the root of the repository and lands in `romantika/data/` when built. Only the
+# content files are listed: `data/` also holds runtime data (media, backups, postgres) that
+# must never be baked into the wheel.
+[tool.hatch.build.targets.wheel.force-include]
+"data/tzolkin.json" = "romantika/data/tzolkin.json"
+"data/seasons" = "romantika/data/seasons"
+
+[tool.hatch.build.targets.sdist]
+include = ["romantika", "data", "alembic.ini", "Makefile", "tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["legacy"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/acceptance/*" = ["E501", "C420"]
+"romantika/db/migrations/versions/*" = ["E501"]
+
+[tool.ruff.format]
+exclude = ["tests/acceptance/*", "legacy/*"]
+
+[tool.mypy]
+python_version = "3.12"
+# The pydantic plugin knows a `BaseSettings` field with no default is filled from the
+# environment, so `Settings()` stays a valid call even though `media_dir` is required.
+plugins = ["pydantic.mypy"]
+disallow_untyped_defs = true
+warn_return_any = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+strict_equality = true
+ignore_missing_imports = true
+exclude = ["legacy/", "romantika/db/migrations/versions/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

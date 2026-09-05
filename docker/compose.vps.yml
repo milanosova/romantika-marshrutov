@@ -1,0 +1,39 @@
+# VPS overlay (Hostkey, Moscow): Telegram is reachable only through the xray proxy on the host
+# (host.docker.internal:10809); PyPI/apt at build time go through the same proxy via build args
+# (scripts/deploy.sh). CPU/memory limits keep the shared server under the hoster's 70% rule.
+x-proxy-env: &proxy-env
+  HTTP_PROXY: http://host.docker.internal:10809
+  HTTPS_PROXY: http://host.docker.internal:10809
+  NO_PROXY: localhost,127.0.0.1,db,web,worker,bot,host.docker.internal
+
+x-hdi: &hdi
+  - "host.docker.internal:host-gateway"
+
+services:
+  db:
+    cpus: 0.5
+    mem_limit: 512m
+
+  migrate:
+    cpus: 0.5
+    mem_limit: 256m
+
+  bot:
+    extra_hosts: *hdi
+    environment: *proxy-env
+    cpus: 0.5
+    mem_limit: 256m
+
+  web:
+    cpus: 0.5
+    mem_limit: 384m
+
+  worker:
+    extra_hosts: *hdi
+    environment: *proxy-env
+    cpus: 0.5
+    mem_limit: 512m
+
+  backup:
+    cpus: 0.25
+    mem_limit: 256m

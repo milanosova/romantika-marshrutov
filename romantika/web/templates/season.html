@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}{% if season %}Сезон · {{ season.title }}{% else %}Романтика маршрутов{% endif %}{% endblock %}
+{% block content %}
+<header class="hero">
+  <p class="eyebrow">Романтика маршрутов</p>
+  {% if season %}
+  <h1>{{ season.title }}</h1>
+  <p class="muted">{{ season.starts_on.strftime('%d.%m') }} — {{ season.ends_on.strftime('%d.%m.%Y') }} · {{ weeks_total }} недель</p>
+  <div class="progress" aria-label="Прогресс сезона">
+    {% for w in range(weeks_total) %}
+      {% set n = w + 1 %}
+      <span class="seg {% if n <= passed %}done{% elif current and n == current.number %}now{% endif %}"></span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <h1>Сезон ещё не начался</h1>
+  <p class="muted">Как только рандомайзер выберет страну — здесь появятся недели.</p>
+  {% endif %}
+</header>
+
+{% if season and tzolkin %}
+<section class="card day">
+  <p class="eyebrow">Сегодня в цолькине · {{ today.strftime('%d.%m') }}</p>
+  <h2>{{ tzolkin.number }} {{ tzolkin.sign.name }} <span class="muted">· {{ tzolkin.sign.symbol }}</span></h2>
+  <p class="advice">{{ tzolkin.sign.day_advice }}</p>
+  {% if season.daily_note %}<p class="note">{{ season.daily_note }}</p>{% endif %}
+  <a class="btn ghost" href="/calendar">Узнать свой день →</a>
+</section>
+{% endif %}
+
+{% if season %}
+<section class="weeks">
+  {% for w in released %}
+  <article class="card week {% if current and w.number == current.number %}current{% endif %}">
+    <p class="eyebrow">Неделя {{ w.number }} · {{ w.starts_on.strftime('%d.%m') }}–{{ w.ends_on.strftime('%d.%m') }}{% if current and w.number == current.number %} · идёт сейчас{% endif %}</p>
+    <h2>{{ w.title }}</h2>
+    {% if w.intro %}<p>{{ w.intro }}</p>{% endif %}
+    <dl>
+      <dt>Минимум</dt><dd>{{ w.task_min }}</dd>
+      {% if w.task_max %}<dt>Максимум</dt><dd>{{ w.task_max }}</dd>{% endif %}
+    </dl>
+    {% if w.word %}<p class="word"><b>Слово недели:</b> {{ w.word }}{% if w.word_ru %} · {{ w.word_ru }}{% endif %}{% if w.word_meaning %} — {{ w.word_meaning }}{% endif %}</p>{% endif %}
+  </article>
+  {% endfor %}
+  {% if ahead %}
+  <article class="card locked">
+    <h2>Впереди ещё {{ ahead }} {% if ahead % 10 == 1 and ahead % 100 != 11 %}неделя{% elif 2 <= ahead % 10 <= 4 and not (12 <= ahead % 100 <= 14) %}недели{% else %}недель{% endif %}</h2>
+    <p class="muted">Каждая открывается в понедельник, вместе с постом в канале. До этого дня её не знает никто.</p>
+  </article>
+  {% endif %}
+</section>
+
+{% if catalogue %}
+<section class="card">
+  <h2>Ачивки сезона</h2>
+  <p class="muted">Выдаются руками, за поступок, а не за посещаемость.</p>
+  <ul class="badges">
+    {% for a in catalogue %}<li><span class="emoji">{{ a.emoji }}</span> <b>{{ a.name }}</b> — {{ a.description }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endif %}
+
+<footer class="actions">
+  {% if settings.bot_username %}<a class="btn" href="https://t.me/{{ settings.bot_username }}">Открыть бота</a>{% endif %}
+  {% if settings.channel_url %}<a class="btn ghost" href="{{ settings.channel_url }}">Читать канал</a>{% endif %}
+</footer>
+{% endblock %}

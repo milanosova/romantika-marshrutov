@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Романтика маршрутов{% endblock %}
+{% block body_class %}app-body{% endblock %}
+{% block content %}
+<div id="app" class="app" data-tab="{{ tab }}" data-bot="{{ settings.bot_username }}">
+  <div id="screen" class="screen">
+    <div class="loading"><div class="spinner"></div></div>
+  </div>
+  <nav class="tabbar" id="tabbar" hidden>
+    <button data-tab="today"><span class="ico">📋</span><span class="lbl">Сегодня</span></button>
+    <button data-tab="passport"><span class="ico">📘</span><span class="lbl">Паспорт</span></button>
+    <button data-tab="journal"><span class="ico">📔</span><span class="lbl">Журнал</span></button>
+    <button data-tab="words"><span class="ico">📖</span><span class="lbl">Словарь</span></button>
+    <button data-tab="more"><span class="ico">⋯</span><span class="lbl">Ещё</span></button>
+  </nav>
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-panel">
+      <div class="sheet-head"><button class="sheet-close" id="sheet-close" aria-label="Закрыть">✕</button><div id="sheet-title" class="sheet-title"></div></div>
+      <div id="sheet-body" class="sheet-body"></div>
+    </div>
+  </div>
+  <p id="toast" class="toast" hidden></p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/app.js?v={{ asset_version }}" defer></script>{% endblock %}
