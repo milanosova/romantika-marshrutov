@@ -17,10 +17,38 @@ Operations guide for the person who runs the stack (English; the owner's guide i
   reads it via `TELEGRAM_PROXY`/`HTTPS_PROXY` (`romantika/bot/factory.py`, needs `aiohttp-socks`).
 - Season content: `rc exec -T bot python -m romantika.ops.seed --activate` (idempotent).
 
+## Access
+
+- Host `77.91.92.61` (Hostkey, Moscow). The VPS is shared with other stacks: touch only
+  `/opt/stacks/romantika` and the `romantika-*` containers. Work as the user `romantika`
+  (member of `docker`, no sudo, key-only login); `docker` membership is root-equivalent on the
+  host, so the key is as sensitive as a root key.
+- `~/.ssh/config` on the machine that deploys (the private key stays outside any repository,
+  `chmod 600`):
+
+  ```
+  Host romantika-vps
+    HostName 77.91.92.61
+    User romantika
+    IdentityFile ~/.ssh/romantika_vps_ed25519
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-romantika-%p
+    ControlPersist 600
+  ```
+
+  `ssh romantika-vps 'docker ps --format "{{.Names}}"'` lists the `romantika-*` containers.
+  fail2ban is on: reuse the connection (ControlMaster above) instead of reconnecting in a loop.
+- Keys are handed over in person by the person who runs the VPS (Dima). A lost key is removed
+  from `/home/romantika/.ssh/authorized_keys`; nothing else changes.
+- Secrets live only in `/opt/stacks/romantika/.env` on the VPS (owner `romantika`, chmod 600).
+  Nobody needs them locally: the local stand runs on the fake Bot API, tests on testcontainers.
+- Host level (cloudflared tunnel, xray proxy, the backup copy to the Mac) is run by Dima and is
+  not touched from the project.
+
 ## Deploy
 
 ```bash
-scripts/deploy.sh                 # from the repo root on the Mac
+scripts/deploy.sh                 # from the repo root, as the romantika user (see Access)
 DRY=1 scripts/deploy.sh           # see what rsync would send
 ```
 
@@ -122,8 +150,10 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
 2. `/release-check` in Claude Code (verifier + code/security/data reviewers over the diff).
 3. `DRY=1 scripts/deploy.sh` — nothing unexpected in the file list.
 4. Migrations reviewed: additive, reversible, no data loss.
-5. `scripts/deploy.sh`; watch `rc logs -f bot worker` for two minutes; open the Mini App.
-6. Note the release in `docs/CHANGELOG.md` (what changed for participants, for Mila).
+5. `scripts/deploy.sh`; `healthz` says `"status":"ok"`; watch `rc logs -f bot worker web` for two
+   minutes; open the bot and the Mini App once.
+6. Note the release in `docs/CHANGELOG.md` (what changed for participants, for Mila); merge
+   into `master` and push.
 
 ## Rollback
 

@@ -8,6 +8,11 @@ mount is read-write now; `/healthz` reports `media` and answers 503 when the dir
 writable, so the compose healthcheck and the deploy smoke catch it before people do; the
 upload cleanup no longer hides the original error in the log.
 
+For the people who change the code: `master` of the owner's repository is now the trunk;
+`CLAUDE.md` describes the change loop (branch → `make check` → critics on the local stand →
+data review gate → deploy → report), and `docs/RUNBOOK.md` «Access» how the VPS is reached
+(the `romantika` user; `scripts/deploy.sh` refuses to run as anyone else).
+
 ## v2.1.0 — 2026-09-05 (Mini App round two, new bot)
 
 For participants: reports can be edited in the app while the week is open (text and files;

@@ -4,16 +4,19 @@
 #
 #   scripts/deploy.sh            # full deploy
 #   DRY=1 scripts/deploy.sh      # only show what rsync would send
-#   HOST=vps247 DEST=/opt/stacks/romantika scripts/deploy.sh
+#   HOST=romantika-vps DEST=/opt/stacks/romantika scripts/deploy.sh
+#
+# Always as the `romantika` user (docs/RUNBOOK.md «Access»): the stack directory belongs to it,
+# and a deploy as root would leave root-owned files that the next deploy cannot replace.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-HOST="${HOST:-vps247}"
+HOST="${HOST:-romantika-vps}"
 DEST="${DEST:-/opt/stacks/romantika}"
 PROXY="${BUILD_PROXY:-http://172.17.0.1:10809}"
 COMPOSE="docker compose -f docker/compose.yml -f docker/compose.vps.yml --project-directory ."
 
-RSYNC_OPTS=(-az --delete
+RSYNC_OPTS=(-az --delete --no-owner --no-group
   --exclude .git --exclude .venv --exclude .dev --exclude data/media --exclude data/backups --exclude data/postgres --exclude .env --exclude '.env.*' --exclude legacy
   --exclude __pycache__ --exclude .pytest_cache --exclude .mypy_cache --exclude .ruff_cache
   --exclude '*.sqlite' --exclude journals --exclude .playwright-mcp)
@@ -22,6 +25,7 @@ if [ "${DRY:-0}" = "1" ]; then
   exit 0
 fi
 
+[ "$(ssh "$HOST" id -un)" = romantika ] || { echo "deploy as the romantika user, not $(ssh "$HOST" id -un) — see docs/RUNBOOK.md «Access»"; exit 1; }
 ssh "$HOST" "mkdir -p '$DEST/data/backups'"
 rsync "${RSYNC_OPTS[@]}" ./ "$HOST:$DEST/"
 
