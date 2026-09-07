@@ -38,8 +38,10 @@ Operations guide for the person who runs the stack (English; the owner's guide i
 
   `ssh romantika-vps 'docker ps --format "{{.Names}}"'` lists the `romantika-*` containers.
   fail2ban is on: reuse the connection (ControlMaster above) instead of reconnecting in a loop.
-- Keys are handed over in person by the person who runs the VPS (Dima). A lost key is removed
-  from `/home/romantika/.ssh/authorized_keys`; nothing else changes.
+- Each person generates their own key pair (`docs/GUIDE-RU.md` «Доступ Claude к серверу») and
+  sends the public half to the person who runs the VPS (Dima), who appends it to
+  `/home/romantika/.ssh/authorized_keys`. A lost key is removed from that file; nothing else
+  changes. Private keys never travel: not in chats, not in the repository.
 - Secrets live only in `/opt/stacks/romantika/.env` on the VPS (owner `romantika`, chmod 600).
   Nobody needs them locally: the local stand runs on the fake Bot API, tests on testcontainers.
 - Host level (cloudflared tunnel, xray proxy, the backup copy to the Mac) is run by Dima and is
