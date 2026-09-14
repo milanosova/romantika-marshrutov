@@ -72,6 +72,67 @@ async def edit_week(
     return _admin_week(week, today)
 
 
+def _calendar_error(exc: content.ContentError) -> HTTPException:
+    """Calendar refusals are conflicts (409); a missing week is 404."""
+    code = status.HTTP_404_NOT_FOUND if "does not exist" in str(exc) else status.HTTP_409_CONFLICT
+    return HTTPException(code, str(exc))
+
+
+@router.post("/weeks", response_model=schemas.AdminWeekOut, status_code=status.HTTP_201_CREATED)
+async def create_week(
+    body: schemas.WeekCreate, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
+) -> schemas.AdminWeekOut:
+    texts = {k: v for k, v in body.model_dump().items() if k in content.EDITABLE_WEEK_FIELDS}
+    try:
+        week = await content.create_week(
+            session,
+            actor_id=admin.user.id,
+            season_id=season.id,
+            number=body.number,
+            starts_on=body.starts_on,
+            ends_on=body.ends_on,
+            today=today,
+            texts=texts,
+        )
+    except content.ContentError as exc:
+        raise _calendar_error(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return _admin_week(week, today)
+
+
+@router.patch("/weeks/{week_id}/calendar", response_model=schemas.AdminWeekOut)
+async def move_week(
+    week_id: int, body: schemas.WeekMove, admin: AdminDep, session: SessionDep, today: TodayDep
+) -> schemas.AdminWeekOut:
+    if body.number is None and body.starts_on is None and body.ends_on is None:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "nothing to change")
+    try:
+        week = await content.move_week(
+            session,
+            actor_id=admin.user.id,
+            week_id=week_id,
+            today=today,
+            number=body.number,
+            starts_on=body.starts_on,
+            ends_on=body.ends_on,
+        )
+    except content.ContentError as exc:
+        raise _calendar_error(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return _admin_week(week, today)
+
+
+@router.delete("/weeks/{week_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_week(week_id: int, admin: AdminDep, session: SessionDep, today: TodayDep) -> Response:
+    try:
+        await content.delete_week(session, actor_id=admin.user.id, week_id=week_id, today=today)
+    except content.ContentError as exc:
+        raise _calendar_error(exc) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/achievement-types", response_model=list[schemas.AchievementTypeOut])
 async def achievement_types(_: AdminDep, session: SessionDep, season: SeasonDep) -> list[schemas.AchievementTypeOut]:
     return [

@@ -128,7 +128,8 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
         )
     stamped: dict[int, JournalWeek] = {week.number: week for week in view.weeks}
     grid = []
-    for number in range(1, view.weeks_total + 1):
+    # The season's real numbers, not 1..N: a deleted or inserted week must not shift the cells.
+    for number in view.week_numbers or range(1, view.weeks_total + 1):
         entry = stamped.get(number)
         if entry is not None:
             mark, state = ("★", "star") if entry.level is StampLevel.MAX else ("✓", "ok")

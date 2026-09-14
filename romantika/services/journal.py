@@ -63,6 +63,8 @@ class JournalView:
     facts: list[FactDTO]
     wish: str | None
     weeks_total: int = 0
+    week_numbers: list[int] = field(default_factory=list)
+    """Every week of the season in order. Numbers need not be dense: Mila adds and deletes weeks."""
     season_words: list[WeekWord] = field(default_factory=list)
     """Words of the weeks that have started, for the «Словарик сезона» block."""
     level: Level | None = None
@@ -110,6 +112,7 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
         facts=await facts.list_active(session, season_id),
         wish=await wishes.get_wish(session, season_id, user_id),
         weeks_total=len(weeks),
+        week_numbers=sorted(weeks),
         season_words=(await words.season_dictionary(session, season_id, today=today)).week_words,
     )
 

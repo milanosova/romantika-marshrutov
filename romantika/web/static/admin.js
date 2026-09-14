@@ -236,16 +236,65 @@
 
   function renderContent() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; прошедшие недели не редактируются — люди их уже прожили.</p></header>
-      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>`;
+      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>
+      <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
+      <p class="note">Новая неделя — только в будущее и только в свободные даты. Тексты можно дописать потом.</p>`;
     screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));
+    $("week-add").addEventListener("click", openWeekCreator);
+  }
+
+  // Add a week after the last one: the defaults are the next free Monday–Sunday and the next number.
+  function openWeekCreator() {
+    const last = state.weeks[state.weeks.length - 1];
+    const after = last ? new Date(last.ends_on + "T12:00:00") : new Date();
+    const nextMonday = new Date(after);
+    nextMonday.setDate(after.getDate() + ((8 - after.getDay()) % 7 || 7)); // strictly after `after`
+    const sunday = new Date(nextMonday); sunday.setDate(nextMonday.getDate() + 6);
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const number = last ? last.number + 1 : 1;
+    openSheet("Новая неделя", `<form class="stack" id="week-new">
+      <label>Номер<input name="number" type="number" min="1" value="${number}"></label>
+      <div class="row"><label style="flex:1">Начало<input name="starts_on" type="date" value="${iso(nextMonday)}"></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${iso(sunday)}"></label></div>
+      <label>Название<input name="title" placeholder="Можно оставить пустым и вписать позже"></label>
+      <button class="btn block" type="submit">Добавить</button>
+      <p class="note">Вступление, минимум, максимум и слово — потом, в карточке недели.</p></form>`, () => {
+      $("week-new").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = $("week-new").elements;
+        if (!f.number.value || !f.starts_on.value || !f.ends_on.value) return RM.toast("Нужны номер и обе даты");
+        const body = { number: +f.number.value, starts_on: f.starts_on.value, ends_on: f.ends_on.value, title: f.title.value };
+        try {
+          const w = await RM.api("/api/admin/weeks", { method: "POST", body });
+          state.weeks.push(w); state.weeks.sort((a, b) => a.number - b.number);
+          RM.haptic("success"); RM.toast("Добавила"); closeSheet(); renderContent();
+        } catch (err) { RM.toast(calendarError(err), 4500); }
+      });
+    });
+  }
+
+  // The API names the rule it refused; here it is said the way Mila would say it.
+  function calendarError(err) {
+    const m = String(err && err.message || "");
+    if (/overlaps/.test(m)) return "Эти даты заняты другой неделей";
+    if (/already taken/.test(m)) return "Такой номер недели уже есть";
+    if (/not after today/.test(m)) return "Новую неделю можно ставить только на будущее";
+    if (/frozen/.test(m)) return "Неделя уже началась — даты не меняются";
+    if (/participant data/.test(m)) return "По этой неделе уже есть штампы или отчёты — её нельзя удалить";
+    if (/before it starts/.test(m)) return "Конец недели раньше её начала";
+    if (/is not deleted/.test(m)) return "Неделя уже началась — её нельзя удалить";
+    if (/does not exist/.test(m)) return "Такой недели уже нет — обнови список";
+    return "Не получилось: " + m;
   }
 
   function openWeekEditor(id) {
     const w = state.weeks.find((x) => x.id === id);
     const past = w.state === "stamped";
-    openSheet(`Неделя ${w.number}`, `<p class="muted small">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${past ? " · прошла, только чтение" : ""}</p>
+    const future = w.state === "locked"; // the calendar moves only before the week starts (DOMAIN §1)
+    openSheet(`Неделя ${w.number}`, `<p class="muted small">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${past ? " · прошла, только чтение" : future ? "" : " · идёт, даты заморожены"}</p>
+      ${future ? `<form class="stack" id="week-cal"><div class="row"><label style="flex:0 0 72px">Номер<input name="number" type="number" min="1" value="${w.number}"></label><label style="flex:1">Начало<input name="starts_on" type="date" value="${w.starts_on}"></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${w.ends_on}"></label></div><button class="btn soft small" type="submit">Переставить</button></form>` : ""}
       <form class="stack" id="week-form">${FIELDS.map(([f, label, kind]) => `<label>${label}${kind === "textarea" ? `<textarea name="${f}" ${past ? "readonly" : ""}>${esc(w[f])}</textarea>` : `<input name="${f}" value="${esc(w[f])}" ${past ? "readonly" : ""}>`}</label>`).join("")}
-      ${past ? "" : `<button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.</p>`}</form>`, () => {
+      ${past ? "" : `<button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.</p>`}</form>
+      ${future ? `<button class="btn soft small danger" id="week-del" style="margin-top:16px">Удалить неделю</button><p class="note">Удалить можно только неделю, по которой ещё ничего нет — ни штампов, ни отчётов.</p>` : ""}`, () => {
       $("week-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const body = {};
@@ -253,6 +302,32 @@
         if (!Object.keys(body).length) return RM.toast("Ничего не изменилось");
         try { Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}`, { method: "PUT", body })); RM.haptic("success"); RM.toast("Сохранила"); closeSheet(); renderContent(); }
         catch (err) { RM.toast("Не сохранилось: " + err.message); }
+      });
+      if ($("week-cal")) $("week-cal").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const f = $("week-cal").elements;
+        const body = {};
+        if (+f.number.value !== w.number) body.number = +f.number.value;
+        if (f.starts_on.value !== w.starts_on) body.starts_on = f.starts_on.value;
+        if (f.ends_on.value !== w.ends_on) body.ends_on = f.ends_on.value;
+        if (!Object.keys(body).length) return RM.toast("Ничего не изменилось");
+        // Texts typed into the same sheet are not lost: they are saved first, then the calendar moves.
+        const texts = {};
+        FIELDS.forEach(([k]) => { const v = $("week-form").elements[k].value; if (v !== w[k]) texts[k] = v; });
+        try {
+          if (Object.keys(texts).length) Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}`, { method: "PUT", body: texts }));
+          Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}/calendar`, { method: "PATCH", body }));
+          state.weeks.sort((a, b) => a.number - b.number);
+          RM.haptic("success"); RM.toast(Object.keys(texts).length ? "Сохранила и переставила" : "Переставила"); closeSheet(); renderContent();
+        } catch (err) { RM.toast(calendarError(err), 4500); }
+      });
+      if ($("week-del")) $("week-del").addEventListener("click", async () => {
+        if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${w.title}»` : ""}? Это записывается в «Изменения».`))) return;
+        try {
+          await RM.api(`/api/admin/weeks/${w.id}`, { method: "DELETE" });
+          state.weeks = state.weeks.filter((x) => x.id !== w.id);
+          RM.haptic("success"); RM.toast("Удалила"); closeSheet(); renderContent();
+        } catch (err) { RM.toast(calendarError(err), 4500); }
       });
     });
   }
@@ -308,18 +383,26 @@
     try { rows = await RM.api("/api/admin/audit?limit=100"); } catch (e) { $("audit").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     $("audit").innerHTML = rows.length ? rows.map((r) => `<div class="audit-row" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><b>${esc(auditAction(r))}</b> <span class="muted">· ${esc(r.actor_name || (r.actor_id ? "участник " + r.actor_id : "бот"))} · ${RM.fmtDateTime(r.created_at)}</span></div><div class="diff">${diff(r.before, r.after)}</div></div>`).join("") : `<p class="muted">Изменений пока нет.</p>`;
   }
-  const AUDIT_ACTIONS = { "week.update": "Неделя изменена", "stamp.set": "Штамп поставлен вручную", "stamp.clear": "Штамп снят", "stamp.override": "Отчёт поднял ручной штамп", "fact.delete": "Факт убран", "season.activate": "Сезон включён", "report.edit": "Отчёт поправлен", "wish.set": "Пожелание записано" };
+  const AUDIT_ACTIONS = { "week.update": "Неделя изменена", "week.create": "Неделя добавлена", "week.move": "Неделя переставлена", "week.delete": "Неделя удалена", "stamp.set": "Штамп поставлен вручную", "stamp.clear": "Штамп снят", "stamp.override": "Отчёт поднял ручной штамп", "fact.delete": "Факт убран", "season.activate": "Сезон включён", "report.edit": "Отчёт поправлен", "wish.set": "Пожелание записано" };
   const AUDIT_ENTITIES = { week: "неделя", stamp: "штамп", fact: "факт", season: "сезон", report: "отчёт", wish: "пожелание" };
-  const AUDIT_FIELDS = { title: "название", intro: "вступление", task_min: "минимум", task_max: "максимум", word: "слово недели", word_ru: "транскрипция", word_meaning: "значение слова", level: "уровень", source: "источник", text: "текст", cleared_reports: "отчёты без штампа", added: "добавлено файлов", removed: "убрано файлов", edit_key: "ключ правки", note: "заметка", post_url: "ссылка на пост" };
+  const AUDIT_FIELDS = { number: "номер", starts_on: "начало", ends_on: "конец", title: "название", intro: "вступление", task_min: "минимум", task_max: "максимум", word: "слово недели", word_ru: "транскрипция", word_meaning: "значение слова", level: "уровень", source: "источник", text: "текст", cleared_reports: "отчёты без штампа", added: "добавлено файлов", removed: "убрано файлов", edit_key: "ключ правки", note: "заметка", post_url: "ссылка на пост" };
   const AUDIT_VALUES = { max: "⭐ максимум", min: "✅ минимум", admin: "вручную", report: "по отчёту" };
+  // A week row is named by its number, never by the database id: the id is meaningless to Mila.
+  function weekLabel(r) {
+    const snap = (r.after && r.after.number != null) ? r.after : (r.before && r.before.number != null) ? r.before : null;
+    const number = snap ? snap.number : (state.weeks.find((w) => String(w.id) === String(r.entity_id)) || {}).number;
+    return number != null ? `неделя ${number}` : "неделя";
+  }
   function auditAction(r) {
     const key = r.entity + "." + r.action;
-    const what = r.entity === "stamp" && r.entity_id ? `неделя ${String(r.entity_id).split(":")[1] || r.entity_id}` : r.entity_id ? `${AUDIT_ENTITIES[r.entity] || r.entity} ${r.entity_id}` : "";
+    const what = r.entity === "stamp" && r.entity_id ? `неделя ${String(r.entity_id).split(":")[1] || r.entity_id}` : r.entity === "week" ? weekLabel(r) : r.entity_id ? `${AUDIT_ENTITIES[r.entity] || r.entity} ${r.entity_id}` : "";
     return (AUDIT_ACTIONS[key] || key) + (what ? ` · ${what}` : "");
   }
+  const FIELD_ORDER = Object.keys(AUDIT_FIELDS);
   function diff(before, after) {
-    const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => k !== "edit_key");
-    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || short(v);
+    const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => k !== "edit_key")
+      .sort((a, b) => (FIELD_ORDER.indexOf(a) + 1 || 999) - (FIELD_ORDER.indexOf(b) + 1 || 999));
+    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || (v === "" ? "—" : short(v));
     return keys.map((k) => `${esc(AUDIT_FIELDS[k] || k)}: ${esc(value((before || {})[k]))} → ${esc(value((after || {})[k]))}`).join("\n") || "—";
   }
   function short(v) { const s = v == null ? "—" : typeof v === "string" ? v : JSON.stringify(v); return s.length > 140 ? s.slice(0, 140) + "…" : s; }

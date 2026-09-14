@@ -72,9 +72,9 @@ async def season_page(request: Request, session: SessionDep, settings: SettingsD
         weeks = await content.weeks(session, season.id)
         released = [w for w in weeks if w.starts_on <= today]
         context.update(
+            weeks=weeks,
             weeks_total=len(weeks),
             released=released,
-            passed=sum(1 for w in weeks if w.ends_on < today),
             current=next((w for w in weeks if w.starts_on <= today <= w.ends_on), None),
             ahead=len(weeks) - len(released),
             catalogue=await achievements.catalogue(session, season.id),

@@ -141,6 +141,33 @@ class WeekEdit(BaseModel):
     word_meaning: str | None = None
 
 
+class WeekCreate(BaseModel):
+    """A new week in the future of the season; texts are optional and may come later."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    number: int = Field(ge=1)
+    starts_on: date
+    ends_on: date
+    title: str = ""
+    intro: str = ""
+    task_min: str = ""
+    task_max: str = ""
+    word: str = ""
+    word_ru: str = ""
+    word_meaning: str = ""
+
+
+class WeekMove(BaseModel):
+    """New number or dates for a week that has not started; omitted fields stay."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    number: int | None = Field(default=None, ge=1)
+    starts_on: date | None = None
+    ends_on: date | None = None
+
+
 class AdminWeekOut(WeekOut):
     pass
 

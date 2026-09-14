@@ -7,9 +7,8 @@
   <h1>{{ season.title }}</h1>
   <p class="muted">{{ season.starts_on.strftime('%d.%m') }} — {{ season.ends_on.strftime('%d.%m.%Y') }} · {{ weeks_total }} недель</p>
   <div class="progress" aria-label="Прогресс сезона">
-    {% for w in range(weeks_total) %}
-      {% set n = w + 1 %}
-      <span class="seg {% if n <= passed %}done{% elif current and n == current.number %}now{% endif %}"></span>
+    {% for w in weeks %}
+      <span class="seg {% if w.ends_on < today %}done{% elif current and w.number == current.number %}now{% endif %}"></span>
     {% endfor %}
   </div>
   {% else %}

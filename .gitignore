@@ -16,3 +16,7 @@ journals/
 .DS_Store
 legacy/бот/__pycache__/
 .dev/
+
+# The owner's legacy working folder on her Mac: token, admin id, old sqlite, journals.
+бот/
+index (1).html

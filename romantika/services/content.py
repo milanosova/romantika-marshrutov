@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import exists, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
@@ -257,6 +258,185 @@ async def update_week(
         )
     await session.flush()
     return _week_dto(row)
+
+
+# --- calendar: add, move, delete (DOMAIN §1, «недели буду делать сама») -----------
+
+
+def _week_started(row: models.Week, today: date) -> bool:
+    return row.starts_on <= today
+
+
+def _week_row_snapshot(row: models.Week) -> dict[str, Any]:
+    return {
+        "number": row.number,
+        "title": row.title,
+        "starts_on": row.starts_on.isoformat(),
+        "ends_on": row.ends_on.isoformat(),
+        "intro": row.intro,
+        "task_min": row.task_min,
+        "task_max": row.task_max,
+        "word": row.word,
+        "word_ru": row.word_ru,
+        "word_meaning": row.word_meaning,
+    }
+
+
+async def _week_has_participant_data(session: AsyncSession, week_id: int) -> bool:
+    """Anything that points at this week: intents, reports, stamps, words, facts, reply links.
+
+    Deleting a week with any of it would delete participant data (CLAUDE.md rule 1) — or,
+    for `admin_links`, break the routing of Mila's replies. Every FK to `weeks` is listed.
+    """
+    clauses = [
+        exists().where(models.WeekIntent.week_id == week_id),
+        exists().where(models.Report.week_id == week_id),
+        exists().where(models.Stamp.week_id == week_id),
+        exists().where(models.Word.week_id == week_id),
+        exists().where(models.Fact.week_id == week_id),
+        exists().where(models.AdminLink.week_id == week_id),
+    ]
+    return bool(await session.scalar(select(or_(*clauses))))
+
+
+async def create_week(
+    session: AsyncSession,
+    *,
+    actor_id: int | None,
+    season_id: int,
+    number: int,
+    starts_on: date,
+    ends_on: date,
+    today: date,
+    texts: Mapping[str, str] | None = None,
+) -> WeekDTO:
+    """Add a week to a season. Only into the future: `starts_on` after today (Moscow).
+
+    The calendar rules live in the schema (number ≥ 1, ends ≥ starts, no overlap within
+    a season, unique number); here they are turned into a `ContentError` the admin UI can
+    show instead of a 500.
+    """
+    if starts_on <= today:
+        raise ContentError(f"week {number} would start on {starts_on}, not after today ({today})")
+    if ends_on < starts_on:
+        raise ValueError(f"week {number} ends on {ends_on} before it starts on {starts_on}")
+    if number < 1:
+        raise ValueError(f"week number must be ≥ 1, got {number}")
+    unknown = sorted(set(texts or {}) - EDITABLE_WEEK_FIELDS)
+    if unknown:
+        raise ValueError(f"week fields {unknown} are not editable (allowed: {sorted(EDITABLE_WEEK_FIELDS)})")
+
+    fields: dict[str, str] = dict.fromkeys(EDITABLE_WEEK_FIELDS, "")
+    fields.update(texts or {})
+    row = models.Week(season_id=season_id, number=number, starts_on=starts_on, ends_on=ends_on, **fields)
+    try:
+        async with session.begin_nested():
+            session.add(row)
+            await session.flush()
+    except IntegrityError as exc:
+        raise ContentError(_calendar_conflict(exc, number, starts_on, ends_on)) from exc
+    audit(
+        session,
+        actor_id=actor_id,
+        action="create",
+        entity="week",
+        entity_id=str(row.id),
+        before=None,
+        after=_week_row_snapshot(row),
+    )
+    await session.flush()
+    return _week_dto(row)
+
+
+async def move_week(
+    session: AsyncSession,
+    *,
+    actor_id: int | None,
+    week_id: int,
+    today: date,
+    number: int | None = None,
+    starts_on: date | None = None,
+    ends_on: date | None = None,
+) -> WeekDTO:
+    """Change the number or the dates of a week that has not started yet.
+
+    A started week keeps its calendar: the deadline was already named to people. The new
+    dates must also stay in the future for the same reason.
+    """
+    row = await session.get(models.Week, week_id)
+    if row is None:
+        raise ContentError(f"week {week_id} does not exist")
+    if _week_started(row, today):
+        raise ContentError(f"week {row.number} started on {row.starts_on} and its calendar is frozen")
+
+    new_number = row.number if number is None else number
+    new_starts = row.starts_on if starts_on is None else starts_on
+    new_ends = row.ends_on if ends_on is None else ends_on
+    if new_starts <= today:
+        raise ContentError(f"week {new_number} would start on {new_starts}, not after today ({today})")
+    if new_ends < new_starts:
+        raise ValueError(f"week {new_number} ends on {new_ends} before it starts on {new_starts}")
+    if new_number < 1:
+        raise ValueError(f"week number must be ≥ 1, got {new_number}")
+
+    full_before = {"number": row.number, "starts_on": row.starts_on.isoformat(), "ends_on": row.ends_on.isoformat()}
+    full_after = {"number": new_number, "starts_on": new_starts.isoformat(), "ends_on": new_ends.isoformat()}
+    before = {k: v for k, v in full_before.items() if full_after[k] != v}
+    after = {k: v for k, v in full_after.items() if full_before[k] != v}
+    if not after:
+        return _week_dto(row)
+
+    try:
+        async with session.begin_nested():
+            row.number, row.starts_on, row.ends_on = new_number, new_starts, new_ends
+            await session.flush()
+    except IntegrityError as exc:
+        raise ContentError(_calendar_conflict(exc, new_number, new_starts, new_ends)) from exc
+    audit(session, actor_id=actor_id, action="move", entity="week", entity_id=str(week_id), before=before, after=after)
+    await session.flush()
+    return _week_dto(row)
+
+
+async def delete_week(session: AsyncSession, *, actor_id: int | None, week_id: int, today: date) -> None:
+    """Remove a week that has not started and that nobody has touched.
+
+    Participant data is never deleted (CLAUDE.md rule 1), so a week with intents, reports,
+    stamps, words or facts stays; the admin UI says why.
+    """
+    row = await session.get(models.Week, week_id)
+    if row is None:
+        raise ContentError(f"week {week_id} does not exist")
+    if _week_started(row, today):
+        raise ContentError(f"week {row.number} started on {row.starts_on} and is not deleted")
+    if await _week_has_participant_data(session, week_id):
+        raise ContentError(f"week {row.number} has participant data and is not deleted")
+
+    audit(
+        session,
+        actor_id=actor_id,
+        action="delete",
+        entity="week",
+        entity_id=str(week_id),
+        before=_week_row_snapshot(row),
+        after=None,
+    )
+    try:
+        async with session.begin_nested():
+            await session.delete(row)
+            await session.flush()
+    except IntegrityError as exc:
+        raise ContentError(f"week {row.number} is still referenced and is not deleted") from exc
+    await session.flush()
+
+
+def _calendar_conflict(exc: IntegrityError, number: int, starts_on: date, ends_on: date) -> str:
+    """Name the schema rule that refused the calendar change, in words the admin UI can show."""
+    message = str(exc.orig)
+    if "weeks_no_overlap" in message:
+        return f"week {number} ({starts_on}–{ends_on}) overlaps another week of the season"
+    if "uq_weeks_season_id_number" in message:
+        return f"week number {number} is already taken in this season"
+    return f"week {number} ({starts_on}–{ends_on}) breaks a calendar rule: {message.splitlines()[0]}"
 
 
 async def get_setting(session: AsyncSession, key: str, default: str | None = None) -> str | None:

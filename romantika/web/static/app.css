@@ -168,6 +168,7 @@ dd { margin: 0; }
 .btn.soft { background: var(--accent-soft); border-color: transparent; color: var(--ink); }
 .btn.small { padding: 7px 12px; font-size: 13px; border-radius: 10px; }
 .btn.block { width: 100%; }
+.btn.danger { color: var(--tg-theme-destructive-text-color, #c0392b); background: transparent; border-color: currentColor; }
 .btn[disabled] { opacity: 0.5; cursor: default; }
 .btn.link { border: 0; background: none; color: var(--accent); padding: 4px 0; font-weight: 500; }
 .segment { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 10px; }
