@@ -63,7 +63,9 @@
   function renderToday() {
     const h = state.home, w = h.week, t = h.today;
     const dateTitle = new Date(t.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
-    const status = w ? `Неделя ${w.number} из ${h.passport.weeks_total} · дедлайн ${esc(w.deadline)}` : h.next_week_starts_on ? `Между неделями · следующая с ${fmt(h.next_week_starts_on)}` : "Сезон завершён";
+    // The position in the calendar, not the number: numbers may have gaps once Mila edits the season.
+    const position = w ? h.weeks.findIndex((x) => x.id === w.id) + 1 : 0;
+    const status = w ? `Неделя ${w.number} · ${position}-я из ${h.weeks.length} · дедлайн ${esc(w.deadline)}` : h.next_week_starts_on ? `Между неделями · следующая с ${fmt(h.next_week_starts_on)}` : "Сезон завершён";
     let out = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · ${esc(h.season.title)}</p><h1>${esc(capital(dateTitle))}</h1><p class="muted">${status}</p></header>`;
 
     if (w) {

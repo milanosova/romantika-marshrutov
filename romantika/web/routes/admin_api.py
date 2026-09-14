@@ -37,11 +37,17 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 # --- content ------------------------------------------------------------------------
 
 
+@router.get("/season", response_model=schemas.SeasonOut)
+async def active_season(_: AdminDep, season: SeasonDep) -> schemas.SeasonOut:
+    """The season the admin edits: its dates bound every new or moved week."""
+    return views.season_out(season)
+
+
 @router.get("/weeks", response_model=list[schemas.AdminWeekOut])
 async def list_weeks(
     _: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> list[schemas.AdminWeekOut]:
-    return [_admin_week(week, today) for week in await content.weeks(session, season.id)]
+    return [_admin_week(week, today) for week in await content.weeks(session, season.id, include_drafts=True)]
 
 
 def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
@@ -103,7 +109,7 @@ async def create_week(
 
 @router.patch("/weeks/{week_id}/calendar", response_model=schemas.AdminWeekOut)
 async def move_week(
-    week_id: int, body: schemas.WeekMove, admin: AdminDep, session: SessionDep, today: TodayDep
+    week_id: int, body: schemas.WeekMove, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> schemas.AdminWeekOut:
     if body.number is None and body.starts_on is None and body.ends_on is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "nothing to change")
@@ -113,6 +119,7 @@ async def move_week(
             actor_id=admin.user.id,
             week_id=week_id,
             today=today,
+            season_id=season.id,
             number=body.number,
             starts_on=body.starts_on,
             ends_on=body.ends_on,
@@ -125,9 +132,11 @@ async def move_week(
 
 
 @router.delete("/weeks/{week_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_week(week_id: int, admin: AdminDep, session: SessionDep, today: TodayDep) -> Response:
+async def delete_week(
+    week_id: int, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
+) -> Response:
     try:
-        await content.delete_week(session, actor_id=admin.user.id, week_id=week_id, today=today)
+        await content.delete_week(session, actor_id=admin.user.id, week_id=week_id, today=today, season_id=season.id)
     except content.ContentError as exc:
         raise _calendar_error(exc) from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -5,7 +5,7 @@
   <p class="eyebrow">Романтика маршрутов</p>
   {% if season %}
   <h1>{{ season.title }}</h1>
-  <p class="muted">{{ season.starts_on.strftime('%d.%m') }} — {{ season.ends_on.strftime('%d.%m.%Y') }} · {{ weeks_total }} недель</p>
+  <p class="muted">{{ season.starts_on.strftime('%d.%m') }} — {{ season.ends_on.strftime('%d.%m.%Y') }} · {{ weeks_total }} {{ 'неделя' if weeks_total % 10 == 1 and weeks_total % 100 != 11 else ('недели' if 2 <= weeks_total % 10 <= 4 and not 12 <= weeks_total % 100 <= 14 else 'недель') }}</p>
   <div class="progress" aria-label="Прогресс сезона">
     {% for w in weeks %}
       <span class="seg {% if w.ends_on < today %}done{% elif current and w.number == current.number %}now{% endif %}"></span>

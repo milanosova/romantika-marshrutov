@@ -191,7 +191,7 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 | Module | Functions (all `async`, first arg `session`) |
 |---|---|
 | `people` | `upsert_user(session, tg: TelegramUser, *, now) -> UserDTO` (keeps first `joined_at`); `ensure_member(session, season_id, user_id, *, now) -> datetime` (returns existing `joined_at`); `set_dialog_state(session, user_id, state, payload=None, *, now)`, `get_dialog_state(session, user_id, *, now) -> DialogStateDTO | None` (TTL 6 h), `clear_dialog_state(session, user_id)`; `set_intent(session, *, season_id, user_id, week_id, choice: IntentChoice, now)` |
-| `content` | `active_season(session, *, today) -> SeasonDTO | None`; `activate_season(session, season_id, *, actor_id)`; `weeks(session, season_id) -> list[WeekDTO]`; `current_week(session, season_id, *, today) -> WeekDTO | None`; `update_week(session, *, actor_id, week_id, changes: dict[str, str]) -> WeekDTO` (only title/intro/task_min/task_max/word/word_ru/word_meaning; audit row); `get_setting/set_setting(session, key, value)` |
+| `content` | `active_season(session, *, today) -> SeasonDTO | None`; `activate_season(session, season_id, *, actor_id)`; `weeks(session, season_id, *, include_drafts=False) -> list[WeekDTO]` (calendar order; announced weeks only unless `include_drafts`); `is_announced(week) -> bool` (title and task_min non-blank); `current_week(session, season_id, *, today) -> WeekDTO | None` (announced only); `week_by_number(session, season_id, number)` (drafts included); `update_week(session, *, actor_id, week_id, changes: dict[str, str], today=None) -> WeekDTO` (only title/intro/task_min/task_max/word/word_ru/word_meaning; refuses a week that is over; audit row); `create_week(session, *, actor_id, season_id, number, starts_on, ends_on, today, texts=None) -> WeekDTO` (future, inside the season; overlap / taken number → `ContentError`; audit `create`); `move_week(session, *, actor_id, week_id, today, season_id=None, number=None, starts_on=None, ends_on=None) -> WeekDTO` (not-started weeks only; audit `move` with the changed fields); `delete_week(session, *, actor_id, week_id, today, season_id=None)` (not-started, untouched weeks only; audit `delete`); `get_setting/set_setting(session, key, value)` |
 | `reports` | `IncomingFile`, `IncomingMessage` dataclasses; `accept(session, *, season_id, user_id, message, now) -> AcceptResult(report_id, week_number, out_of_week, level, stamp_level, freeze_granted, media_ids)`; `fix_level(session, *, season_id, user_id, week_number, level, now) -> FixResult(ok, stamp_level, reason)`; `cancel(session, *, user_id, report_id, now) -> CancelResult(ok, stamp_level)` |
 | `stamps` | `admin_set(session, *, actor_id, season_id, user_id, week_number, level: StampLevel | None, now) -> StampLevel | None` (audit row) |
 | `freezes` | `grant(session, *, season_id, user_id, reason: FreezeReason, granted_by, now, note=None) -> bool`; `bonus_count(session, season_id, user_id) -> int` |
@@ -311,7 +311,7 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   `GET /api/me`, `GET /api/journal` (passport + weeks + reports + media urls + achievements +
   words + wishes), `POST /api/journal/pdf` (enqueue) / `GET /api/journal/pdf/{job_id}`,
   `GET /media/{media_id}` (auth: owner or admin; `Cache-Control: private`),
-  admin: `GET/PUT /api/admin/seasons/{id}`, `GET/PUT /api/admin/weeks/{id}`,
+  admin: `GET/PUT /api/admin/seasons/{id}`, `GET /api/admin/season`, `GET/POST /api/admin/weeks`, `PUT/DELETE /api/admin/weeks/{id}`, `PATCH /api/admin/weeks/{id}/calendar`,
   `GET/POST/PATCH /api/admin/achievement-types`, `GET/POST/DELETE /api/admin/facts`,
   `GET /api/admin/participants`, `GET /api/admin/participants/{id}`,
   `PUT /api/admin/participants/{id}/stamps/{week}`, `POST .../freezes`, `POST .../achievements`,
@@ -346,8 +346,8 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   `/api/journal/pdf/{job_id}` → `{status, url?}` (403 for other users' jobs).
   `/media/{media_id}` → file bytes with the stored mime, `Cache-Control: private, max-age=3600`;
   401 anonymous, 403 not owner/admin, 404 unknown or hidden.
-- Admin API: `GET /api/admin/weeks` (all weeks of the active season), `PUT /api/admin/weeks/{id}`
-  body = subset of editable fields (422 for anything else), `GET /api/admin/participants`
+- Admin API: `GET /api/admin/season` (the active season's dates), `GET /api/admin/weeks` (all weeks of the active season, drafts included, calendar order), `POST /api/admin/weeks` body `{number, starts_on, ends_on, title?, …}` → 201 (409 overlap / taken number / outside the season / not in the future, 422 malformed), `PUT /api/admin/weeks/{id}`
+  body = subset of editable fields (422 for anything else), `PATCH /api/admin/weeks/{id}/calendar` body `{number?, starts_on?, ends_on?}` → 200 (409 started week or calendar conflict, 404 not in the active season), `DELETE /api/admin/weeks/{id}` → 204 (409 started or referenced, 404 not in the active season), `GET /api/admin/participants`
   (`[{id, first_name, username, joined_at, stamps, level}]`), `GET
   /api/admin/participants/{id}` (`{user, passport, achievements, wish, reports}`), `PUT
   /api/admin/participants/{id}/stamps/{week_number}` body `{level: "min"|"max"|null}` → 200

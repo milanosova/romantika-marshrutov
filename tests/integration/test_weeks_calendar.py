@@ -21,6 +21,15 @@ from tests.integration.test_services_edges import season  # noqa: F401
 from tests.integration.test_web_miniapp import App, app, moscow  # noqa: F401
 
 TODAY = date(2026, 9, 2)  # week 1 (31.08–06.09) is running in the fixture season
+SLOT = (date(2026, 11, 16), date(2026, 11, 18))  # week 12's dates; the season ends 18.11
+
+
+async def _free_last_slot(session: AsyncSession, season_id: int) -> int:
+    """Delete untouched week 12 so its dates are free inside the season; returns its old id."""
+    week12 = await content.week_by_number(session, season_id, 12)
+    assert week12 is not None
+    await content.delete_week(session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY)
+    return week12.id
 
 
 async def _audit(session: AsyncSession, entity_id: int) -> list[models.AuditLog]:
@@ -35,20 +44,21 @@ async def _audit(session: AsyncSession, entity_id: int) -> list[models.AuditLog]
 # --- create ------------------------------------------------------------------------
 
 
-async def test_create_week_after_the_season_and_it_is_listed(db_session: AsyncSession, season: int) -> None:
+async def test_create_week_into_a_free_slot_and_it_is_listed(db_session: AsyncSession, season: int) -> None:
+    await _free_last_slot(db_session, season)
     week = await content.create_week(
         db_session,
         actor_id=ADMIN_ID,
         season_id=season,
         number=13,
-        starts_on=date(2026, 11, 23),
-        ends_on=date(2026, 11, 29),
+        starts_on=SLOT[0],
+        ends_on=SLOT[1],
         today=TODAY,
-        texts={"title": "Эпилог"},
+        texts={"title": "Эпилог", "task_min": "Что забрал себе за сезон."},
     )
-    assert week.number == 13 and week.title == "Эпилог" and week.task_min == ""
+    assert week.number == 13 and week.title == "Эпилог" and week.task_max == ""
     numbers = [w.number for w in await content.weeks(db_session, season)]
-    assert numbers == list(range(1, 14))
+    assert numbers == [*range(1, 12), 13]
     log = await _audit(db_session, week.id)
     assert [row.action for row in log] == ["create"]
     assert log[0].before is None and log[0].after is not None and log[0].after["title"] == "Эпилог"
@@ -78,29 +88,32 @@ async def test_create_week_refuses_overlap_and_a_taken_number(db_session: AsyncS
             ends_on=date(2026, 9, 12),
             today=TODAY,
         )
+    await _free_last_slot(db_session, season)
     with pytest.raises(content.ContentError, match="already taken"):
         await content.create_week(
             db_session,
             actor_id=ADMIN_ID,
             season_id=season,
             number=2,
-            starts_on=date(2026, 11, 23),
-            ends_on=date(2026, 11, 29),
+            starts_on=SLOT[0],
+            ends_on=SLOT[1],
             today=TODAY,
         )
     # The refused inserts must not poison the session: the calendar is still usable.
-    assert len(await content.weeks(db_session, season)) == 12
+    assert len(await content.weeks(db_session, season)) == 11
 
 
-async def test_create_week_refuses_bad_dates_and_unknown_texts(db_session: AsyncSession, season: int) -> None:
+async def test_create_week_refuses_bad_dates_unknown_texts_and_the_next_season(
+    db_session: AsyncSession, season: int
+) -> None:
     with pytest.raises(ValueError, match="before it starts"):
         await content.create_week(
             db_session,
             actor_id=ADMIN_ID,
             season_id=season,
             number=13,
-            starts_on=date(2026, 11, 29),
-            ends_on=date(2026, 11, 23),
+            starts_on=SLOT[1],
+            ends_on=SLOT[0],
             today=TODAY,
         )
     with pytest.raises(ValueError, match="not editable"):
@@ -109,10 +122,21 @@ async def test_create_week_refuses_bad_dates_and_unknown_texts(db_session: Async
             actor_id=ADMIN_ID,
             season_id=season,
             number=13,
+            starts_on=SLOT[0],
+            ends_on=SLOT[1],
+            today=TODAY,
+            texts={"starts_on": "2027-01-01"},
+        )
+    # 23.11 is the next country's first day (DOMAIN §1): outside this season, refused.
+    with pytest.raises(content.ContentError, match="outside the season"):
+        await content.create_week(
+            db_session,
+            actor_id=ADMIN_ID,
+            season_id=season,
+            number=13,
             starts_on=date(2026, 11, 23),
             ends_on=date(2026, 11, 29),
             today=TODAY,
-            texts={"starts_on": "2027-01-01"},
         )
 
 
@@ -127,14 +151,17 @@ async def test_move_a_future_week_and_log_it(db_session: AsyncSession, season: i
         actor_id=ADMIN_ID,
         week_id=week12.id,
         today=TODAY,
-        starts_on=date(2026, 11, 23),
-        ends_on=date(2026, 11, 25),
+        ends_on=date(2026, 11, 17),
     )
-    assert (moved.starts_on, moved.ends_on, moved.number) == (date(2026, 11, 23), date(2026, 11, 25), 12)
+    assert (moved.starts_on, moved.ends_on, moved.number) == (date(2026, 11, 16), date(2026, 11, 17), 12)
     log = await _audit(db_session, week12.id)
     assert [row.action for row in log] == ["move"]
-    assert log[0].before == {"starts_on": "2026-11-16", "ends_on": "2026-11-18"}, "only what changed is logged"
-    assert log[0].after == {"starts_on": "2026-11-23", "ends_on": "2026-11-25"}
+    assert log[0].before == {"ends_on": "2026-11-18"}, "only what changed is logged"
+    assert log[0].after == {"ends_on": "2026-11-17"}
+    with pytest.raises(content.ContentError, match="outside the season"):
+        await content.move_week(
+            db_session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY, ends_on=date(2026, 11, 19)
+        )
 
 
 async def test_move_refuses_a_started_week_and_a_move_into_the_past(db_session: AsyncSession, season: int) -> None:
@@ -221,9 +248,12 @@ async def test_delete_unknown_week(db_session: AsyncSession, season: int) -> Non
 
 async def test_admin_api_create_move_delete_round_trip(app: App) -> None:
     admin = app.headers(ADMIN_ID, "Мила")
+    weeks = {w["number"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert (await app.client.delete(f"/api/admin/weeks/{weeks[12]['id']}", headers=admin)).status_code == 204
+
     r = await app.client.post(
         "/api/admin/weeks",
-        json={"number": 13, "starts_on": "2026-11-23", "ends_on": "2026-11-29", "title": "Эпилог"},
+        json={"number": 13, "starts_on": "2026-11-16", "ends_on": "2026-11-18", "title": "Эпилог"},
         headers=admin,
     )
     assert r.status_code == 201, r.text
@@ -231,17 +261,15 @@ async def test_admin_api_create_move_delete_round_trip(app: App) -> None:
     assert created["number"] == 13 and created["title"] == "Эпилог" and created["state"] == "locked"
 
     r = await app.client.patch(
-        f"/api/admin/weeks/{created['id']}/calendar",
-        json={"starts_on": "2026-11-30", "ends_on": "2026-12-06"},
-        headers=admin,
+        f"/api/admin/weeks/{created['id']}/calendar", json={"ends_on": "2026-11-17", "number": 14}, headers=admin
     )
     assert r.status_code == 200, r.text
-    assert r.json()["starts_on"] == "2026-11-30" and r.json()["number"] == 13
+    assert r.json()["ends_on"] == "2026-11-17" and r.json()["number"] == 14
 
     r = await app.client.delete(f"/api/admin/weeks/{created['id']}", headers=admin)
     assert r.status_code == 204
     numbers = [w["number"] for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()]
-    assert numbers == list(range(1, 13))
+    assert numbers == list(range(1, 12))
 
 
 async def test_admin_api_calendar_refusals_have_the_right_codes(app: App) -> None:
@@ -252,10 +280,10 @@ async def test_admin_api_calendar_refusals_have_the_right_codes(app: App) -> Non
     r = await app.client.post(
         "/api/admin/weeks", json={"number": 2, "starts_on": "2026-11-23", "ends_on": "2026-11-29"}, headers=admin
     )
-    assert r.status_code == 409 and "already taken" in r.json()["detail"]
+    assert r.status_code == 409 and "outside the season" in r.json()["detail"]
 
     r = await app.client.post(
-        "/api/admin/weeks", json={"number": 13, "starts_on": "2026-11-29", "ends_on": "2026-11-23"}, headers=admin
+        "/api/admin/weeks", json={"number": 13, "starts_on": "2026-11-18", "ends_on": "2026-11-16"}, headers=admin
     )
     assert r.status_code == 422
 
@@ -321,3 +349,93 @@ async def test_delete_refuses_a_week_a_reply_link_points_at(db_session: AsyncSes
     with pytest.raises(content.ContentError, match="participant data"):
         await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY)
     assert await content.week_by_number(db_session, season, 12) is not None
+
+
+# --- drafts: a week without a title or a minimum does not exist for participants --------
+
+
+async def test_a_draft_week_is_invisible_not_current_and_not_a_miss(db_session: AsyncSession, season: int) -> None:
+    """Release check, 14.09: an empty week became current, reminded about «задание «»» and
+    cost every member a freeze. Now it is a draft until it has a title and a minimum."""
+    from romantika.services import passport
+
+    await _free_last_slot(db_session, season)
+    draft = await content.create_week(
+        db_session, actor_id=ADMIN_ID, season_id=season, number=13, starts_on=SLOT[0], ends_on=SLOT[1], today=TODAY
+    )
+    assert not content.is_announced(draft)
+
+    listed = [w.number for w in await content.weeks(db_session, season)]
+    assert 13 not in listed, "participants' list skips drafts"
+    assert 13 in [w.number for w in await content.weeks(db_session, season, include_drafts=True)], "the admin sees it"
+
+    on_its_day = date(2026, 11, 16)
+    assert await content.current_week(db_session, season, today=on_its_day) is None, "a draft is never current"
+
+    after = date(2026, 11, 19)  # the draft's dates are over; a real week would now be a miss
+    view = await passport.build(db_session, season_id=season, user_id=ALICE, today=after)
+    assert 13 not in view.breakdown.states and view.weeks_total == 11, "no freeze spent on a draft"
+
+    # Filling in the title and the minimum announces it.
+    await content.update_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        week_id=draft.id,
+        today=TODAY,
+        changes={"title": "Эпилог", "task_min": "Скажи слово."},
+    )
+    assert (await content.current_week(db_session, season, today=on_its_day)) is not None
+    assert 13 in [w.number for w in await content.weeks(db_session, season)]
+
+
+async def test_weeks_are_ordered_by_calendar_not_by_number(db_session: AsyncSession, season: int) -> None:
+    """Numbers are labels; the passport walks the season in date order."""
+    from romantika.services import passport
+
+    week11 = await content.week_by_number(db_session, season, 11)
+    week12 = await content.week_by_number(db_session, season, 12)
+    assert week11 is not None and week12 is not None
+    await content.move_week(db_session, actor_id=ADMIN_ID, week_id=week11.id, today=TODAY, number=20)
+    ordered = [w.number for w in await content.weeks(db_session, season)]
+    assert ordered == [*range(1, 11), 20, 12], "ORDER BY starts_on, so the renumbered week keeps its place"
+    view = await passport.build(db_session, season_id=season, user_id=ALICE, today=date(2026, 11, 17))
+    assert view.breakdown.states[20] is not None and view.breakdown.states[12] is not None
+
+
+async def test_move_and_delete_are_scoped_to_the_active_season(db_session: AsyncSession, season: int) -> None:
+    """A guessable id of a next-season week must not be editable from this season's admin."""
+    other = models.Season(
+        slug="japan-2027",
+        title="Япония",
+        title_accusative="Японию",
+        hashtag="#япония",
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2027, 2, 21),
+        status=models.SeasonStatus.DRAFT.value,
+        daily_kind=None,
+        daily_title="",
+        daily_note="",
+        base_freezes=2,
+        max_freezes=5,
+        level_tourist=3,
+        level_traveler=6,
+        level_resident=9,
+    )
+    db_session.add(other)
+    await db_session.flush()
+    foreign = await content.create_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=other.id,
+        number=1,
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2026, 11, 29),
+        today=TODAY,
+    )
+    with pytest.raises(content.ContentError, match="does not exist"):
+        await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=foreign.id, today=TODAY, season_id=season)
+    with pytest.raises(content.ContentError, match="does not exist"):
+        await content.move_week(
+            db_session, actor_id=ADMIN_ID, week_id=foreign.id, today=TODAY, season_id=season, number=2
+        )
+    assert await content.week_by_number(db_session, other.id, 1) is not None

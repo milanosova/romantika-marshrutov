@@ -10,7 +10,7 @@
   const FREEZE_REASONS = [["comment", "💬 За комментарий в канале"], ["meetup", "🤝 За приход на встречу"], ["friend", "🧭 За приведённого друга"], ["manual", "❄️ Просто от меня"]];
   const SOURCE = { bot: "из бота", app: "из приложения", out_of_week: "между неделями", not_report: "«это не отчёт»" };
   const PEOPLE_FILTERS = [["all", "Все"], ["nostamp", "Без штампа на неделе"], ["silent", "Взялись и молчат"]];
-  const state = { tab: "week", me: null, weeks: [], catalogue: [], participants: [], week: null, filter: "all", unanswered: 0, personChanged: false, onSheetClose: null };
+  const state = { tab: "week", me: null, season: null, weeks: [], catalogue: [], participants: [], week: null, filter: "all", unanswered: 0, personChanged: false, onSheetClose: null };
 
   boot();
 
@@ -23,6 +23,7 @@
     }
     if (!state.me.is_admin) return fatal("Эта страница только для Милы.");
     try {
+      state.season = await RM.api("/api/admin/season");
       state.weeks = await RM.api("/api/admin/weeks");
       state.catalogue = await RM.api("/api/admin/achievement-types");
     } catch (e) {
@@ -236,28 +237,37 @@
 
   function renderContent() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; прошедшие недели не редактируются — люди их уже прожили.</p></header>
-      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>
+      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
       <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
-      <p class="note">Новая неделя — только в будущее и только в свободные даты. Тексты можно дописать потом.</p>`;
+      <p class="note">Новая неделя — только в будущее, внутри сезона и в свободные даты. Пока у недели нет названия и минимума, она черновик: участники её не видят, и она не считается пропуском.</p>`;
     screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));
     $("week-add").addEventListener("click", openWeekCreator);
   }
 
-  // Add a week after the last one: the defaults are the next free Monday–Sunday and the next number.
+  const isDraft = (w) => !String(w.title || "").trim() || !String(w.task_min || "").trim();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const day = (s) => new Date(s + "T12:00:00");
+  // Add a week: the defaults are the next free Monday–Sunday after the latest-dated week (or after
+  // today), kept inside the season; the next number after the highest one.
   function openWeekCreator() {
-    const last = state.weeks[state.weeks.length - 1];
-    const after = last ? new Date(last.ends_on + "T12:00:00") : new Date();
+    const latest = state.weeks.reduce((a, w) => (!a || w.ends_on > a.ends_on ? w : a), null);
+    const today = new Date(); today.setHours(12, 0, 0, 0);
+    const after = latest && day(latest.ends_on) > today ? day(latest.ends_on) : today;
     const nextMonday = new Date(after);
     nextMonday.setDate(after.getDate() + ((8 - after.getDay()) % 7 || 7)); // strictly after `after`
     const sunday = new Date(nextMonday); sunday.setDate(nextMonday.getDate() + 6);
-    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    const number = last ? last.number + 1 : 1;
+    const seasonEnd = state.season ? day(state.season.ends_on) : null;
+    const startsOn = seasonEnd && nextMonday > seasonEnd ? "" : iso(nextMonday);
+    const endsOn = seasonEnd && nextMonday > seasonEnd ? "" : iso(sunday > seasonEnd ? seasonEnd : sunday);
+    const number = state.weeks.reduce((m, w) => Math.max(m, w.number), 0) + 1;
+    const bounds = state.season ? `<p class="note">Сезон идёт ${fmt(state.season.starts_on)} — ${fmt(state.season.ends_on)}; неделя должна лежать внутри.</p>` : "";
     openSheet("Новая неделя", `<form class="stack" id="week-new">
       <label>Номер<input name="number" type="number" min="1" value="${number}"></label>
-      <div class="row"><label style="flex:1">Начало<input name="starts_on" type="date" value="${iso(nextMonday)}"></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${iso(sunday)}"></label></div>
-      <label>Название<input name="title" placeholder="Можно оставить пустым и вписать позже"></label>
+      <div class="row"><label style="flex:1">Начало<input name="starts_on" type="date" value="${startsOn}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${endsOn}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label></div>
+      ${bounds}
+      <label>Название<input name="title" placeholder="Без названия неделя останется черновиком"></label>
       <button class="btn block" type="submit">Добавить</button>
-      <p class="note">Вступление, минимум, максимум и слово — потом, в карточке недели.</p></form>`, () => {
+      <p class="note">Вступление, минимум, максимум и слово — в карточке недели. Участники увидят её, когда будут название и минимум.</p></form>`, () => {
       $("week-new").addEventListener("submit", async (e) => {
         e.preventDefault();
         const f = $("week-new").elements;
@@ -265,7 +275,7 @@
         const body = { number: +f.number.value, starts_on: f.starts_on.value, ends_on: f.ends_on.value, title: f.title.value };
         try {
           const w = await RM.api("/api/admin/weeks", { method: "POST", body });
-          state.weeks.push(w); state.weeks.sort((a, b) => a.number - b.number);
+          state.weeks.push(w); state.weeks.sort((a, b) => a.starts_on < b.starts_on ? -1 : a.starts_on > b.starts_on ? 1 : a.number - b.number);
           RM.haptic("success"); RM.toast("Добавила"); closeSheet(); renderContent();
         } catch (err) { RM.toast(calendarError(err), 4500); }
       });
@@ -278,6 +288,7 @@
     if (/overlaps/.test(m)) return "Эти даты заняты другой неделей";
     if (/already taken/.test(m)) return "Такой номер недели уже есть";
     if (/not after today/.test(m)) return "Новую неделю можно ставить только на будущее";
+    if (/outside the season/.test(m)) return "Эти даты за пределами сезона";
     if (/frozen/.test(m)) return "Неделя уже началась — даты не меняются";
     if (/participant data/.test(m)) return "По этой неделе уже есть штампы или отчёты — её нельзя удалить";
     if (/before it starts/.test(m)) return "Конец недели раньше её начала";
@@ -291,7 +302,8 @@
     const past = w.state === "stamped";
     const future = w.state === "locked"; // the calendar moves only before the week starts (DOMAIN §1)
     openSheet(`Неделя ${w.number}`, `<p class="muted small">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${past ? " · прошла, только чтение" : future ? "" : " · идёт, даты заморожены"}</p>
-      ${future ? `<form class="stack" id="week-cal"><div class="row"><label style="flex:0 0 72px">Номер<input name="number" type="number" min="1" value="${w.number}"></label><label style="flex:1">Начало<input name="starts_on" type="date" value="${w.starts_on}"></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${w.ends_on}"></label></div><button class="btn soft small" type="submit">Переставить</button></form>` : ""}
+      ${isDraft(w) && !past ? `<p class="note" style="margin-top:0"><b>Черновик.</b> Участники её не видят и не теряют заморозку. Станет настоящей, когда будут название и минимум.</p>` : ""}
+      ${future ? `<form class="stack" id="week-cal"><div class="row"><label style="flex:0 0 72px">Номер<input name="number" type="number" min="1" value="${w.number}"></label><label style="flex:1">Начало<input name="starts_on" type="date" value="${w.starts_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${w.ends_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label></div><button class="btn soft small" type="submit">Переставить</button></form>` : ""}
       <form class="stack" id="week-form">${FIELDS.map(([f, label, kind]) => `<label>${label}${kind === "textarea" ? `<textarea name="${f}" ${past ? "readonly" : ""}>${esc(w[f])}</textarea>` : `<input name="${f}" value="${esc(w[f])}" ${past ? "readonly" : ""}>`}</label>`).join("")}
       ${past ? "" : `<button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.</p>`}</form>
       ${future ? `<button class="btn soft small danger" id="week-del" style="margin-top:16px">Удалить неделю</button><p class="note">Удалить можно только неделю, по которой ещё ничего нет — ни штампов, ни отчётов.</p>` : ""}`, () => {
@@ -306,6 +318,7 @@
       if ($("week-cal")) $("week-cal").addEventListener("submit", async (e) => {
         e.preventDefault();
         const f = $("week-cal").elements;
+        if (!f.number.value || !f.starts_on.value || !f.ends_on.value) return RM.toast("Нужны номер и обе даты");
         const body = {};
         if (+f.number.value !== w.number) body.number = +f.number.value;
         if (f.starts_on.value !== w.starts_on) body.starts_on = f.starts_on.value;
@@ -314,12 +327,13 @@
         // Texts typed into the same sheet are not lost: they are saved first, then the calendar moves.
         const texts = {};
         FIELDS.forEach(([k]) => { const v = $("week-form").elements[k].value; if (v !== w[k]) texts[k] = v; });
+        let textsSaved = false;
         try {
-          if (Object.keys(texts).length) Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}`, { method: "PUT", body: texts }));
+          if (Object.keys(texts).length) { Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}`, { method: "PUT", body: texts })); textsSaved = true; }
           Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}/calendar`, { method: "PATCH", body }));
-          state.weeks.sort((a, b) => a.number - b.number);
-          RM.haptic("success"); RM.toast(Object.keys(texts).length ? "Сохранила и переставила" : "Переставила"); closeSheet(); renderContent();
-        } catch (err) { RM.toast(calendarError(err), 4500); }
+          state.weeks.sort((a, b) => a.starts_on < b.starts_on ? -1 : a.starts_on > b.starts_on ? 1 : a.number - b.number);
+          RM.haptic("success"); RM.toast(textsSaved ? "Сохранила и переставила" : "Переставила"); closeSheet(); renderContent();
+        } catch (err) { RM.toast((textsSaved ? "Тексты сохранила, а даты нет: " : "") + calendarError(err), 5000); }
       });
       if ($("week-del")) $("week-del").addEventListener("click", async () => {
         if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${w.title}»` : ""}? Это записывается в «Изменения».`))) return;

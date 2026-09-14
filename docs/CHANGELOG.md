@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.2.0 — 2026-09-15 (Mila edits the season's calendar herself)
+
+For Mila: in the admin's «Задания» a week can be added («＋ Добавить неделю»), a future
+week's number and dates can be changed («Переставить») and an untouched future week can be
+deleted. The rules (DOMAIN §1): only into the future and inside the season; a week that has
+started keeps its calendar; a week anyone touched (intents, reports, stamps, words, facts,
+reply links) is never deleted. A week without a title or a minimum is a **draft**: participants
+do not see it, it is never the current week and it costs nobody a freeze — Mila can plan
+weeks ahead and fill them in as the channel's plan settles. Every calendar change is in
+«Изменения», named by the week's number.
+
+For participants: nothing new to do. Week numbers may now have gaps; the passport, the PDF
+grid, the public progress bar and «N-я из M» on the home screen follow the season's real
+weeks in calendar order instead of assuming 1..N.
+
 ## v2.1.1 — 2026-09-05 (hotfix: photo reports from the app)
 
 On the VPS the media volume was mounted read-only into `web`, so every report with a file from

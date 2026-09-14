@@ -176,17 +176,40 @@ async def activate_season(session: AsyncSession, season_id: int, *, actor_id: in
     return _season_dto(row)
 
 
-async def weeks(session: AsyncSession, season_id: int) -> list[WeekDTO]:
-    query = select(models.Week).where(models.Week.season_id == season_id).order_by(models.Week.number)
+def is_announced(week: WeekDTO | models.Week) -> bool:
+    """A week participants may see: it has a title and a minimum task (DOMAIN §1).
+
+    Mila creates weeks as drafts and fills them in later. A draft must never become the
+    current week — the bot would remind about «задание «»» and the passport would count it
+    as a miss that costs everyone a freeze — so every participant-facing reader gets only
+    announced weeks. The admin lists drafts too (`weeks(..., include_drafts=True)`).
+    """
+    return bool(week.title.strip()) and bool(week.task_min.strip())
+
+
+def _announced_filter() -> Any:
+    from sqlalchemy import func
+
+    return (func.btrim(models.Week.title) != "") & (func.btrim(models.Week.task_min) != "")
+
+
+async def weeks(session: AsyncSession, season_id: int, *, include_drafts: bool = False) -> list[WeekDTO]:
+    """The season's weeks in calendar order (numbers and dates are independent, DOMAIN §1)."""
+    query = select(models.Week).where(models.Week.season_id == season_id)
+    if not include_drafts:
+        query = query.where(_announced_filter())
+    query = query.order_by(models.Week.starts_on, models.Week.number)
     return [_week_dto(row) for row in (await session.execute(query)).scalars()]
 
 
 async def current_week(session: AsyncSession, season_id: int, *, today: date) -> WeekDTO | None:
-    """The week that contains `today`; between weeks and outside the season there is none."""
+    """The announced week that contains `today`; between weeks, outside the season and on a
+    draft there is none."""
     query = select(models.Week).where(
         models.Week.season_id == season_id,
         models.Week.starts_on <= today,
         models.Week.ends_on >= today,
+        _announced_filter(),
     )
     row = (await session.execute(query)).scalar_one_or_none()
     return None if row is None else _week_dto(row)
@@ -208,6 +231,7 @@ def daily_words(weeks: list[WeekDTO], current: WeekDTO | None, today: date) -> t
 
 
 async def week_by_number(session: AsyncSession, season_id: int, number: int) -> WeekDTO | None:
+    """A week by its number, drafts included: this is how the admin addresses weeks."""
     query = select(models.Week).where(models.Week.season_id == season_id, models.Week.number == number)
     row = (await session.execute(query)).scalar_one_or_none()
     return None if row is None else _week_dto(row)
@@ -267,6 +291,36 @@ def _week_started(row: models.Week, today: date) -> bool:
     return row.starts_on <= today
 
 
+async def _week_of_season(session: AsyncSession, week_id: int, season_id: int | None) -> models.Week:
+    """The week row, and — when the caller names a season — only if it belongs to it.
+
+    The admin session is scoped to the active season; a week of a draft next season must
+    not be editable from it even though its id is guessable.
+    """
+    row = await session.get(models.Week, week_id)
+    if row is None or (season_id is not None and row.season_id != season_id):
+        raise ContentError(f"week {week_id} does not exist")
+    return row
+
+
+def _check_calendar(number: int, starts_on: date, ends_on: date, *, today: date, season: SeasonDTO) -> None:
+    """The calendar rules a new or moved week must satisfy before the schema sees it.
+
+    Inside the season (DOMAIN §1: the next country has its own dates), in the future, and
+    well-formed. Overlap and a taken number are left to the schema and named afterwards.
+    """
+    if number < 1:
+        raise ValueError(f"week number must be ≥ 1, got {number}")
+    if ends_on < starts_on:
+        raise ValueError(f"week {number} ends on {ends_on} before it starts on {starts_on}")
+    if starts_on <= today:
+        raise ContentError(f"week {number} would start on {starts_on}, not after today ({today})")
+    if starts_on < season.starts_on or ends_on > season.ends_on:
+        raise ContentError(
+            f"week {number} ({starts_on}–{ends_on}) is outside the season ({season.starts_on}–{season.ends_on})"
+        )
+
+
 def _week_row_snapshot(row: models.Week) -> dict[str, Any]:
     return {
         "number": row.number,
@@ -316,12 +370,8 @@ async def create_week(
     a season, unique number); here they are turned into a `ContentError` the admin UI can
     show instead of a 500.
     """
-    if starts_on <= today:
-        raise ContentError(f"week {number} would start on {starts_on}, not after today ({today})")
-    if ends_on < starts_on:
-        raise ValueError(f"week {number} ends on {ends_on} before it starts on {starts_on}")
-    if number < 1:
-        raise ValueError(f"week number must be ≥ 1, got {number}")
+    season = await require_season(session, season_id)
+    _check_calendar(number, starts_on, ends_on, today=today, season=season)
     unknown = sorted(set(texts or {}) - EDITABLE_WEEK_FIELDS)
     if unknown:
         raise ValueError(f"week fields {unknown} are not editable (allowed: {sorted(EDITABLE_WEEK_FIELDS)})")
@@ -354,6 +404,7 @@ async def move_week(
     actor_id: int | None,
     week_id: int,
     today: date,
+    season_id: int | None = None,
     number: int | None = None,
     starts_on: date | None = None,
     ends_on: date | None = None,
@@ -363,21 +414,14 @@ async def move_week(
     A started week keeps its calendar: the deadline was already named to people. The new
     dates must also stay in the future for the same reason.
     """
-    row = await session.get(models.Week, week_id)
-    if row is None:
-        raise ContentError(f"week {week_id} does not exist")
+    row = await _week_of_season(session, week_id, season_id)
     if _week_started(row, today):
         raise ContentError(f"week {row.number} started on {row.starts_on} and its calendar is frozen")
 
     new_number = row.number if number is None else number
     new_starts = row.starts_on if starts_on is None else starts_on
     new_ends = row.ends_on if ends_on is None else ends_on
-    if new_starts <= today:
-        raise ContentError(f"week {new_number} would start on {new_starts}, not after today ({today})")
-    if new_ends < new_starts:
-        raise ValueError(f"week {new_number} ends on {new_ends} before it starts on {new_starts}")
-    if new_number < 1:
-        raise ValueError(f"week number must be ≥ 1, got {new_number}")
+    _check_calendar(new_number, new_starts, new_ends, today=today, season=await require_season(session, row.season_id))
 
     full_before = {"number": row.number, "starts_on": row.starts_on.isoformat(), "ends_on": row.ends_on.isoformat()}
     full_after = {"number": new_number, "starts_on": new_starts.isoformat(), "ends_on": new_ends.isoformat()}
@@ -397,15 +441,15 @@ async def move_week(
     return _week_dto(row)
 
 
-async def delete_week(session: AsyncSession, *, actor_id: int | None, week_id: int, today: date) -> None:
+async def delete_week(
+    session: AsyncSession, *, actor_id: int | None, week_id: int, today: date, season_id: int | None = None
+) -> None:
     """Remove a week that has not started and that nobody has touched.
 
     Participant data is never deleted (CLAUDE.md rule 1), so a week with intents, reports,
     stamps, words or facts stays; the admin UI says why.
     """
-    row = await session.get(models.Week, week_id)
-    if row is None:
-        raise ContentError(f"week {week_id} does not exist")
+    row = await _week_of_season(session, week_id, season_id)
     if _week_started(row, today):
         raise ContentError(f"week {row.number} started on {row.starts_on} and is not deleted")
     if await _week_has_participant_data(session, week_id):

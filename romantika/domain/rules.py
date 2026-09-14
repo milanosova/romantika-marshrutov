@@ -77,7 +77,7 @@ def season_breakdown(
     streak = 0
     best = 0
 
-    for week in sorted(weeks, key=lambda w: w.number):
+    for week in sorted(weeks, key=lambda w: (w.starts_on, w.number)):  # calendar order: numbers may be reshuffled
         if today < week.starts_on:
             states[week.number] = WeekState.LOCKED
             continue
