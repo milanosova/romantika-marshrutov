@@ -117,7 +117,9 @@ async def _dispatch(
     if head == "intent" and len(parts) == 3:
         week_number, choice = int(parts[1]), parts[2]
         week = await content.week_by_number(session, season.id, week_number)
-        if week is None or choice not in ru.INTENT_HINTS:
+        # A forged button must not pin a draft or a future week with an intent row (DOMAIN §2):
+        # only an announced week that has opened takes «берусь / попробую / мимо».
+        if week is None or choice not in ru.INTENT_HINTS or week.is_draft or week.starts_on > today:
             await answer(query)
             return
         await people.set_intent(

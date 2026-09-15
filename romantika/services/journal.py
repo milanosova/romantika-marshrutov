@@ -80,7 +80,8 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
     set on a future week is not shown before that week starts.
     """
     season = await content.require_season(session, season_id)
-    weeks = {week.number: week for week in await content.weeks(session, season_id)}
+    ordered = await content.weeks(session, season_id)  # calendar order, announced only
+    weeks = {week.number: week for week in ordered}
     levels = await stamps.for_user(session, season_id=season_id, user_id=user_id)
     texts = await _texts(session, season_id=season_id, user_id=user_id)
     media = await _media(session, season_id=season_id, user_id=user_id)
@@ -112,7 +113,7 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
         facts=await facts.list_active(session, season_id),
         wish=await wishes.get_wish(session, season_id, user_id),
         weeks_total=len(weeks),
-        week_numbers=sorted(weeks),
+        week_numbers=[week.number for week in ordered],
         season_words=(await words.season_dictionary(session, season_id, today=today)).week_words,
     )
 

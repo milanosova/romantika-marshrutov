@@ -6,10 +6,12 @@ For Mila: in the admin's «Задания» a week can be added («＋ Доба�
 week's number and dates can be changed («Переставить») and an untouched future week can be
 deleted. The rules (DOMAIN §1): only into the future and inside the season; a week that has
 started keeps its calendar; a week anyone touched (intents, reports, stamps, words, facts,
-reply links) is never deleted. A week without a title or a minimum is a **draft**: participants
-do not see it, it is never the current week and it costs nobody a freeze — Mila can plan
-weeks ahead and fill them in as the channel's plan settles. Every calendar change is in
-«Изменения», named by the week's number.
+reply links) is never deleted. A new week is a **draft** (`weeks.announced_at`, migration
+`c4e8f1a2b9d3`): participants do not see it, it is never the current week, it takes no stamps
+or intents and it costs nobody a freeze — Mila plans weeks ahead and fills them in as the
+channel's plan settles, then presses «Объявить» (needs a title and a minimum). Announcing is
+one way, and an announced week keeps its title and minimum, so stamps never lose their week.
+Every calendar change is in «Изменения», named by the week's number.
 
 For participants: nothing new to do. Week numbers may now have gaps; the passport, the PDF
 grid, the public progress bar and «N-я из M» on the home screen follow the season's real

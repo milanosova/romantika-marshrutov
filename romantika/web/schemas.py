@@ -74,6 +74,8 @@ class WeekOut(BaseModel):
     word: str = ""
     word_ru: str = ""
     word_meaning: str = ""
+    announced_at: UtcDateTime | None = None
+    """None = a draft; the participant API never returns drafts, the admin API marks them."""
 
 
 class MediaOut(BaseModel):
@@ -149,13 +151,15 @@ class WeekCreate(BaseModel):
     number: int = Field(ge=1)
     starts_on: date
     ends_on: date
-    title: str = ""
+    title: str = Field(default="", max_length=255)
     intro: str = ""
     task_min: str = ""
     task_max: str = ""
-    word: str = ""
-    word_ru: str = ""
+    word: str = Field(default="", max_length=255)
+    word_ru: str = Field(default="", max_length=255)
     word_meaning: str = ""
+    announce: bool = False
+    """Announce right away (needs a title and a minimum); otherwise the week is a draft."""
 
 
 class WeekMove(BaseModel):

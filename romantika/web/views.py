@@ -60,6 +60,7 @@ def week_out(week: WeekDTO, state: WeekState, level: str | None, *, reveal: bool
         level=level,
         starts_on=week.starts_on,
         ends_on=week.ends_on,
+        announced_at=week.announced_at,
     )
     if not reveal:
         return base

@@ -190,7 +190,7 @@ async def set_intent(
     so an intent on it would be a guess about a task nobody has seen.
     """
     week = await content.week_by_number(session, season.id, body.week_number)
-    if week is None:
+    if week is None or week.is_draft:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
     if week.starts_on > today:
         raise HTTPException(status.HTTP_409_CONFLICT, "эта неделя ещё не открылась")

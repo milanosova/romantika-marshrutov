@@ -194,6 +194,8 @@ class Week(Base, TimestampMixin):
     word: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
     word_ru: Mapped[str] = mapped_column(String(255), nullable=False, server_default="")
     word_meaning: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    announced_at: Mapped[datetime | None] = mapped_column(Timestamp)
+    """NULL = a draft nobody but the admin sees; set once, never cleared (DOMAIN §1)."""
 
 
 class AchievementType(Base, TimestampMixin):

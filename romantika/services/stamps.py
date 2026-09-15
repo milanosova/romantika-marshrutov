@@ -122,6 +122,9 @@ async def admin_set(
     week = await content.week_by_number(session, season_id, week_number)
     if week is None:
         raise content.ContentError(f"season {season_id} has no week {week_number}")
+    if level is not None and week.is_draft:
+        # A stamp on a draft would have no week to hang on in every passport.
+        raise content.ContentError(f"week {week_number} is a draft and takes no stamps")
     if level is not None and week.starts_on > to_moscow(now).date():
         # The passport walk (rules.season_breakdown) only counts weeks that have started; a stamp
         # here would show as «🔒 закрыта» and «⭐» at once.

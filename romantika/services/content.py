@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import exists, or_, select
@@ -57,6 +57,12 @@ class WeekDTO:
     word: str
     word_ru: str
     word_meaning: str
+    announced_at: datetime | None = None
+
+    @property
+    def is_draft(self) -> bool:
+        """Nobody but the admin sees a draft; it is never current and costs no freeze (DOMAIN §1)."""
+        return self.announced_at is None
 
     @property
     def info(self) -> WeekInfo:
@@ -105,6 +111,7 @@ def _week_dto(row: models.Week) -> WeekDTO:
         word=row.word,
         word_ru=row.word_ru,
         word_meaning=row.word_meaning,
+        announced_at=row.announced_at,
     )
 
 
@@ -176,21 +183,17 @@ async def activate_season(session: AsyncSession, season_id: int, *, actor_id: in
     return _season_dto(row)
 
 
-def is_announced(week: WeekDTO | models.Week) -> bool:
-    """A week participants may see: it has a title and a minimum task (DOMAIN §1).
-
-    Mila creates weeks as drafts and fills them in later. A draft must never become the
+def _announced_filter() -> Any:
+    """Weeks participants may see. A draft (`announced_at IS NULL`) must never become the
     current week — the bot would remind about «задание «»» and the passport would count it
     as a miss that costs everyone a freeze — so every participant-facing reader gets only
-    announced weeks. The admin lists drafts too (`weeks(..., include_drafts=True)`).
-    """
+    announced weeks. The admin lists drafts too (`weeks(..., include_drafts=True)`)."""
+    return models.Week.announced_at.is_not(None)
+
+
+def ready_to_announce(week: WeekDTO | models.Week) -> bool:
+    """What a draft needs before people may see it: a title and a minimum task."""
     return bool(week.title.strip()) and bool(week.task_min.strip())
-
-
-def _announced_filter() -> Any:
-    from sqlalchemy import func
-
-    return (func.btrim(models.Week.title) != "") & (func.btrim(models.Week.task_min) != "")
 
 
 async def weeks(session: AsyncSession, season_id: int, *, include_drafts: bool = False) -> list[WeekDTO]:
@@ -260,6 +263,11 @@ async def update_week(
         raise ContentError(f"week {week_id} does not exist")
     if today is not None and row.ends_on < today:
         raise ContentError(f"week {row.number} ended on {row.ends_on} and is not edited afterwards")
+    if row.announced_at is not None:
+        # An announced week never falls back to a draft: its stamps would be orphaned.
+        for field_name in ("title", "task_min"):
+            if field_name in changes and not str(changes[field_name]).strip():
+                raise ValueError(f"week {row.number} is announced: '{field_name}' cannot be emptied")
 
     before: dict[str, Any] = {}
     after: dict[str, Any] = {}
@@ -333,7 +341,37 @@ def _week_row_snapshot(row: models.Week) -> dict[str, Any]:
         "word": row.word,
         "word_ru": row.word_ru,
         "word_meaning": row.word_meaning,
+        "announced_at": row.announced_at.isoformat() if row.announced_at else None,
     }
+
+
+async def announce_week(
+    session: AsyncSession, *, actor_id: int | None, week_id: int, now: datetime, season_id: int | None = None
+) -> WeekDTO:
+    """Turn a draft into a week participants see. One way; needs a title and a minimum task.
+
+    Announcing a week whose dates are already over is pointless and is refused, like editing
+    it: nobody could have done it.
+    """
+    row = await _week_of_season(session, week_id, season_id)
+    if row.announced_at is not None:
+        return _week_dto(row)
+    if not ready_to_announce(row):
+        raise ValueError(f"week {row.number} cannot be announced without a title and a minimum task")
+    if row.ends_on < now.date():
+        raise ContentError(f"week {row.number} ended on {row.ends_on} and is not announced afterwards")
+    row.announced_at = now
+    audit(
+        session,
+        actor_id=actor_id,
+        action="announce",
+        entity="week",
+        entity_id=str(week_id),
+        before={"announced_at": None},
+        after={"announced_at": now.isoformat()},
+    )
+    await session.flush()
+    return _week_dto(row)
 
 
 async def _week_has_participant_data(session: AsyncSession, week_id: int) -> bool:
@@ -347,6 +385,8 @@ async def _week_has_participant_data(session: AsyncSession, week_id: int) -> boo
         exists().where(models.Report.week_id == week_id),
         exists().where(models.Stamp.week_id == week_id),
         exists().where(models.Word.week_id == week_id),
+        # A hidden fact is still a row that points at the week (nothing is ever deleted):
+        # it keeps the week too, and the admin UI says so.
         exists().where(models.Fact.week_id == week_id),
         exists().where(models.AdminLink.week_id == week_id),
     ]
@@ -363,8 +403,11 @@ async def create_week(
     ends_on: date,
     today: date,
     texts: Mapping[str, str] | None = None,
+    announce: datetime | None = None,
 ) -> WeekDTO:
     """Add a week to a season. Only into the future: `starts_on` after today (Moscow).
+
+    Created as a draft unless `announce` (the moment) is given and the texts allow it.
 
     The calendar rules live in the schema (number ≥ 1, ends ≥ starts, no overlap within
     a season, unique number); here they are turned into a `ContentError` the admin UI can
@@ -379,6 +422,10 @@ async def create_week(
     fields: dict[str, str] = dict.fromkeys(EDITABLE_WEEK_FIELDS, "")
     fields.update(texts or {})
     row = models.Week(season_id=season_id, number=number, starts_on=starts_on, ends_on=ends_on, **fields)
+    if announce:
+        if not ready_to_announce(row):
+            raise ValueError(f"week {number} cannot be announced without a title and a minimum task")
+        row.announced_at = announce
     try:
         async with session.begin_nested():
             session.add(row)

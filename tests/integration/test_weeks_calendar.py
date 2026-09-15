@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
+from romantika.domain.types import ReportKind, StampLevel
 from romantika.services import content, people
 from tests.integration.bot_harness import ADMIN_ID, ALICE
 from tests.integration.test_services_edges import season  # noqa: F401
@@ -56,9 +57,9 @@ async def test_create_week_into_a_free_slot_and_it_is_listed(db_session: AsyncSe
         today=TODAY,
         texts={"title": "Эпилог", "task_min": "Что забрал себе за сезон."},
     )
-    assert week.number == 13 and week.title == "Эпилог" and week.task_max == ""
-    numbers = [w.number for w in await content.weeks(db_session, season)]
-    assert numbers == [*range(1, 12), 13]
+    assert week.number == 13 and week.title == "Эпилог" and week.task_max == "" and week.is_draft
+    assert [w.number for w in await content.weeks(db_session, season)] == list(range(1, 12)), "a draft: not for people"
+    assert [w.number for w in await content.weeks(db_session, season, include_drafts=True)] == [*range(1, 12), 13]
     log = await _audit(db_session, week.id)
     assert [row.action for row in log] == ["create"]
     assert log[0].before is None and log[0].after is not None and log[0].after["title"] == "Эпилог"
@@ -259,6 +260,13 @@ async def test_admin_api_create_move_delete_round_trip(app: App) -> None:
     assert r.status_code == 201, r.text
     created = r.json()
     assert created["number"] == 13 and created["title"] == "Эпилог" and created["state"] == "locked"
+    assert created["announced_at"] is None, "a new week is a draft"
+    r = await app.client.post(f"/api/admin/weeks/{created['id']}/announce", headers=admin)
+    assert r.status_code == 422 and "cannot be announced" in r.json()["detail"], "no minimum yet"
+    r = await app.client.put(f"/api/admin/weeks/{created['id']}", json={"task_min": "Скажи слово."}, headers=admin)
+    assert r.status_code == 200
+    r = await app.client.post(f"/api/admin/weeks/{created['id']}/announce", headers=admin)
+    assert r.status_code == 200 and r.json()["announced_at"] is not None
 
     r = await app.client.patch(
         f"/api/admin/weeks/{created['id']}/calendar", json={"ends_on": "2026-11-17", "number": 14}, headers=admin
@@ -351,19 +359,26 @@ async def test_delete_refuses_a_week_a_reply_link_points_at(db_session: AsyncSes
     assert await content.week_by_number(db_session, season, 12) is not None
 
 
-# --- drafts: a week without a title or a minimum does not exist for participants --------
+# --- drafts: a week is invisible until Mila announces it; announcing is one way -----------
 
 
 async def test_a_draft_week_is_invisible_not_current_and_not_a_miss(db_session: AsyncSession, season: int) -> None:
     """Release check, 14.09: an empty week became current, reminded about «задание «»» and
-    cost every member a freeze. Now it is a draft until it has a title and a minimum."""
+    cost every member a freeze. A new week is a draft until Mila announces it."""
     from romantika.services import passport
 
     await _free_last_slot(db_session, season)
     draft = await content.create_week(
-        db_session, actor_id=ADMIN_ID, season_id=season, number=13, starts_on=SLOT[0], ends_on=SLOT[1], today=TODAY
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=season,
+        number=13,
+        starts_on=SLOT[0],
+        ends_on=SLOT[1],
+        today=TODAY,
+        texts={"title": "Эпилог", "task_min": "Скажи слово."},  # complete texts, still a draft
     )
-    assert not content.is_announced(draft)
+    assert draft.is_draft and content.ready_to_announce(draft)
 
     listed = [w.number for w in await content.weeks(db_session, season)]
     assert 13 not in listed, "participants' list skips drafts"
@@ -376,16 +391,92 @@ async def test_a_draft_week_is_invisible_not_current_and_not_a_miss(db_session: 
     view = await passport.build(db_session, season_id=season, user_id=ALICE, today=after)
     assert 13 not in view.breakdown.states and view.weeks_total == 11, "no freeze spent on a draft"
 
-    # Filling in the title and the minimum announces it.
-    await content.update_week(
-        db_session,
-        actor_id=ADMIN_ID,
-        week_id=draft.id,
-        today=TODAY,
-        changes={"title": "Эпилог", "task_min": "Скажи слово."},
+    announced = await content.announce_week(
+        db_session, actor_id=ADMIN_ID, week_id=draft.id, now=moscow(2026, 9, 2, 12), season_id=season
     )
+    assert not announced.is_draft
     assert (await content.current_week(db_session, season, today=on_its_day)) is not None
     assert 13 in [w.number for w in await content.weeks(db_session, season)]
+    log = await _audit(db_session, draft.id)
+    assert [row.action for row in log] == ["create", "announce"]
+
+
+async def test_announce_needs_a_title_and_a_minimum(db_session: AsyncSession, season: int) -> None:
+    await _free_last_slot(db_session, season)
+    bare = await content.create_week(
+        db_session, actor_id=ADMIN_ID, season_id=season, number=13, starts_on=SLOT[0], ends_on=SLOT[1], today=TODAY
+    )
+    with pytest.raises(ValueError, match="cannot be announced"):
+        await content.announce_week(db_session, actor_id=ADMIN_ID, week_id=bare.id, now=moscow(2026, 9, 2, 12))
+    with pytest.raises(ValueError, match="cannot be announced"):
+        await content.create_week(
+            db_session,
+            actor_id=ADMIN_ID,
+            season_id=season,
+            number=14,
+            starts_on=SLOT[0],
+            ends_on=SLOT[1],
+            today=TODAY,
+            texts={"title": "Только название"},
+            announce=moscow(2026, 9, 2, 12),
+        )
+    assert (await content.week_by_number(db_session, season, 13)) is not None and bare.is_draft
+
+
+async def test_an_announced_week_never_falls_back_to_a_draft(db_session: AsyncSession, season: int) -> None:
+    """Release check, 15.09 (critical): blanking the title of a week with stamps orphaned
+    them and every passport answered 500. The title and the minimum of an announced week
+    cannot be emptied; the week stays in every list with its stamps."""
+    from romantika.services import passport, reports
+    from romantika.services.reports import IncomingMessage
+
+    week1 = await content.week_by_number(db_session, season, 1)
+    assert week1 is not None and not week1.is_draft
+    await reports.accept(
+        db_session,
+        season_id=season,
+        user_id=ALICE,
+        message=IncomingMessage(kind=ReportKind.TEXT, text="сделала", tg_chat_id=ALICE, tg_message_id=1),
+        now=moscow(2026, 9, 2, 12),
+    )
+    for field_name in ("title", "task_min"):
+        with pytest.raises(ValueError, match="cannot be emptied"):
+            await content.update_week(
+                db_session, actor_id=ADMIN_ID, week_id=week1.id, today=TODAY, changes={field_name: "  "}
+            )
+    # Other texts stay editable, and the passport keeps computing.
+    await content.update_week(db_session, actor_id=ADMIN_ID, week_id=week1.id, today=TODAY, changes={"intro": ""})
+    view = await passport.build(db_session, season_id=season, user_id=ALICE, today=TODAY)
+    assert 1 in view.stamps and view.weeks_total == 12
+
+
+async def test_no_stamp_and_no_intent_lands_on_a_draft(db_session: AsyncSession, season: int) -> None:
+    """Release check, 15.09: a stamp set by Mila on a started draft, or an intent from a
+    forged button, would be a row no passport can render."""
+    from romantika.services import stamps
+
+    await _free_last_slot(db_session, season)
+    draft = await content.create_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=season,
+        number=13,
+        starts_on=SLOT[0],
+        ends_on=SLOT[1],
+        today=TODAY,
+        texts={"title": "Эпилог", "task_min": "Скажи слово."},
+    )
+    with pytest.raises(content.ContentError, match="draft"):
+        await stamps.admin_set(
+            db_session,
+            actor_id=ADMIN_ID,
+            season_id=season,
+            user_id=ALICE,
+            week_number=13,
+            level=StampLevel.MIN,
+            now=moscow(2026, 11, 17, 12),  # the draft's dates have begun
+        )
+    assert draft.is_draft
 
 
 async def test_weeks_are_ordered_by_calendar_not_by_number(db_session: AsyncSession, season: int) -> None:
@@ -400,6 +491,10 @@ async def test_weeks_are_ordered_by_calendar_not_by_number(db_session: AsyncSess
     assert ordered == [*range(1, 11), 20, 12], "ORDER BY starts_on, so the renumbered week keeps its place"
     view = await passport.build(db_session, season_id=season, user_id=ALICE, today=date(2026, 11, 17))
     assert view.breakdown.states[20] is not None and view.breakdown.states[12] is not None
+    from romantika.services import journal
+
+    grid = await journal.build(db_session, season_id=season, user_id=ALICE, today=date(2026, 11, 17))
+    assert grid.week_numbers == ordered, "the PDF grid walks the same calendar order as the passport"
 
 
 async def test_move_and_delete_are_scoped_to_the_active_season(db_session: AsyncSession, season: int) -> None:
@@ -439,3 +534,24 @@ async def test_move_and_delete_are_scoped_to_the_active_season(db_session: Async
             db_session, actor_id=ADMIN_ID, week_id=foreign.id, today=TODAY, season_id=season, number=2
         )
     assert await content.week_by_number(db_session, other.id, 1) is not None
+
+
+async def test_a_hidden_fact_still_pins_its_week(db_session: AsyncSession, season: int) -> None:
+    """Nothing is ever deleted (CLAUDE.md rule 1): a fact Mila hid still points at the week,
+    so the week stays — with a reason, not a 500."""
+    from romantika.services import facts
+
+    week12 = await content.week_by_number(db_session, season, 12)
+    assert week12 is not None
+    fact_id = await facts.add(
+        db_session,
+        season_id=season,
+        week_id=week12.id,
+        text="Сомбреро — не только шляпа.",
+        author_id=ADMIN_ID,
+        now=moscow(2026, 9, 2, 12),
+    )
+    assert await facts.remove(db_session, fact_id=fact_id, actor_id=ADMIN_ID, now=moscow(2026, 9, 2, 13))
+    with pytest.raises(content.ContentError, match="participant data"):
+        await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY)
+    assert await content.week_by_number(db_session, season, 12) is not None

@@ -12,7 +12,7 @@ import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -163,6 +163,9 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
         week.word = _text(item, "word")
         week.word_ru = _text(item, "word_ru")
         week.word_meaning = _text(item, "word_meaning")
+        # A seeded week is announced by construction: the file is the channel's plan.
+        if week.announced_at is None:
+            week.announced_at = datetime.now(UTC)
     await session.flush()
     await session.execute(text("SET CONSTRAINTS weeks_no_overlap IMMEDIATE"))
     described = set(numbers)

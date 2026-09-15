@@ -86,7 +86,7 @@ def _calendar_error(exc: content.ContentError) -> HTTPException:
 
 @router.post("/weeks", response_model=schemas.AdminWeekOut, status_code=status.HTTP_201_CREATED)
 async def create_week(
-    body: schemas.WeekCreate, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
+    body: schemas.WeekCreate, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep, now: NowDep
 ) -> schemas.AdminWeekOut:
     texts = {k: v for k, v in body.model_dump().items() if k in content.EDITABLE_WEEK_FIELDS}
     try:
@@ -99,6 +99,7 @@ async def create_week(
             ends_on=body.ends_on,
             today=today,
             texts=texts,
+            announce=now if body.announce else None,
         )
     except content.ContentError as exc:
         raise _calendar_error(exc) from exc
@@ -123,6 +124,22 @@ async def move_week(
             number=body.number,
             starts_on=body.starts_on,
             ends_on=body.ends_on,
+        )
+    except content.ContentError as exc:
+        raise _calendar_error(exc) from exc
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from exc
+    return _admin_week(week, today)
+
+
+@router.post("/weeks/{week_id}/announce", response_model=schemas.AdminWeekOut)
+async def announce_week(
+    week_id: int, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep, now: NowDep
+) -> schemas.AdminWeekOut:
+    """A draft becomes a week participants see. One way; needs a title and a minimum task."""
+    try:
+        week = await content.announce_week(
+            session, actor_id=admin.user.id, week_id=week_id, now=now, season_id=season.id
         )
     except content.ContentError as exc:
         raise _calendar_error(exc) from exc
