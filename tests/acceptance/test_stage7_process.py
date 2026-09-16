@@ -1,18 +1,24 @@
 """Stage 7 acceptance: documentation and the Claude-driven change process.
 
-READ-ONLY for implementers. Static checks that the repository is self-describing enough for a
-non-technical owner working through Claude Code (CLAUDE.md, RUNBOOK, GUIDE-RU, in-repo review
-agents and the release-check skill, CI).
+OWNED BY DIMA (CLAUDE.md rule 5). Static checks that the repository is self-describing enough for
+a non-technical owner working through Claude Code: rules, settings, skills, critic agents, the
+project memory (`brain/`), the stand scripts, the owner's guides, CI.
 """
 
 from __future__ import annotations
 
+import importlib.util
+import json
 import re
+import subprocess
 from pathlib import Path
 
 import yaml
 
 REPO = Path(__file__).resolve().parents[2]
+SKILLS = ("zadacha", "stend", "proverka", "relize", "otchet", "avaria", "status", "prod")
+AGENTS = ("verifier", "critic-code", "critic-ui", "critic-data", "critic-limits", "editor-report")
+CYRILLIC = re.compile(r"[А-Яа-яЁё]")
 
 
 def read(path: str) -> str:
@@ -21,40 +27,114 @@ def read(path: str) -> str:
     return p.read_text(encoding="utf-8")
 
 
-def test_claude_md_has_rules_and_commands() -> None:
+def front_matter(text: str) -> dict[str, object]:
+    match = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    assert match, "no front matter"
+    loaded = yaml.safe_load(match.group(1))
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def test_claude_md_names_rules_routes_and_memory() -> None:
     text = read("CLAUDE.md")
-    for needle in ("docs/ARCHITECTURE.md", "docs/DOMAIN.md", "make check", "tests/acceptance", "Never delete", "release-check", "docs/RUNBOOK.md"):
+    for needle in (
+        "docs/ARCHITECTURE.md", "docs/DOMAIN.md", "docs/RUNBOOK.md", "brain/README.md",
+        "make check", "tests/acceptance", "Never delete", "demo_data",
+        "Контент", "Микро-правка", "Авария", "/zadacha", "/proverka", "/relize", "/avaria", "/status", "/prod",
+        "feature/NN-slug", "уточнить у Димы", "test_stage8_language",
+    ):
         assert needle in text, f"CLAUDE.md lacks {needle!r}"
+    assert len(text.splitlines()) <= 200, "CLAUDE.md should stay short: procedures belong to skills"
 
 
-def test_runbook_covers_deploy_backup_restore_cutover() -> None:
+def test_settings_json_speaks_russian_and_denies_destruction() -> None:
+    settings = json.loads(read(".claude/settings.json"))
+    assert settings["language"] == "russian"
+    deny = " ".join(settings["permissions"]["deny"])
+    for needle in ("docker compose down", "rm -rf", "git push --force", "psql"):
+        assert needle in deny, f"deny lacks {needle!r}"
+    assert any("deploy.sh" in rule for rule in settings["permissions"]["ask"])
+
+
+def test_skills_are_the_entry_points() -> None:
+    for name in SKILLS:
+        text = read(f".claude/skills/{name}/SKILL.md")
+        fm = front_matter(text)
+        assert fm["name"] == name
+        description = str(fm["description"])
+        assert CYRILLIC.search(description), f"{name}: the description must carry the Russian phrases Mila says"
+        assert len(description) <= 1000
+        assert len(text.splitlines()) <= 150, f"{name}: keep SKILL.md focused"
+    assert front_matter(read(".claude/skills/relize/SKILL.md")).get("disable-model-invocation") is True
+    assert not (REPO / ".claude" / "skills" / "release-check").exists(), "release-check was folded into /relize"
+    assert not (REPO / ".claude" / "workflows").exists(), "the Workflow-based release check is gone"
+    present = {p.name for p in (REPO / ".claude" / "skills").iterdir() if p.is_dir()}
+    assert present == set(SKILLS), f"unexpected skills: {present ^ set(SKILLS)}"
+
+
+def test_agents_are_critics_not_implementers() -> None:
+    present = {p.stem for p in (REPO / ".claude" / "agents").glob("*.md")}
+    assert present == set(AGENTS), f"unexpected agents: {present ^ set(AGENTS)}"
+    assert not any(name.startswith("forge") for name in present)
+    for name in AGENTS:
+        fm = front_matter(read(f".claude/agents/{name}.md"))
+        assert fm["name"] == name and fm["description"] and fm["model"] in {"sonnet", "opus", "haiku", "inherit"}
+    assert front_matter(read(".claude/agents/verifier.md"))["model"] == "sonnet"
+
+
+def test_brain_memory_is_in_place_and_valid() -> None:
+    for path in ("brain/README.md", "brain/backlog.md", "brain/skills-log.md", "brain/_templates/status.md", "brain/_templates/page.html"):
+        read(path)
+    spec = importlib.util.spec_from_file_location("brain_index", REPO / "scripts" / "brain_index.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    _text, problems = module.render()
+    assert problems == [], "\n".join(problems)
+    cards = list((REPO / "brain" / "tasks").glob("*/status.md"))
+    assert cards, "at least the harness task card exists"
+    for card in cards:
+        fm = front_matter(card.read_text(encoding="utf-8"))
+        assert fm["status"] in module.STATES and fm["route"] in module.ROUTES
+    assert "generated by scripts/brain_index.py" in read("brain/backlog.md")
+    assert not (REPO / "docs" / "tasks").exists(), "task artefacts live in brain/, docs/ is published as a site"
+
+
+def test_stand_scripts_exist_and_refuse_to_destroy_production() -> None:
+    for path in ("scripts/dev-stack.sh", "scripts/shots.sh", "scripts/rc.sh", "scripts/prod-snapshot.sh", "scripts/brain_index.py"):
+        assert (REPO / path).stat().st_mode & 0o111, f"{path} is not executable"
+    stack = read("scripts/dev-stack.sh")
+    for needle in ("--live", "dev-bot.env", "demo_data", "reset", "fake_telegram"):
+        assert needle in stack
+    for args in (["down", "-v"], ["volume", "rm", "romantika_media"]):
+        result = subprocess.run([str(REPO / "scripts" / "rc.sh"), *args], capture_output=True, text=True, timeout=10)
+        assert result.returncode == 2 and "refused" in result.stdout, args
+    for module_name in ("romantika.ops.demo_data", "romantika.ops.chat_mockup"):
+        assert importlib.util.find_spec(module_name), module_name
+
+
+def test_runbook_covers_operations_and_read_only_queries() -> None:
     text = read("docs/RUNBOOK.md")
-    for heading in ("Deploy", "Backup", "Restore", "Cut-over", "Release checklist", "Rollback", "Logs"):
+    for heading in ("Deploy", "Backup", "Restore", "Release checklist", "Rollback", "Logs", "Local stand", "Read-only queries"):
         assert re.search(rf"^#+\s*.*{heading}", text, flags=re.MULTILINE | re.IGNORECASE), f"RUNBOOK lacks section {heading!r}"
     assert "/opt/stacks/romantika" in text and "restore-verify" in text and "mac-pull-backups" in text
+    assert "scripts/rc.sh" in text and "prod-snapshot.sh" in text
 
 
-def test_owner_guide_in_russian() -> None:
-    text = read("docs/GUIDE-RU.md")
-    for needle in ("админ", "Mini App", "бэкап", "Claude", "PDF", "недел"):
-        assert needle.lower() in text.lower(), f"GUIDE-RU lacks {needle!r}"
-    assert len(text) > 3000
+def test_owner_guides_in_russian() -> None:
+    guide = read("docs/GUIDE-RU.md")
+    for needle in ("админ", "Mini App", "бэкап", "Claude", "PDF", "недел", "контент", "микро-правк", "авари", "стенд", "SETUP-RU"):
+        assert needle.lower() in guide.lower(), f"GUIDE-RU lacks {needle!r}"
+    assert len(guide) > 3000
+    setup = read("docs/SETUP-RU.md")
+    for needle in ("Private", "Pages", "Docker", "uv", "ключ", "dev-bot.env", "VPN", "стенд", "бэкап"):
+        assert needle.lower() in setup.lower(), f"SETUP-RU lacks {needle!r}"
 
 
 def test_readme_describes_v2() -> None:
     text = read("README.md")
     assert "uv sync" in text and "make check" in text and "docker" in text.lower()
-
-
-def test_in_repo_review_agents_and_release_skill() -> None:
-    agents = {p.name for p in (REPO / ".claude" / "agents").glob("*.md")}
-    for name in ("forge-implementer.md", "forge-verifier.md", "forge-reviewer-code.md", "forge-reviewer-security.md", "forge-reviewer-data.md", "forge-reviewer-ui.md"):
-        assert name in agents, f"missing .claude/agents/{name}"
-    skill = read(".claude/skills/release-check/SKILL.md")
-    assert "make check" in skill and "forge-reviewer-code" in skill and "forge-verifier" in skill
-    assert (REPO / ".claude" / "workflows" / "release-check.js").exists()
-    workflow = read(".claude/workflows/release-check.js")
-    assert "export const meta" in workflow and "forge-verifier" in workflow and "forge-reviewer-security" in workflow
+    assert "brain/" in text and "SETUP-RU" in text
 
 
 def test_ci_runs_the_same_checks() -> None:

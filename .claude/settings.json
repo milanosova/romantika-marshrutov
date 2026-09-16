@@ -1,0 +1,18 @@
+{
+  "language": "russian",
+  "permissions": {
+    "deny": [
+      "Bash(docker compose down *)",
+      "Bash(docker-compose down *)",
+      "Bash(docker volume rm *)",
+      "Bash(rm -rf *)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(psql *)"
+    ],
+    "ask": [
+      "Bash(scripts/deploy.sh *)",
+      "Bash(git push origin master*)"
+    ]
+  }
+}

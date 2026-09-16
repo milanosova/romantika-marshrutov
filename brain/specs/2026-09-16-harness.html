@@ -1,0 +1,484 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Харнес Романтики: как работает Мила</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F4F4F1; --surface:#FFFFFF; --ink:#1B1E26; --ink2:#4A5060; --muted:#7A8090; --line:#DCDCD5;
+  --ok:#1F7A4C; --ok-soft:rgba(31,122,76,.09); --warn:#A85410; --warn-soft:rgba(168,84,16,.10);
+  --bad:#B3261E; --bad-soft:rgba(179,38,30,.09);
+  /* акцент темы: financial-advisor #2447C9 · tg-interview-bot #0F766E · входящие обращения #6B3FA0 · романтика маршрутов #0E6E7A */
+  --accent:#0E6E7A; --accent-soft:rgba(14,110,122,.08); --accent-ink:#FFFFFF;
+  --display:"Literata",Georgia,"Times New Roman",serif;
+  --body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161B; --surface:#1B1E25; --ink:#E8E9EE; --ink2:#B7BAC6; --muted:#858B9B; --line:#2C2F38;
+    --ok:#4CC38A; --ok-soft:rgba(76,195,138,.12); --warn:#E0A93E; --warn-soft:rgba(224,169,62,.12);
+    --bad:#F2857C; --bad-soft:rgba(242,133,124,.12);
+    --accent:#5FD0DE; --accent-soft:rgba(95,208,222,.12); --accent-ink:#0F1220;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161B; --surface:#1B1E25; --ink:#E8E9EE; --ink2:#B7BAC6; --muted:#858B9B; --line:#2C2F38;
+  --ok:#4CC38A; --ok-soft:rgba(76,195,138,.12); --warn:#E0A93E; --warn-soft:rgba(224,169,62,.12);
+  --bad:#F2857C; --bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE; --accent-soft:rgba(95,208,222,.12); --accent-ink:#0F1220;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 var(--body); padding:0 20px 96px}
+a{color:var(--accent); text-decoration:none; border-bottom:1px solid transparent}
+a:hover,a:focus-visible{border-bottom-color:currentColor}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+.wrap{max-width:760px; margin:0 auto}
+.crumbs{font:12.5px/1.4 var(--mono); color:var(--muted); padding:28px 0 6px; letter-spacing:.01em}
+.crumbs a{color:var(--muted)}
+h1{font:600 38px/1.15 var(--display); letter-spacing:-.01em; margin:6px 0 10px; text-wrap:balance}
+.lede{font-size:17px; color:var(--ink2); margin:0 0 28px; max-width:62ch}
+h2{font:600 24px/1.25 var(--display); margin:48px 0 6px; text-wrap:balance}
+.h2sub{color:var(--muted); font-size:14px; margin:0 0 16px}
+h3{font:600 16px/1.3 var(--body); margin:20px 0 6px}
+p{margin:0 0 12px; max-width:68ch}
+ul{margin:0 0 12px; padding-left:20px} li{margin:0 0 6px}
+.mono{font-family:var(--mono); font-variant-numeric:tabular-nums}
+.src{font:10.5px/1 var(--mono); color:var(--accent); vertical-align:super; margin-left:1px; white-space:nowrap}
+.tldr{background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; padding:18px 22px 10px; margin:0 0 8px}
+.tldr h2{margin:0 0 10px; font-size:20px}
+.tldr li{margin:0 0 8px}
+figure{margin:18px 0 8px; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px 14px 10px; overflow-x:auto}
+figure svg{display:block; width:100%; min-width:640px; height:auto; max-width:760px}
+figcaption{font-size:14px; color:var(--ink2); margin:10px 2px 0; max-width:70ch}
+svg text{font-family:var(--body); font-size:12px; fill:var(--ink)}
+svg text.mono{font-family:var(--mono); font-size:10.5px}
+svg text.muted{fill:var(--muted)}
+svg text.small{font-size:11.5px}
+svg text.b{font-weight:600}
+.tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:16px 0 8px}
+@media (max-width:640px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px 16px}
+.tile .n{font:600 30px/1.1 var(--display); font-variant-numeric:tabular-nums; color:var(--accent)}
+.tile .l{font-size:13.5px; color:var(--ink2); margin-top:4px; line-height:1.35}
+.segs{display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 14px}
+.seg{border:1px solid var(--line); border-radius:999px; padding:6px 14px; font-size:14px; color:var(--ink2); background:var(--surface)}
+.seg.on{border-color:var(--accent); background:var(--accent); color:var(--accent-ink); font-weight:500}
+.scroll{overflow-x:auto; margin:14px 0 8px}
+table.cmp{border-collapse:collapse; width:100%; font-size:14.5px; background:var(--surface); border:1px solid var(--line); border-radius:6px}
+table.cmp th,table.cmp td{text-align:left; vertical-align:top; padding:10px 12px; border-top:1px solid var(--line)}
+table.cmp th{font-weight:600; color:var(--ink2); font-size:13px; letter-spacing:.03em; text-transform:uppercase; border-top:0}
+table.cmp td.k{font-weight:500; white-space:nowrap}
+table.cmp td.mono{white-space:nowrap}
+.zone{display:inline-block; padding:2px 8px; border-radius:4px; font-size:13px; font-weight:500}
+.z-ok{background:var(--ok-soft); color:var(--ok)} .z-warn{background:var(--warn-soft); color:var(--warn)} .z-bad{background:var(--bad-soft); color:var(--bad)}
+.notes{margin:8px 0 12px; padding-left:20px; color:var(--ink2); font-size:15px}
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:14px 0 8px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:14px 16px}
+.card h3{margin:0 0 8px}
+.card ul{margin:0}
+.verdict{margin:56px 0 0; padding:24px 26px; background:var(--accent-soft); border-radius:8px}
+.verdict h2{margin:0 0 12px}
+.verdict p{max-width:70ch}
+.verdict table.cmp,.verdict table.cmp th,.verdict table.cmp td{border-color:color-mix(in srgb, var(--accent) 35%, transparent)}
+.next{display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:14px; font-size:14px}
+.sources{margin-top:40px; font-size:13.5px; color:var(--ink2)}
+.sources ol{padding-left:22px} .sources li{margin:0 0 4px}
+.sources code{font:12.5px var(--mono)}
+.callout{background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; padding:14px 18px; margin:16px 0}
+.callout p{margin:0 0 6px; font-size:16px}
+.callout .who{font-size:13px; color:var(--muted)}
+</style>
+
+<div class="wrap">
+<nav class="crumbs" aria-label="где вы">романтика маршрутов → brain/specs → харнес v1</nav>
+<h1>Харнес Романтики: как работает Мила</h1>
+<p class="lede">Спека процесса и файлов, которые я собираюсь положить в репозиторий бота, чтобы Мила — не разработчик — вела продукт через Claude Code сама. Составлена 16 сентября 2026 по устной постановке Дмитрия от 15–16 сентября и по коду репозитория на коммите 8f4646e. Всё, что здесь описано как «появится», ещё не сделано: это предложение на утверждение, а не отчёт о работе.</p>
+
+<aside class="tldr" aria-label="коротко">
+  <h2>Коротко</h2>
+  <ul>
+    <li>Инженерная часть харнеса уже стоит: 331 тест в трёх уровнях, CI на каждый push, контракт архитектуры, ранбук эксплуатации и отдельный тест, который проверяет сам харнес.<sup class="src">[1]</sup> Нет процесса вокруг задачи и нет точек входа для человека, который не читает код.</li>
+    <li>Просьбы Милы разводятся на четыре маршрута. Полная машина — план, ветка, стенд, веер проверяющих агентов — запускается только на фиче; правка текста задания уходит в админку и не трогает код вообще.<sup class="src">[2]</sup></li>
+    <li>Копия прода на её ноутбук не попадает никогда. Стенд живёт на тридцати придуманных участницах, и живой тестовый бот работает с ними же — поэтому написать настоящему человеку он не может физически.</li>
+    <li>Проверок две ступени: перед вливанием в ветку <span class="mono">dev</span> — быстрая, перед выходом на прод — полная, с живым прогоном в Telegram руками и вопросом Миле «выкатываем сейчас?» с числом активных участниц на руках.</li>
+    <li>Первым делом не харнес, а гигиена GitHub: репозиторий публичный, и его документация раздаётся как сайт вместе с адресом сервера. Закрыть нужно до первого отчёта со скриншотами — проверено 16 сентября.<sup class="src">[3]</sup></li>
+  </ul>
+</aside>
+
+<h2>Что происходит после того, как Мила попросила</h2>
+<p class="h2sub">Один вход, четыре маршрута, разная цена ошибки</p>
+<figure>
+  <svg viewBox="0 0 760 320" role="img" aria-label="Схема: просьба Милы сортируется на четыре маршрута — контент идёт в админку без кода, микро-правка и фича идут через ветку и ветку dev на прод, авария идёт на прод сразу с бэкапом и отчётом после.">
+    <rect x="8" y="132" width="120" height="52" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text class="b" x="26" y="153">Просьба</text>
+    <text class="small muted" x="26" y="170">словами продукта</text>
+    <path d="M128 158 H168" stroke="var(--line)" stroke-width="2"/>
+    <polygon points="168,158 200,138 232,158 200,178" fill="var(--surface)" stroke="var(--accent)"/>
+    <text class="mono muted" x="176" y="196">что это?</text>
+
+    <path d="M232 158 C 260 158, 262 42, 300 42" stroke="var(--line)" stroke-width="2" fill="none"/>
+    <path d="M232 158 C 260 158, 262 112, 300 112" stroke="var(--line)" stroke-width="2" fill="none"/>
+    <path d="M232 158 C 260 158, 262 190, 300 190" stroke="var(--accent)" stroke-width="2" fill="none"/>
+    <path d="M232 158 C 260 158, 262 272, 300 272" stroke="var(--bad)" stroke-width="2" fill="none"/>
+
+    <rect x="300" y="22" width="140" height="40" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text x="312" y="41">Контент</text>
+    <text class="small muted" x="312" y="55">тексты, факты, ачивки</text>
+    <path d="M440 42 H600" stroke="var(--line)" stroke-width="2" stroke-dasharray="4 3"/>
+    <rect x="600" y="22" width="152" height="40" rx="6" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="612" y="41">Админка, сразу</text>
+    <text class="small muted" x="612" y="55">ни ветки, ни выкатки</text>
+
+    <rect x="300" y="92" width="140" height="40" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text x="312" y="111">Микро-правка</text>
+    <text class="small muted" x="312" y="125">опечатка, подпись, цвет</text>
+    <path d="M440 112 H600" stroke="var(--line)" stroke-width="2"/>
+    <text class="mono muted" x="452" y="105">ветка → dev</text>
+    <rect x="600" y="92" width="152" height="40" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text x="612" y="111">Прод, короткий отчёт</text>
+    <text class="small muted" x="612" y="125">без плана и веера</text>
+
+    <rect x="300" y="168" width="140" height="44" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text class="b" x="312" y="188">Фича или баг</text>
+    <text class="small muted" x="312" y="203">всё заметное людям</text>
+    <path d="M440 190 H600" stroke="var(--accent)" stroke-width="2"/>
+    <text class="mono" x="450" y="182">план → ветка → стенд</text>
+    <text class="mono muted" x="450" y="208">две ступени проверок</text>
+    <rect x="600" y="168" width="152" height="44" rx="6" fill="var(--surface)" stroke="var(--accent)"/>
+    <text x="612" y="188">Прод после «да»</text>
+    <text class="small muted" x="612" y="203">отчёт было-стало</text>
+
+    <rect x="300" y="250" width="140" height="44" rx="6" fill="var(--bad-soft)" stroke="var(--bad)"/>
+    <text x="312" y="270">Авария на проде</text>
+    <text class="small muted" x="312" y="285">бот лежит сейчас</text>
+    <path d="M440 272 H600" stroke="var(--bad)" stroke-width="2"/>
+    <text class="mono muted" x="452" y="265">бэкап → откат или фикс</text>
+    <rect x="600" y="250" width="152" height="44" rx="6" fill="var(--surface)" stroke="var(--bad)"/>
+    <text x="612" y="270">Прод сразу</text>
+    <text class="small muted" x="612" y="285">разбор и отчёт потом</text>
+  </svg>
+  <figcaption>Сортировка — первое, что делает Claude, и она же главная экономия: три маршрута из четырёх не запускают ни плана, ни агентов. Полная машина остаётся там, где ошибка видна участницам клуба.</figcaption>
+</figure>
+<p>Маршрут выбирает Claude и называет его вслух первой фразой ответа: «это контент, сделаем в админке» или «это фича, готовлю план». Мила может возразить — тогда маршрут меняется по её слову. Смысл в том, чтобы правка формулировки задания недели занимала две минуты в админке, а не полдня с ветками и отчётом.</p>
+
+<h2>Четыре маршрута: что включается, а что нет</h2>
+<div class="scroll">
+<table class="cmp">
+  <tr><th>Маршрут</th><th>Что запускается</th><th>Проверки</th><th>Слово Милы</th></tr>
+  <tr><td class="k">Контент</td><td>ничего: правка идёт в админке бота</td><td>глазами Милы</td><td>не нужно, это её зона</td></tr>
+  <tr><td class="k">Микро-правка</td><td>ветка от <span class="mono">dev</span>, плана нет</td><td><span class="mono">make check</span> и сама правка на стенде</td><td>одно «ок»</td></tr>
+  <tr><td class="k">Фича или заметный баг</td><td>план страницей, ветка, стенд</td><td>две ступени проверок</td><td>дважды: «сливаем в dev» и «выкатываем»</td></tr>
+  <tr><td class="k">Авария</td><td>фикс прямо в <span class="mono">master</span> после бэкапа</td><td><span class="mono">make check</span> и сломанное место живьём</td><td>не спрашиваю, сообщаю после</td></tr>
+</table>
+</div>
+<p>В репозитории от маршрута остаётся разное: контент не оставляет ничего, кроме записи в истории правок внутри базы; микро-правка — запись в учёте и три строки отчёта; фича — план, отчёт с парами было-стало и карточку задачи; авария — карточку и отчёт, написанный после того, как бот снова работает.</p>
+<p>Различие между микро-правкой и фичей Claude объясняет Миле словами: «тут меняется только надпись, проверю и выложу» против «тут меняется поведение, нужен план». Если он сомневается, маршрут выбирается более тяжёлый.</p>
+
+<h2>Где живёт продукт и где работает Мила</h2>
+<p class="h2sub">Один сервер, один ноутбук и одна стрелка, которой не будет</p>
+<figure>
+  <svg viewBox="0 0 760 300" role="img" aria-label="Схема двух сред: на VPS живут бот Милы, база, фотографии и бэкапы; на её ноутбуке — тот же стек в двух режимах, на придуманных данных. Код едет наверх, бэкапы едут вниз, живые данные участниц вниз не едут.">
+    <rect x="8" y="14" width="744" height="104" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="mono muted" x="22" y="34">прод · vps, круглосуточно</text>
+    <rect x="22" y="44" width="150" height="56" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text class="b" x="34" y="66">Бот Милы</text>
+    <text class="small muted" x="34" y="84">настоящие участницы</text>
+    <rect x="186" y="44" width="130" height="56" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text x="198" y="66">Postgres</text>
+    <text class="small muted" x="198" y="84">отчёты, штампы</text>
+    <rect x="330" y="44" width="130" height="56" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text x="342" y="66">Фотографии</text>
+    <text class="small muted" x="342" y="84">том на диске</text>
+    <rect x="474" y="44" width="264" height="56" rx="6" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="486" y="66">Бэкап каждую ночь</text>
+    <text class="small muted" x="486" y="84">раз в неделю проверка восстановлением</text>
+
+    <path d="M120 118 V 196" stroke="var(--accent)" stroke-width="2"/>
+    <polygon points="120,118 115,130 125,130" fill="var(--accent)"/>
+    <text class="mono" x="130" y="150">код наверх</text>
+    <text class="mono muted" x="130" y="166">deploy.sh</text>
+
+    <path d="M606 118 V 196" stroke="var(--ok)" stroke-width="2"/>
+    <polygon points="606,196 601,184 611,184" fill="var(--ok)"/>
+    <text class="mono" x="500" y="150">бэкапы вниз</text>
+    <text class="mono muted" x="500" y="166">копия на её мак</text>
+
+    <path d="M360 130 V 186" stroke="var(--bad)" stroke-width="2" stroke-dasharray="5 4"/>
+    <path d="M344 150 L 376 166 M 376 150 L 344 166" stroke="var(--bad)" stroke-width="2"/>
+    <text class="mono" x="234" y="152" fill="var(--bad)">живые данные</text>
+    <text class="mono" x="234" y="168" fill="var(--bad)">вниз не едут</text>
+
+    <rect x="8" y="196" width="744" height="96" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="mono muted" x="22" y="216">стенд · macbook air m5, когда открыт</text>
+    <rect x="22" y="226" width="352" height="54" rx="6" fill="var(--surface)" stroke="var(--accent)"/>
+    <text class="b" x="34" y="246">Режим «работа»</text>
+    <text class="small muted" x="34" y="264">поддельный Telegram, агенты за участниц</text>
+    <rect x="388" y="226" width="350" height="54" rx="6" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="b" x="400" y="246">Режим «живой»</text>
+    <text class="small muted" x="400" y="264">тестовый бот в Telegram, руками</text>
+  </svg>
+  <figcaption>Оба режима стенда работают на тридцати придуманных участницах, поэтому тестовый бот не знает ни одного настоящего адресата. Это и есть замена копии прода: те же таблицы, тот же объём, никакой ответственности за чужие данные.</figcaption>
+</figure>
+<p>В режиме «работа» вместо Telegram отвечает поддельный сервер, который уже есть в репозитории: агент отправляет боту сообщение от «участницы 1001», нажимает кнопки и читает, что бот отправил в ответ.<sup class="src">[4]</sup> В режиме «живой» тот же стек говорит с настоящим Telegram через тестового бота — этим Мила и я проверяем фичу глазами перед выкаткой. Токен тестового бота уже лежит на сервере в её домашней папке, поэтому в переписке он не появится.</p>
+<ul class="notes">
+  <li>Придуманных данных нужно столько, чтобы админка и журнал выглядели как настоящие: тридцать участниц, отчёты за прошедшие недели, картинки-заглушки вместо фотографий, кто-то в заморозке, кто-то молчит, письма без ответа.</li>
+  <li>Дорога за настоящими данными остаётся ровно одна и только для разбора аварии: развернуть ночной бэкап во временную базу на сервере, а не на ноутбуке. Это решение принимает Дима, а не Claude.</li>
+  <li>Настоящий Telegram с её мака открывается через VPN, который у неё уже есть. Стенд проверяет доступ при запуске и говорит прямо: «Telegram не отвечает, включи VPN» — вместо получаса непонятных таймаутов.</li>
+</ul>
+
+<h2>Две ступени проверок</h2>
+<p class="h2sub">Быстрая — перед вливанием в ветку dev, полная — перед выходом на прод</p>
+<figure>
+  <svg viewBox="0 0 760 252" role="img" aria-label="Схема двух ступеней: перед dev прогоняются тесты, проверка фичи и код-ревью двумя агентами; перед master добавляются e2e, регресс из двенадцати сценариев, устойчивость, проверка данных и живой прогон в Telegram.">
+    <rect x="8" y="16" width="366" height="220" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="mono muted" x="24" y="38">ступень 1 · перед веткой dev</text>
+    <text class="b" x="24" y="62">Не сломали ли то, что было</text>
+    <rect x="24" y="76" width="334" height="30" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text class="small" x="36" y="96">make check — 331 тест, линтер, типы</text>
+    <rect x="24" y="112" width="334" height="30" rx="5" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="small" x="36" y="132">новые тесты на саму правку</text>
+    <rect x="24" y="148" width="334" height="30" rx="5" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="small" x="36" y="168">прогон фичи на стенде, чтение логов</text>
+    <rect x="24" y="184" width="334" height="30" rx="5" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="small" x="36" y="204">код-ревью диффа и чистоты кода</text>
+    <text class="mono muted" x="24" y="228">два агента</text>
+
+    <path d="M374 126 H 392" stroke="var(--line)" stroke-width="2"/>
+    <rect x="394" y="16" width="358" height="220" rx="8" fill="var(--surface)" stroke="var(--accent)"/>
+    <text class="mono muted" x="410" y="38">ступень 2 · перед master и продом</text>
+    <text class="b" x="410" y="62">Точно ли работает как задумано</text>
+    <rect x="410" y="76" width="326" height="30" rx="5" fill="var(--accent-soft)" stroke="var(--accent)"/>
+    <text class="small" x="422" y="96">всё из первой ступени плюс сценарии e2e</text>
+    <rect x="410" y="112" width="326" height="30" rx="5" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="small" x="422" y="132">регресс: 12 сценариев бота и админки</text>
+    <rect x="410" y="148" width="326" height="30" rx="5" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="small" x="422" y="168">устойчивость: лимиты, миграции, бэкап</text>
+    <rect x="410" y="184" width="326" height="30" rx="5" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text class="small" x="422" y="204">живой прогон в Telegram руками</text>
+    <text class="mono muted" x="410" y="228">четыре-пять агентов, затем человек</text>
+  </svg>
+  <figcaption>Первая ступень отвечает на вопрос «не стало ли хуже», вторая — «делает ли фича то, что обещали». Живой прогон руками стоит последним и не заменяется агентами: настоящий Telegram-клиент автоматизировать честно нельзя.</figcaption>
+</figure>
+<p>У каждого агента в обеих ступенях одно общее требование: находка без доказательства не считается. Для кода это файл и строка с цитатой, для поведения — шаги и ответ сервиса, для данных — запрос и его результат. Отдельно требуется то, о чём ты просил прямо: агент обязан заглянуть в логи сервисов и привести оттуда строки, иначе «проверено» не принимается.</p>
+<p>Нагрузочных тестов в клубе на несколько десятков человек не будет — вместо них проверяются границы, на которых сервис действительно ломался: больше десяти файлов в одном отчёте, длинный текст, одновременная правка отчёта с двух устройств, таймаут Telegram.<sup class="src">[5]</sup> Регресс-набор из двенадцати сценариев фиксируется списком и прогоняется целиком перед каждым выходом на прод: старт, задание недели, отчёт текстом, отчёт с фотографией, правка отчёта, паспорт, словарь, журнал, сборка PDF, админка по неделе, письма, напоминание.</p>
+<p>Перед выкаткой Claude сам считает, сколько участниц пользовалось ботом за последние сутки, называет число и предлагает окно. Понедельник утром в клубе выходит пост, в четверг вечером и в воскресенье днём уходят напоминания, в воскресенье вечером Мила собирает «Привал» — поэтому спокойное окно это вторник и среда днём.<sup class="src">[6]</sup> Последнее слово всё равно за Милой: она отвечает «давай» или «давай завтра».</p>
+
+<h2>Что появится в репозитории</h2>
+<p class="h2sub">Правила, точки входа, учёт и обвязка стенда — рядом с кодом, в одной истории изменений</p>
+<figure>
+  <svg viewBox="0 0 760 476" role="img" aria-label="Дерево файлов харнеса: CLAUDE.md и GUIDE-RU меняются, появляются settings.json, восемь скиллов, папка brain с учётом, генератор придуманных данных, скриншоты стенда и два новых приёмочных теста; агенты forge переименовываются в критиков.">
+    <g>
+      <rect x="8" y="12" width="744" height="28" rx="5" fill="var(--accent-soft)"/>
+      <text class="mono b" x="20" y="31">CLAUDE.md</text>
+      <text class="small" x="340" y="31">правила, маршруты, язык кода</text>
+      <text class="mono" x="640" y="31" fill="var(--warn)">меняется</text>
+    </g>
+    <text class="mono muted" x="20" y="64">.claude/</text>
+    <text class="mono" x="40" y="86">settings.json</text>
+    <text class="small" x="340" y="86">ответы по-русски, четыре запрета</text>
+    <text class="mono" x="640" y="86" fill="var(--accent)">новое</text>
+    <text class="mono" x="40" y="108">skills/ · zadacha stend proverka relize</text>
+    <text class="small" x="340" y="130">восемь точек входа для Милы</text>
+    <text class="mono" x="40" y="130">         otchet avaria status prod</text>
+    <text class="mono" x="640" y="130" fill="var(--accent)">новое</text>
+    <text class="mono" x="40" y="152">agents/ · critic-code critic-ui critic-data</text>
+    <text class="small" x="340" y="174">роли проверяющих вместо forge-*</text>
+    <text class="mono" x="40" y="174">          critic-limits verifier</text>
+    <text class="mono" x="640" y="174" fill="var(--warn)">меняется</text>
+
+    <text class="mono muted" x="20" y="206">brain/</text>
+    <text class="mono" x="40" y="228">README.md · backlog.md</text>
+    <text class="small" x="340" y="228">как ведётся учёт, список задач</text>
+    <text class="mono" x="640" y="228" fill="var(--accent)">новое</text>
+    <text class="mono" x="40" y="250">tasks/NN-slug/ plan.html report.html status.md</text>
+    <text class="small" x="340" y="250">план, отчёт, состояние задачи</text>
+    <text class="mono" x="40" y="272">bugs/ ideas/ ops/ skills-log.md</text>
+    <text class="small" x="340" y="272">баги, идеи, снимки прода, журнал</text>
+    <text class="mono" x="640" y="272" fill="var(--accent)">новое</text>
+
+    <text class="mono muted" x="20" y="304">docs/</text>
+    <text class="mono" x="40" y="326">GUIDE-RU.md</text>
+    <text class="small" x="340" y="326">руководство Милы под новые маршруты</text>
+    <text class="mono" x="640" y="326" fill="var(--warn)">меняется</text>
+    <text class="mono muted" x="40" y="348">ARCHITECTURE DOMAIN RUNBOOK CHANGELOG</text>
+    <text class="small muted" x="340" y="348">контракты и эксплуатация</text>
+    <text class="mono muted" x="640" y="348">уже есть</text>
+
+    <text class="mono muted" x="20" y="380">scripts/ · romantika/ops/</text>
+    <text class="mono" x="40" y="402">demo_data.py · shots.sh · brain-index.py</text>
+    <text class="small" x="340" y="402">придуманные данные, скриншоты, бэклог</text>
+    <text class="mono" x="640" y="402" fill="var(--accent)">новое</text>
+    <text class="mono" x="40" y="424">dev-stack.sh</text>
+    <text class="small" x="340" y="424">два режима и проверка Telegram</text>
+    <text class="mono" x="640" y="424" fill="var(--warn)">меняется</text>
+
+    <text class="mono muted" x="20" y="456">tests/acceptance/ · stage7 и новый тест языка</text>
+    <text class="small" x="340" y="456">приёмка харнеса и запрет кириллицы в коде</text>
+    <text class="mono" x="640" y="456" fill="var(--warn)">меняется</text>
+  </svg>
+  <figcaption>Учёт лежит в <span class="mono">brain/</span>, а не в <span class="mono">docs/</span>, специально: папка <span class="mono">docs/</span> сейчас раздаётся как сайт, и любой файл в ней становится публичной страницей.<sup class="src">[3]</sup></figcaption>
+</figure>
+
+<h2>Точки входа: что Мила говорит и что происходит</h2>
+<p class="h2sub">Имена команд латиницей, а подхватываются они по русским словам — команду знать не обязательно</p>
+<div class="scroll">
+<table class="cmp">
+  <tr><th>Команда</th><th>Что делает</th><th>Подхватывается сама, когда Мила говорит</th><th>Что оставляет после себя</th></tr>
+  <tr><td class="k mono">zadacha</td><td>принимает задание, выбирает маршрут, задаёт до трёх вопросов, готовит план и заводит ветку</td><td>«хочу», «давай добавим», «поправь», «мне не нравится, что…»</td><td>карточку задачи и план страницей</td></tr>
+  <tr><td class="k mono">stend</td><td>поднимает и гасит стенд в нужном режиме, наливает придуманные данные, проверяет Telegram</td><td>«подними стенд», «покажи локально», «хочу потыкать»</td><td>запись в логе стенда</td></tr>
+  <tr><td class="k mono">proverka</td><td>первая ступень: тесты, прогон фичи, код-ревью двумя агентами</td><td>«проверь», «готово ли», «можно в dev?»</td><td>вердикт в карточке задачи</td></tr>
+  <tr><td class="k mono">relize</td><td>вторая ступень, окно выкатки, деплой, наблюдение за логами после</td><td>только по прямой просьбе «выкатываем»</td><td>отчёт о релизе и запись в журнале изменений</td></tr>
+  <tr><td class="k mono">otchet</td><td>пишет план или отчёт по правилам читаемости и отдаёт его на ревью второму агенту</td><td>«напиши отчёт», «что изменилось»</td><td>страницу в папке задачи</td></tr>
+  <tr><td class="k mono">avaria</td><td>аварийный маршрут: бэкап, логи, откат или минимальный фикс</td><td>«бот не работает», «всё сломалось», «участницы жалуются»</td><td>карточку аварии и отчёт после</td></tr>
+  <tr><td class="k mono">status</td><td>говорит, где мы: ветка, незакрытые задачи, что делать следующим шагом</td><td>«что у нас», «на чём остановились», «что дальше»</td><td>ничего, это ответ в чат</td></tr>
+  <tr><td class="k mono">prod</td><td>снимает состояние прода: активность, ошибки в логах, бэкапы, место на диске</td><td>«как дела у бота», «всё ли в порядке»</td><td>снимок в <span class="mono">brain/ops/</span></td></tr>
+</table>
+</div>
+<p>Русские слова-триггеры — не украшение: именно по ним модель решает, какую процедуру достать, поэтому в описании каждого скилла будут стоять те фразы, которыми Мила действительно говорит. Команду с косой чертой она может не запоминать вовсе.</p>
+
+<h2>Как выглядят план и отчёт</h2>
+<p class="h2sub">Две страницы на задачу: одна до работы, другая после, обе проверяются на понятность</p>
+<figure>
+  <svg viewBox="0 0 760 268" role="img" aria-label="Мокап двух страниц: план содержит цель словами Милы, что меняется, что не трогаем и пункты приёмки; отчёт содержит короткое резюме, пары было-стало со скриншотами, что проверено с цитатами логов и что осталось.">
+    <rect x="8" y="14" width="360" height="240" rx="8" fill="var(--surface)" stroke="var(--accent)"/>
+    <text class="mono muted" x="24" y="36">plan.html · до работы</text>
+    <rect x="24" y="48" width="328" height="34" rx="4" fill="var(--accent-soft)"/>
+    <text class="b" x="36" y="70">Зачем это Миле — её словами</text>
+    <rect x="24" y="90" width="328" height="30" rx="4" fill="var(--bg)" stroke="var(--line)"/>
+    <text class="small" x="36" y="110">Что увидят участницы: до и после</text>
+    <rect x="24" y="128" width="328" height="30" rx="4" fill="var(--bg)" stroke="var(--line)"/>
+    <text class="small" x="36" y="148">Мокап экрана или переписки</text>
+    <rect x="24" y="166" width="328" height="30" rx="4" fill="var(--bg)" stroke="var(--line)"/>
+    <text class="small" x="36" y="186">Чего не трогаем — отдельным списком</text>
+    <rect x="24" y="204" width="328" height="34" rx="4" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text class="small b" x="36" y="226">Приёмка: 4–7 пунктов галочками</text>
+
+    <rect x="392" y="14" width="360" height="240" rx="8" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="mono muted" x="408" y="36">report.html · после работы</text>
+    <rect x="408" y="48" width="328" height="34" rx="4" fill="var(--accent-soft)"/>
+    <text class="b" x="420" y="70">Коротко: что изменилось и что делать</text>
+    <rect x="408" y="90" width="158" height="68" rx="4" fill="var(--bg)" stroke="var(--line)"/>
+    <text class="small muted" x="420" y="112">было</text>
+    <rect x="420" y="120" width="134" height="28" rx="3" fill="var(--surface)" stroke="var(--line)"/>
+    <text class="mono muted" x="430" y="138">скриншот</text>
+    <rect x="578" y="90" width="158" height="68" rx="4" fill="var(--bg)" stroke="var(--accent)"/>
+    <text class="small muted" x="590" y="112">стало</text>
+    <rect x="590" y="120" width="134" height="28" rx="3" fill="var(--surface)" stroke="var(--accent)"/>
+    <text class="mono muted" x="600" y="138">скриншот</text>
+    <rect x="408" y="166" width="328" height="30" rx="4" fill="var(--bg)" stroke="var(--line)"/>
+    <text class="small" x="420" y="186">Что проверено — с цитатами из логов</text>
+    <rect x="408" y="204" width="328" height="34" rx="4" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text class="small b" x="420" y="226">Что осталось и чего я не делал</text>
+  </svg>
+  <figcaption>Приёмка из плана — тот же список, по которому отчёт закрывается пункт за пунктом. Без неё «оттестировали» превращается в «потыкали и вроде работает».</figcaption>
+</figure>
+<p>Каждую страницу перед показом Миле читает второй агент — не автор. Он проверяет ровно то, о чём ты просил: связность, объяснены ли технические слова, есть ли пары «было — стало» на конкретных примерах, есть ли картинки там, где текст не справляется. Пока он возвращает страницу с замечаниями, Мила её не видит.</p>
+<p>Снимки «до» нужно делать до первой правки, иначе их уже не получить. Для Mini App и веб-страниц это настоящие скриншоты со стенда, для переписки с ботом — макет диалога, который скрипт собирает из настоящих текстов бота. Макет честнее, чем кажется: тексты в нём не придуманы, а взяты из кода, и он повторяется на каждой задаче без участия Милы.</p>
+
+<h2>Учёт: где Claude помнит, на чём остановились</h2>
+<p class="h2sub">Папка brain/ — память проекта, которая живёт в репозитории, а не в переписке</p>
+<figure>
+  <svg viewBox="0 0 760 168" role="img" aria-label="Лента жизни задачи: идея, план утверждён, в работе, проверена на стенде, влита в dev, готова к проду, на проде, закрыта. Ответ Милы нужен на двух шагах — после плана и перед продом.">
+    <line x1="30" y1="86" x2="730" y2="86" stroke="var(--line)" stroke-width="2"/>
+    <g>
+      <circle cx="40" cy="86" r="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>
+      <text class="mono small muted" x="20" y="116">идея</text>
+      <circle cx="138" cy="86" r="7" fill="var(--accent)"/>
+      <text class="mono small" x="104" y="116">план готов</text>
+      <text class="mono small b" x="100" y="62" fill="var(--accent)">нужен ответ</text>
+      <circle cx="236" cy="86" r="7" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+      <text class="mono small muted" x="210" y="116">в работе</text>
+      <circle cx="334" cy="86" r="7" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+      <text class="mono small muted" x="300" y="116">на стенде</text>
+      <circle cx="432" cy="86" r="7" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+      <text class="mono small muted" x="406" y="116">в dev</text>
+      <circle cx="530" cy="86" r="7" fill="var(--accent)"/>
+      <text class="mono small" x="494" y="116">к проду</text>
+      <text class="mono small b" x="492" y="62" fill="var(--accent)">нужен ответ</text>
+      <circle cx="628" cy="86" r="7" fill="var(--surface)" stroke="var(--line)" stroke-width="2"/>
+      <text class="mono small muted" x="604" y="116">на проде</text>
+      <circle cx="722" cy="86" r="7" fill="var(--ok)"/>
+      <text class="mono small muted" x="700" y="116">закрыта</text>
+    </g>
+  </svg>
+  <figcaption>Закрашенные точки — шаги, где нужно слово Милы; зелёная — закрытая задача. Слово Милы требуется дважды за задачу: принять план и разрешить выкатку. Остальные переходы Claude делает сам и пишет в карточку, чтобы следующая сессия начиналась не с нуля.</figcaption>
+</figure>
+<p>В карточке задачи лежат состояние, ветка, пункты приёмки с галочками и ссылки на план и отчёт. Список всех задач собирается скриптом из карточек — так две одновременные ветки не спорят за один файл. Рядом с задачами живут ещё четыре тетради: найденные баги, идеи на потом, снимки состояния прода и журнал самого харнеса — что мешало Claude работать и что в правилах поменяли. Последняя тетрадь нужна, чтобы харнес улучшался по наблюдениям, а не по памяти.</p>
+
+<h2>Чистота кода и приёмка</h2>
+<p class="h2sub">Требования к коду держатся проверками, а не обещаниями</p>
+<div class="grid2">
+  <div class="card">
+    <h3>Чем держится чистый код</h3>
+    <ul>
+      <li>Линтер и типы в <span class="mono">make check</span> — форматирование и подсказки типов проверяются на каждый прогон.<sup class="src">[1]</sup></li>
+      <li>Правило слоёв в контракте: правила продукта отдельно, сервисы отдельно, бот и веб только переводят запрос.<sup class="src">[7]</sup></li>
+      <li>Агент-критик читает дифф и ищет раздутый код, мёртвые куски, отсутствие логов там, где без них не разобраться.</li>
+      <li>Язык кода — английский, кириллица допустима только в текстах для людей; на это будет отдельный приёмочный тест, потому что в первой версии бота код был написан по-русски.<sup class="src">[8]</sup></li>
+    </ul>
+  </div>
+  <div class="card">
+    <h3>Что меняется в приёмке</h3>
+    <ul>
+      <li>Тест харнеса обновляется: он до сих пор требует шести файлов старого конвейера, включая агента, который пишет код за Claude.<sup class="src">[9]</sup></li>
+      <li>Добавляются два теста: запрет кириллицы в коде и проверка, что карточки задач заполнены по форме.</li>
+      <li>Приёмочные тесты правит только Дима. Claude Милы, если считает тест неверным, пишет об этом в отчёте.</li>
+    </ul>
+  </div>
+</div>
+<div class="callout">
+  <p>«Нет, мне не нравится этот фордж. Можешь сам писать код, и спавнить агентов на тесты».</p>
+  <span class="who">Дмитрий, 3 сентября 2026 · про конвейер из шести ролей<sup class="src">[8]</sup></span>
+</div>
+<p>Это решение до сих пор не доведено до конца в файлах: правила уже говорят «агенты не пишут код», а приёмочный тест всё ещё требует наличия исполнителя-агента. Разошью это я, а не Claude Милы — ей приёмку менять нельзя.</p>
+
+<h2>Чего мы намеренно не делаем</h2>
+<ul class="notes">
+  <li>Никаких технических блокировок вокруг Claude, кроме четырёх запретов в настройках: ни перехватчиков команд, ни песочницы. Ты выбрал не упарываться — правила живут в тексте, а запреты закрывают только тот класс ошибок, после которого данные не вернуть.</li>
+  <li>Объектного хранилища не будет. Бэкапы остаются на сервере и уезжают копией на мак Милы.</li>
+  <li>Второго стека на сервере под тесты не поднимаем: роль стенда играет её ноутбук.</li>
+  <li>Копию прода на ноутбук не возим и пользовательских аккаунтов Telegram для автотестов не заводим.</li>
+  <li>Нагрузочных тестов нет, вместо них проверка границ и одновременных правок.</li>
+</ul>
+
+<section class="verdict">
+  <h2>Что это значит для нас</h2>
+  <p>Процесс сходится на том, что уже есть в репозитории: стенд без Telegram, приёмочные тесты и ранбук написаны, добавить нужно сортировку задач, восемь точек входа, учёт и придуманные данные. Сначала гигиена GitHub, потом харнес, и только после этого первая настоящая задача Милы — на ней процесс и проверяется.</p>
+  <div class="scroll">
+  <table class="cmp">
+    <tr><th>Шаг</th><th>Что внутри</th></tr>
+    <tr><td class="k">1. Гигиена GitHub</td><td>репозиторий в приватный, страницы-сайт выключить, временный форк удалить</td></tr>
+    <tr><td class="k">2. Правила и точки входа</td><td>CLAUDE.md под четыре маршрута, настройки, восемь скиллов, шаблоны плана и отчёта</td></tr>
+    <tr><td class="k">3. Стенд и данные</td><td>тридцать придуманных участниц, два режима, проверка Telegram, скриншоты</td></tr>
+    <tr><td class="k">4. Учёт</td><td>папка brain, карточки задач, сборка списка, журнал харнеса</td></tr>
+    <tr><td class="k">5. Приёмка</td><td>тест харнеса под новые файлы, запрет кириллицы в коде, проверка карточек</td></tr>
+    <tr><td class="k">6. Руководство Милы</td><td>GUIDE-RU под маршруты, первый запуск стенда, бэкапы на её мак</td></tr>
+    <tr><td class="k">7. Обкатка</td><td>одна настоящая небольшая задача целиком по процессу, до прода</td></tr>
+  </table>
+  </div>
+  <ul class="notes">
+    <li>Шаг 1 держится на людях: Мила переключает видимость репозитория и выключает страницы-сайт, ты даёшь право на удаление форка.</li>
+    <li>Шаг 6 — полчаса вместе с Милой: Docker на её маке и первый запуск стенда под присмотром.</li>
+    <li>Шаг 7 — её выбор задачи; шаги 2–5 от людей не требуют ничего.</li>
+  </ul>
+  <p>Порядок шагов и их состав — моё предложение от 16 сентября, не согласованный план. Шаги 2–5 делаю одним заходом, шаги 6–7 после твоего просмотра результата.</p>
+</section>
+
+<section class="sources" aria-label="источники">
+  <h3>Источники</h3>
+  <ol>
+    <li><code>Makefile</code>, <code>.github/workflows/ci.yml</code>, прогон <code>pytest tests/unit tests/acceptance/test_stage7_process.py</code> — 94 теста прошли за 1,05 с, всего в репозитории 331 тест-функция (проверено 15 сентября 2026).</li>
+    <li>Устная постановка Дмитрия 15–16 сентября 2026: четыре маршрута, учёт, отчёты с парами было-стало, гейты, окно выкатки, предупреждение о сложных решениях.</li>
+    <li>Проверка 16 сентября 2026: <code>gh repo view milanosova/romantika-marshrutov</code> — видимость PUBLIC; страницы <code>RUNBOOK.html</code>, <code>ARCHITECTURE.html</code>, <code>DOMAIN.html</code>, <code>GUIDE-RU.html</code>, <code>CHANGELOG.html</code> отдаются с кодом 200 на <code>milanosova.github.io</code> и содержат адрес сервера и имя системного пользователя.</li>
+    <li><code>romantika/ops/fake_telegram.py</code>, <code>scripts/dev-stack.sh</code> — поддельный Bot API с эндпоинтами управления и локальный стенд без Telegram (версия от 5 сентября 2026).</li>
+    <li><code>docs/CHANGELOG.md</code> v2.1.0–v2.1.1 — лимит в десять файлов, гонки правок отчёта, авария с томом фотографий только для чтения.</li>
+    <li><code>docs/GUIDE-RU.md</code> — недельный ритм клуба: пост в понедельник, напоминания в четверг 19:00 и воскресенье 12:00, «Привал» в воскресенье вечером.</li>
+    <li><code>docs/ARCHITECTURE.md</code> §3 и §12 — слои и контракт тестирования (версия от 3 сентября 2026).</li>
+    <li>Второй мозг, <code>inbox/capture/2026-09-01-romantika-marshrutov.md</code> — слова Дмитрия про конвейер forge (3 сентября 2026) и требование «код не на русском» (3 сентября 2026).</li>
+    <li><code>tests/acceptance/test_stage7_process.py</code>, функция <code>test_in_repo_review_agents_and_release_skill</code> — требует шести файлов <code>forge-*.md</code>, включая <code>forge-implementer.md</code>.</li>
+  </ol>
+</section>
+</div>

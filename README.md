@@ -7,7 +7,9 @@ Telegram-бот клуба [@romantika_marshrutov](https://t.me/romantika_marshr
 
 Продуктовые правила: [`docs/DOMAIN.md`](docs/DOMAIN.md). Техконтракт: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 Эксплуатация: [`docs/RUNBOOK.md`](docs/RUNBOOK.md). Руководство владельца: [`docs/GUIDE-RU.md`](docs/GUIDE-RU.md).
-Правила для Claude Code: [`CLAUDE.md`](CLAUDE.md). Старый код лежит в `legacy/` только для справки.
+Разовая настройка мака и GitHub: [`docs/SETUP-RU.md`](docs/SETUP-RU.md).
+Правила для Claude Code: [`CLAUDE.md`](CLAUDE.md); процедуры — `.claude/skills/`; память проекта (задачи, планы,
+отчёты, снимки прода) — [`brain/`](brain/README.md). Старый код лежит в `legacy/` только для справки.
 
 ## Что внутри
 
@@ -21,7 +23,7 @@ Telegram-бот клуба [@romantika_marshrutov](https://t.me/romantika_marshr
 | Бэкапы и восстановление | `romantika/ops`, `scripts/` | `scripts/backup.sh`, `scripts/restore-verify.sh` |
 | Импорт из старого бота | `romantika/migration` | `python -m romantika.migration.legacy_import --sqlite …` |
 | Контейнеры | `docker/` | `docker compose -f docker/compose.yml --project-directory . up -d` |
-| Локальный стенд без Telegram (заглушка Bot API, подписанные ссылки) | `romantika/ops/fake_telegram.py`, `scripts/dev-stack.sh` | `scripts/dev-stack.sh up` |
+| Локальный стенд: заглушка Bot API или тестовый бот, тридцать демо-участниц, подписанные ссылки | `romantika/ops/{fake_telegram,demo_data,chat_mockup}.py`, `scripts/dev-stack.sh`, `scripts/shots.sh` | `scripts/dev-stack.sh up [--live]` |
 
 ## Локальная разработка
 
@@ -38,12 +40,14 @@ make run-bot            # long polling с токеном из .env
 make run-worker
 ```
 
-Полный стенд без Telegram: `scripts/dev-stack.sh up` поднимает Postgres, заглушку Bot API, веб,
-бота и воркер; `scripts/dev-stack.sh link 1001 Алиса` печатает ссылку на Mini App под этим
-пользователем. Подробнее — в RUNBOOK, раздел «Local stand».
+Стенд: `scripts/dev-stack.sh up` поднимает Postgres, заглушку Bot API, веб, бота, воркер и
+заливает тридцать придуманных участниц; `up --live` — то же с тестовым ботом в настоящем
+Telegram; `scripts/dev-stack.sh link 1001 Алиса` печатает ссылку на Mini App под этим
+пользователем; `scripts/shots.sh` снимает экраны, `python -m romantika.ops.chat_mockup` собирает
+макет переписки с ботом. Подробнее — в RUNBOOK, раздел «Local stand».
 
-Тесты: `tests/acceptance/` — приёмочные контракты по этапам (не менять без обсуждения),
-`tests/unit/`, `tests/integration/`. CI (`.github/workflows/ci.yml`) гоняет то же, что `make check`.
+Тесты: `tests/acceptance/` — приёмочные контракты по этапам, их правит только Дима (стадия 7 —
+харнес, стадия 8 — язык кода), `tests/unit/`, `tests/integration/`. CI (`.github/workflows/ci.yml`) гоняет то же, что `make check`.
 
 ## Прод
 
