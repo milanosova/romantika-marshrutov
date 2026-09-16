@@ -40,11 +40,15 @@ configure_live() {
   export ADMIN_IDS="${ADMIN_IDS:-900001}" ADMIN_CHAT_ID="${ADMIN_CHAT_ID:-${ADMIN_IDS%%,*}}"
   export PUBLIC_BASE_URL="${PUBLIC_BASE_URL:-http://127.0.0.1:8010}"
   export TELEGRAM_API_BASE=""
+  # macOS ships bash 3.2, where an empty array trips `set -u`; hence the `+` expansion below.
   local proxy_opt=()
   [ -n "${TELEGRAM_PROXY:-}" ] && proxy_opt=(-x "$TELEGRAM_PROXY")
   # The token never appears in a shell command Claude runs: only this script sees it.
-  if ! curl -sS --max-time 8 "${proxy_opt[@]}" "https://api.telegram.org/bot${BOT_TOKEN}/getMe" | grep -q '"ok":true'; then
-    echo "Telegram не отвечает — включи VPN (или задай TELEGRAM_PROXY в $DEV/dev-bot.env) и повтори"; exit 1
+  local me
+  me=$(curl -sS --max-time 8 ${proxy_opt[@]+"${proxy_opt[@]}"} "https://api.telegram.org/bot${BOT_TOKEN}/getMe" 2>&1 || true)
+  if ! printf '%s' "$me" | grep -q '"ok":true'; then
+    echo "Telegram не отвечает — включи VPN (или задай TELEGRAM_PROXY в $DEV/dev-bot.env) и повтори"
+    echo "  ответ: $(printf '%s' "$me" | head -c 160)"; exit 1
   fi
   echo "telegram: ok (@${BOT_USERNAME:-?})"
 }

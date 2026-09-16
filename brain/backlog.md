@@ -8,4 +8,4 @@
 
 | № | Задача | Маршрут | Ветка | Приёмка | Обновлено |
 |---|---|---|---|---|---|
-| 01 | [Харнес для работы Милы через Claude Code](tasks/01-harness/status.md) | фича | `harness` | 0/7 | 2026-09-16 · [план](tasks/01-harness/../../specs/2026-09-16-harness.html) · [отчёт](tasks/01-harness/report.html) |
+| 01 | [Харнес для работы Милы через Claude Code](tasks/01-harness/status.md) | фича | `harness` | 4/7 | 2026-09-16 · [план](tasks/01-harness/../../specs/2026-09-16-harness.html) · [отчёт](tasks/01-harness/report.html) |
