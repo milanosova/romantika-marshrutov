@@ -485,13 +485,30 @@ maps 12 legacy tables to the model (see DOMAIN.md §9 for the mapping), download
 `file_id` via the bot token into MEDIA_DIR, is idempotent (re-running updates nothing that
 already matches), and prints a reconciliation table (legacy counts vs imported counts).
 
-## 14. Process (binding; mirrors `tests/acceptance/test_stage7_process.py`)
+## 14. Process (binding; mirrors `tests/acceptance/test_stage7_process.py` and `test_stage8_language.py`)
 
-- `CLAUDE.md` (rules + commands + change workflow), `README.md`, `docs/RUNBOOK.md`
-  (Deploy, Logs, Backup, Restore, Cut-over from the legacy bot, Release checklist,
-  Rollback), `docs/GUIDE-RU.md` (owner's guide in Russian: admin Mini App, bot panel,
-  what backups are and how to check them, how to ask Claude for a change safely, PDF).
-- In-repo review roles `.claude/agents/forge-*.md` (copies of the global forge roles,
-  project-specific rubrics appended), skill `.claude/skills/release-check/SKILL.md` and
-  workflow `.claude/workflows/release-check.js` (verifier + code/security/data lenses over
-  the diff of the release branch; ui lens optional).
+The owner works through Claude Code alone; the process is carried by files in the repository:
+
+- `CLAUDE.md` (hard rules, the four routes — content / micro / feature / emergency —, the
+  branch model `master ← dev ← feature/NN-slug`, pointers to skills and memory; under 200
+  lines), `.claude/settings.json` (`language: russian`, deny on destructive commands, ask on
+  deploy), `README.md`, `docs/RUNBOOK.md` (Deploy, Logs, Backup, Restore, Release checklist,
+  Rollback, Local stand, Read-only queries), `docs/GUIDE-RU.md` (owner's daily guide, Russian),
+  `docs/SETUP-RU.md` (one-time setup: GitHub visibility, the Mac, the stand, the test bot,
+  backups).
+- Skills `.claude/skills/{zadacha,stend,proverka,relize,otchet,avaria,status,prod}/SKILL.md`
+  are the procedures; their descriptions carry the Russian phrases the owner says. `relize`
+  is never model-invoked.
+- Critic agents `.claude/agents/{verifier,critic-code,critic-ui,critic-data,critic-limits,
+  editor-report}.md` never write production code; a finding needs proof.
+- Project memory `brain/`: task cards `tasks/NN-slug/status.md` (validated by
+  `scripts/brain_index.py`, which generates `brain/backlog.md`), plans and reports as HTML
+  pages next to them, `bugs/`, `ideas/`, `ops/` snapshots, `skills-log.md`.
+- Local stand `scripts/dev-stack.sh` (work mode: fake Bot API; live mode: the test bot from
+  `.dev/dev-bot.env`), invented data `romantika/ops/demo_data.py` (never production data),
+  screenshots `scripts/shots.sh`, conversation mock-ups `romantika/ops/chat_mockup.py`,
+  production helpers `scripts/rc.sh` (refuses `down -v` / `volume rm`) and
+  `scripts/prod-snapshot.sh` (read-only, its queries listed in the RUNBOOK).
+- Language: English identifiers, comments and developer docs; Russian only in
+  `romantika/texts/`, templates, data and people-facing strings. `test_stage8_language.py`
+  forbids Cyrillic identifiers and file names and ratchets Russian literals outside `texts/`.
