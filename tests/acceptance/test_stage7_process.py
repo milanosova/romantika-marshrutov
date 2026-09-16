@@ -38,10 +38,26 @@ def front_matter(text: str) -> dict[str, object]:
 def test_claude_md_names_rules_routes_and_memory() -> None:
     text = read("CLAUDE.md")
     for needle in (
-        "docs/ARCHITECTURE.md", "docs/DOMAIN.md", "docs/RUNBOOK.md", "brain/README.md",
-        "make check", "tests/acceptance", "Never delete", "demo_data",
-        "Контент", "Микро-правка", "Авария", "/zadacha", "/proverka", "/relize", "/avaria", "/status", "/prod",
-        "feature/NN-slug", "уточнить у Димы", "test_stage8_language",
+        "docs/ARCHITECTURE.md",
+        "docs/DOMAIN.md",
+        "docs/RUNBOOK.md",
+        "brain/README.md",
+        "make check",
+        "tests/acceptance",
+        "Never delete",
+        "demo_data",
+        "Контент",
+        "Микро-правка",
+        "Авария",
+        "/zadacha",
+        "/proverka",
+        "/relize",
+        "/avaria",
+        "/status",
+        "/prod",
+        "feature/NN-slug",
+        "уточнить у Димы",
+        "test_stage8_language",
     ):
         assert needle in text, f"CLAUDE.md lacks {needle!r}"
     assert len(text.splitlines()) <= 200, "CLAUDE.md should stay short: procedures belong to skills"
@@ -65,7 +81,11 @@ def test_skills_are_the_entry_points() -> None:
         assert CYRILLIC.search(description), f"{name}: the description must carry the Russian phrases Mila says"
         assert len(description) <= 1000
         assert len(text.splitlines()) <= 150, f"{name}: keep SKILL.md focused"
-    assert front_matter(read(".claude/skills/relize/SKILL.md")).get("disable-model-invocation") is True
+    relize = front_matter(read(".claude/skills/relize/SKILL.md"))
+    assert relize.get("disable-model-invocation") is not True, (
+        "Mila says «выкатываем» in words; the skill must be reachable"
+    )
+    assert "выкатываем" in str(relize["description"])
     assert not (REPO / ".claude" / "skills" / "release-check").exists(), "release-check was folded into /relize"
     assert not (REPO / ".claude" / "workflows").exists(), "the Workflow-based release check is gone"
     present = {p.name for p in (REPO / ".claude" / "skills").iterdir() if p.is_dir()}
@@ -83,7 +103,13 @@ def test_agents_are_critics_not_implementers() -> None:
 
 
 def test_brain_memory_is_in_place_and_valid() -> None:
-    for path in ("brain/README.md", "brain/backlog.md", "brain/skills-log.md", "brain/_templates/status.md", "brain/_templates/page.html"):
+    for path in (
+        "brain/README.md",
+        "brain/backlog.md",
+        "brain/skills-log.md",
+        "brain/_templates/status.md",
+        "brain/_templates/page.html",
+    ):
         read(path)
     spec = importlib.util.spec_from_file_location("brain_index", REPO / "scripts" / "brain_index.py")
     assert spec and spec.loader
@@ -101,29 +127,96 @@ def test_brain_memory_is_in_place_and_valid() -> None:
 
 
 def test_stand_scripts_exist_and_refuse_to_destroy_production() -> None:
-    for path in ("scripts/dev-stack.sh", "scripts/shots.sh", "scripts/rc.sh", "scripts/prod-snapshot.sh", "scripts/brain_index.py"):
+    for path in (
+        "scripts/dev-stack.sh",
+        "scripts/shots.sh",
+        "scripts/rc.sh",
+        "scripts/prod-snapshot.sh",
+        "scripts/brain_index.py",
+    ):
         assert (REPO / path).stat().st_mode & 0o111, f"{path} is not executable"
     stack = read("scripts/dev-stack.sh")
     for needle in ("--live", "dev-bot.env", "demo_data", "reset", "fake_telegram"):
         assert needle in stack
-    for args in (["down", "-v"], ["volume", "rm", "romantika_media"]):
-        result = subprocess.run([str(REPO / "scripts" / "rc.sh"), *args], capture_output=True, text=True, timeout=10)
+    rc = str(REPO / "scripts" / "rc.sh")
+    refused = (
+        ["down"],
+        ["down", "-v"],
+        ["down", "--volumes"],
+        ["--progress", "quiet", "down", "--volumes"],
+        ["volume", "rm", "romantika_media"],
+        ["rm", "-sfv", "db"],
+        ["--rmi", "all", "up"],
+        ["exec", "-T", "db", "psql", "-U", "romantika"],
+        ["exec", "-T", "db", "psql", "-U", "romantika", "-d", "romantika", "-c", "delete from reports"],
+        ["exec", "-T", "db", "psql", "-U", "romantika", "-d", "romantika", "-Atc", "select 1; drop table users"],
+        [
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-U",
+            "romantika",
+            "-d",
+            "romantika",
+            "-Atc",
+            "select * from users union select * into x",
+        ],
+    )
+    for args in refused:
+        result = subprocess.run(
+            [rc, *args], capture_output=True, text=True, timeout=10, env={"RC_DRY": "1", "PATH": "/usr/bin:/bin"}
+        )
         assert result.returncode == 2 and "refused" in result.stdout, args
+    allowed = (
+        ["ps"],
+        ["logs", "--since", "30m", "bot", "web", "worker"],
+        ["exec", "-T", "backup", "scripts/backup.sh"],
+        ["exec", "-T", "db", "psql", "-U", "romantika", "-d", "romantika", "-Atc", "select count(*) from users"],
+    )
+    for args in allowed:
+        result = subprocess.run(
+            [rc, *args], capture_output=True, text=True, timeout=10, env={"RC_DRY": "1", "PATH": "/usr/bin:/bin"}
+        )
+        assert result.returncode == 0 and "docker compose" in result.stdout, args
     for module_name in ("romantika.ops.demo_data", "romantika.ops.chat_mockup"):
         assert importlib.util.find_spec(module_name), module_name
 
 
 def test_runbook_covers_operations_and_read_only_queries() -> None:
     text = read("docs/RUNBOOK.md")
-    for heading in ("Deploy", "Backup", "Restore", "Release checklist", "Rollback", "Logs", "Local stand", "Read-only queries"):
-        assert re.search(rf"^#+\s*.*{heading}", text, flags=re.MULTILINE | re.IGNORECASE), f"RUNBOOK lacks section {heading!r}"
+    for heading in (
+        "Deploy",
+        "Backup",
+        "Restore",
+        "Release checklist",
+        "Rollback",
+        "Logs",
+        "Local stand",
+        "Read-only queries",
+    ):
+        assert re.search(rf"^#+\s*.*{heading}", text, flags=re.MULTILINE | re.IGNORECASE), (
+            f"RUNBOOK lacks section {heading!r}"
+        )
     assert "/opt/stacks/romantika" in text and "restore-verify" in text and "mac-pull-backups" in text
     assert "scripts/rc.sh" in text and "prod-snapshot.sh" in text
 
 
 def test_owner_guides_in_russian() -> None:
     guide = read("docs/GUIDE-RU.md")
-    for needle in ("админ", "Mini App", "бэкап", "Claude", "PDF", "недел", "контент", "микро-правк", "авари", "стенд", "SETUP-RU"):
+    for needle in (
+        "админ",
+        "Mini App",
+        "бэкап",
+        "Claude",
+        "PDF",
+        "недел",
+        "контент",
+        "микро-правк",
+        "авари",
+        "стенд",
+        "SETUP-RU",
+    ):
         assert needle.lower() in guide.lower(), f"GUIDE-RU lacks {needle!r}"
     assert len(guide) > 3000
     setup = read("docs/SETUP-RU.md")

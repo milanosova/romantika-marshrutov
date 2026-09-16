@@ -39,7 +39,10 @@ SCENARIOS: dict[str, list[dict[str, str]]] = {
     "help": [{"send": "/start"}, {"send": "/help"}],
 }
 
-TAG_RE = re.compile(r"</?(b|strong|i|em|u|s|code|pre|a|tg-spoiler)\b[^>]*>", re.I)
+TAG_RE = re.compile(r"</?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>")
+SENTINEL_RE = re.compile("\x00\\d+\x01")
+#: Telegram HTML the bot may send → the tag we re-emit (attributes are always dropped).
+ALLOWED_TAGS = {"b": "b", "strong": "b", "i": "i", "em": "i", "u": "u", "s": "s", "code": "code", "pre": "pre"}
 
 STYLE = """
 body{margin:0;background:#8FB0D1;font:15px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif;color:#111}
@@ -65,22 +68,37 @@ body{margin:0;background:#8FB0D1;font:15px/1.4 -apple-system,"Segoe UI",Roboto,s
 
 
 def _clean(text: str) -> str:
-    """Keep the bot's bold/italic/code, escape everything else, keep line breaks."""
-    keep: dict[str, str] = {}
+    """Keep the bot's bold/italic/code as bare tags, escape everything else, keep line breaks.
 
+    Tags are rebuilt from their name, so no attribute survives; unknown tags disappear; a tag
+    left open by the bot is closed at the end so it cannot bleed into the rest of the page.
+    """
+    keep: dict[str, str] = {}
+    open_tags: list[str] = []
+
+    # Sentinels use two different control characters, so a key can never be assembled from the
+    # tail of one key, a digit of the bot's text and the head of the next («2 из 12» once came
+    # out as «45 из 12» that way); they are swapped back in a single regex pass.
     def stash(match: re.Match[str]) -> str:
-        key = f"\x00{len(keep)}\x00"
-        tag = match.group(0)
-        name = match.group(1).lower()
-        keep[key] = (
-            tag if name in {"b", "strong", "i", "em", "u", "s", "code", "pre"} and not tag.startswith("<a") else ""
-        )
+        key = f"\x00{len(keep)}\x01"
+        name = ALLOWED_TAGS.get(match.group(1).lower())
+        if name is None:
+            keep[key] = ""
+        elif match.group(0).startswith("</"):
+            if name in open_tags:
+                open_tags.remove(name)
+                keep[key] = f"</{name}>"
+            else:
+                keep[key] = ""
+        else:
+            open_tags.append(name)
+            keep[key] = f"<{name}>"
         return key
 
     stashed = TAG_RE.sub(stash, text)
     escaped = html.escape(stashed, quote=False)
-    for key, tag in keep.items():
-        escaped = escaped.replace(key, tag)
+    escaped = SENTINEL_RE.sub(lambda m: keep[m.group(0)], escaped)
+    escaped += "".join(f"</{name}>" for name in reversed(open_tags))
     return escaped.replace("\n", "<br>")
 
 
@@ -92,58 +110,81 @@ class Stand:
         self.client = httpx.Client(timeout=10)
         self.transcript: list[dict[str, Any]] = []
         self.last_inline: list[tuple[int, str, str]] = []  # (message_id, button text, callback data)
+        self.cursor = time.time() - 1  # everything the bot sent after this instant belongs to the mock-up
+        self.seen: set[tuple[int, float]] = set()  # (message_id, at) already in the transcript
 
-    def _collect(self, since: float) -> None:
-        """Wait until the bot has been quiet for QUIET_SECONDS, then record what it sent."""
+    def _collect(self) -> None:
+        """Wait until the bot has been quiet for QUIET_SECONDS, then absorb everything new.
+
+        One cursor for the whole run: a message the bot or the worker sends late (after the quiet
+        period of the step that caused it) is picked up by the next step instead of being lost.
+        """
         deadline = time.time() + MAX_WAIT_SECONDS
-        seen = 0
+        pending = 0
         last_change = time.time()
+        rows: list[dict[str, Any]] = []
         while time.time() < deadline:
             rows = self.client.get(
-                f"{self.api}/_control/sent", params={"chat_id": self.user_id, "since": since}
+                f"{self.api}/_control/sent", params={"chat_id": self.user_id, "since": self.cursor}
             ).json()["result"]
-            if len(rows) != seen:
-                seen = len(rows)
+            fresh = len(self.absorbed(rows, dry=True))
+            if fresh != pending:
+                pending = fresh
                 last_change = time.time()
-            elif seen and time.time() - last_change > QUIET_SECONDS:
+            elif fresh and time.time() - last_change > QUIET_SECONDS:
                 break
             time.sleep(0.25)
+        self.absorbed(rows)
+
+    def absorbed(self, rows: list[dict[str, Any]], *, dry: bool = False) -> list[dict[str, Any]]:
+        """Turn raw `sent` rows into transcript entries, skipping what is already there."""
+        entries: list[dict[str, Any]] = []
         for row in rows:
             message = row["message"]
-            if row["method"] == "answerCallbackQuery":
-                if message.get("text"):
-                    self.transcript.append({"who": "toast", "text": message["text"]})
+            key = (message.get("message_id", 0), row["at"])
+            if key in self.seen:
                 continue
-            entry: dict[str, Any] = {"who": "bot", "text": message.get("text") or message.get("caption") or ""}
-            if message.get("photo"):
-                entry["photo"] = True
-            markup = message.get("reply_markup") or {}
-            if isinstance(markup, str):
-                markup = json.loads(markup)
-            if markup.get("inline_keyboard"):
-                entry["inline"] = [[button["text"] for button in line] for line in markup["inline_keyboard"]]
-                self.last_inline = [
-                    (message["message_id"], button["text"], button.get("callback_data", ""))
-                    for line in markup["inline_keyboard"]
-                    for button in line
-                ] + self.last_inline
-            if markup.get("keyboard"):
-                entry["keyboard"] = [
-                    [button["text"] if isinstance(button, dict) else button for button in line]
-                    for line in markup["keyboard"]
-                ]
-            self.transcript.append(entry)
+            if row["method"] == "answerCallbackQuery":
+                entry: dict[str, Any] = {"who": "toast", "text": message.get("text", "")}
+                if not entry["text"]:
+                    if not dry:
+                        self.seen.add(key)
+                    continue
+            else:
+                entry = {"who": "bot", "text": message.get("text") or message.get("caption") or ""}
+                if message.get("photo"):
+                    entry["photo"] = True
+                markup = message.get("reply_markup") or {}
+                if isinstance(markup, str):
+                    markup = json.loads(markup)
+                if markup.get("inline_keyboard"):
+                    entry["inline"] = [[button["text"] for button in line] for line in markup["inline_keyboard"]]
+                    if not dry:
+                        self.last_inline = [
+                            (message["message_id"], button["text"], button.get("callback_data", ""))
+                            for line in markup["inline_keyboard"]
+                            for button in line
+                        ] + self.last_inline
+                if markup.get("keyboard"):
+                    entry["keyboard"] = [
+                        [button["text"] if isinstance(button, dict) else button for button in line]
+                        for line in markup["keyboard"]
+                    ]
+            entries.append(entry)
+            if not dry:
+                self.seen.add(key)
+                self.transcript.append(entry)
+                self.cursor = max(self.cursor, float(row["at"]) - 0.001)
+        return entries
 
     def send(self, text: str) -> None:
-        since = time.time()
         self.transcript.append({"who": "user", "text": text})
         self.client.post(
             f"{self.api}/_control/text", json={"user_id": self.user_id, "text": text, "name": self.name}
         ).raise_for_status()
-        self._collect(since)
+        self._collect()
 
     def photo(self, caption: str) -> None:
-        since = time.time()
         self.transcript.append({"who": "user", "text": caption, "photo": True})
         png = Path(__file__).with_name("demo_data.py")  # any bytes do: the fake API only stores them
         self.client.post(
@@ -151,18 +192,17 @@ class Stand:
             data={"user_id": str(self.user_id), "kind": "photo", "caption": caption, "name": self.name},
             files={"file": ("photo.png", png.read_bytes(), "image/png")},
         ).raise_for_status()
-        self._collect(since)
+        self._collect()
 
     def press(self, fragment: str) -> None:
         for message_id, text, data in self.last_inline:
             if fragment.lower() in text.lower():
-                since = time.time()
                 self.transcript.append({"who": "user", "text": f"[{text}]", "press": True})
                 self.client.post(
                     f"{self.api}/_control/callback",
                     json={"user_id": self.user_id, "data": data, "message_id": message_id},
                 ).raise_for_status()
-                self._collect(since)
+                self._collect()
                 return
         raise SystemExit(f"no inline button containing {fragment!r}; seen: {[t for _, t, _ in self.last_inline]}")
 

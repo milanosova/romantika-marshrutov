@@ -12,7 +12,7 @@
 | Путь | Что | Кто пишет |
 |---|---|---|
 | `backlog.md` | список задач и открытых багов по состояниям — **генерируется** `python3 scripts/brain_index.py`, руками не править | скрипт |
-| `tasks/NN-slug/status.md` | карточка задачи: маршрут, состояние, ветка, приёмка, журнал | `/zadacha`, `/proverka`, `/relize`, `/avaria` |
+| `tasks/NN-slug/status.md` | карточка задачи: маршрут, состояние, ветка, приёмка (4–8 пунктов), журнал | `/zadacha`, `/proverka`, `/relize`, `/avaria` |
 | `tasks/NN-slug/plan.html` | план для Милы (до работы) | `/otchet` |
 | `tasks/NN-slug/report.html` | отчёт для Милы (после) с парами «было — стало» | `/otchet` |
 | `tasks/NN-slug/before/`, `after/` | скриншоты и макеты переписки до и после | `/zadacha`, `/otchet` |
@@ -27,9 +27,12 @@
 
 `idea → planned → in_progress → on_stand → in_dev → ready_for_prod → on_prod → closed`
 
-Слово Милы нужно дважды: `planned → in_progress` (она прочитала план и сказала «ок») и
-`in_dev → ready_for_prod` (она сказала «выкатываем»). Остальные переходы делает Claude и пишет
-строку в журнал карточки. Задача без движения больше месяца помечается `status: parked` с
+Слово Милы нужно трижды за фичу: `planned → in_progress` («ок» на план), `on_stand → in_dev`
+(«сливаем» после первой ступени проверок) и `in_dev → ready_for_prod` («выкатываем»). Для
+микро-правки — один раз: её «ок» покрывает и `dev`, и прод. Остальные переходы делает Claude и
+пишет строку в журнал карточки. Кто какой переход делает: `/zadacha` — `planned`, `in_progress`;
+`/proverka` — `on_stand`, `in_dev`; `/relize` — `ready_for_prod`, `on_prod`; `/prod` через день —
+`closed`. Задача без движения больше месяца помечается `status: parked` с
 причиной.
 
 ## Правила

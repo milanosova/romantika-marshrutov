@@ -7,6 +7,7 @@ table per state. Idempotent; the backlog is never edited by hand (brain/README.m
 
 from __future__ import annotations
 
+import posixpath
 import re
 import sys
 from datetime import date
@@ -66,6 +67,16 @@ def acceptance(card: Path) -> tuple[int, int]:
     return sum(1 for box in boxes if box.lower() == "x"), len(boxes)
 
 
+def _page_link(task_dir: Path, folder: str, label: str, name: str) -> str:
+    """A link to the plan/report page, or an honest note when the card promises a file that is not there."""
+    if not name:
+        return ""
+    target = (task_dir / name).resolve()
+    if target.exists():
+        return f" · [{label}]({posixpath.normpath(posixpath.join(folder, name))})"
+    return f" · {label}: обещан, файла нет"
+
+
 def task_rows() -> tuple[dict[str, list[str]], list[str]]:
     rows: dict[str, list[str]] = {state: [] for state in STATES}
     problems: list[str] = []
@@ -76,8 +87,8 @@ def task_rows() -> tuple[dict[str, list[str]], list[str]]:
             continue
         done, total = acceptance(card)
         folder = card.parent.relative_to(BRAIN).as_posix()
-        plan = f" · [план]({folder}/{fields['plan']})" if fields.get("plan") else ""
-        report = f" · [отчёт]({folder}/{fields['report']})" if fields.get("report") else ""
+        plan = _page_link(card.parent, folder, "план", fields.get("plan", ""))
+        report = _page_link(card.parent, folder, "отчёт", fields.get("report", ""))
         route = ROUTES.get(fields["route"], fields["route"])
         rows[fields["status"]].append(
             f"| {fields['id']} | [{fields['title']}]({folder}/status.md) | {route} "

@@ -6,8 +6,9 @@ letters, achievements, wishes, one edited report. Deterministic (fixed seed), id
 nothing when the demo users already exist, unless `--force`).
 
 Never run against production: the stand is the only place where invented people belong
-(CLAUDE.md rule 1). Everything goes through the services, so the rows are exactly what the bot
-and the app would have written.
+(CLAUDE.md rule 1). Everything but the admin flag goes through the services (there is no
+service that grants admin rights — they come from ADMIN_IDS), so the rows are exactly what the
+bot and the app would have written.
 """
 
 from __future__ import annotations
@@ -146,8 +147,13 @@ def _png(width: int, height: int, hue: int) -> bytes:
 
 
 def _at(day: date, hour: int) -> datetime:
-    """An aware instant at `hour` o'clock Moscow time on `day`, as UTC."""
-    return datetime(day.year, day.month, day.day, hour, tzinfo=MOSCOW).astimezone(UTC)
+    """An aware instant at `hour` o'clock Moscow time on `day`, as UTC — never later than now.
+
+    The clamp matters on the current day: a report stamped this evening would sit in the future
+    and hide its author from the reminder scheduler, which counts by `moscow_now()`.
+    """
+    moment = datetime(day.year, day.month, day.day, hour, tzinfo=MOSCOW).astimezone(UTC)
+    return min(moment, datetime.now(UTC) - timedelta(seconds=1))
 
 
 async def _demo_users_present(session: AsyncSession, count: int) -> int:
@@ -198,6 +204,7 @@ async def _report(
 async def populate(session: AsyncSession, store: MediaStore, *, today: date, participants: int) -> dict[str, int]:
     """Create the demo world; returns counts for the summary line."""
     rng = random.Random(SEED)
+    participants = min(participants, len(NAMES))
     season = await content.active_season(session, today=today)
     if season is None:
         raise SystemExit("no active season: run `python -m romantika.ops.seed --activate` first")

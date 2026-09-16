@@ -1,0 +1,127 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Харнес: что сделано</title>
+<style>
+:root{--bg:#F5F4F0;--surface:#FFFFFF;--ink:#1C1F26;--ink2:#4B5060;--muted:#7B8090;--line:#DDDCD5;
+  --ok:#1F7A4C;--ok-soft:rgba(31,122,76,.09);--warn:#A85410;--warn-soft:rgba(168,84,16,.10);--bad:#B3261E;--bad-soft:rgba(179,38,30,.09);
+  --accent:#0E6E7A;--accent-soft:rgba(14,110,122,.08);--accent-ink:#FFFFFF;
+  --body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}}
+:root[data-theme="dark"]{--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body);padding:0 20px 80px}
+.wrap{max-width:760px;margin:0 auto}
+.crumbs{font:12.5px/1.4 var(--mono);color:var(--muted);padding:28px 0 6px}
+h1{font-size:34px;line-height:1.15;margin:6px 0 10px;text-wrap:balance}
+.lede{font-size:17px;color:var(--ink2);margin:0 0 24px;max-width:62ch}
+h2{font-size:23px;line-height:1.25;margin:44px 0 8px;text-wrap:balance}
+p{margin:0 0 12px;max-width:68ch} ul{margin:0 0 12px;padding-left:20px} li{margin:0 0 6px}
+.tldr{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;padding:18px 22px 10px;margin:0 0 8px}
+.tldr h2{margin:0 0 10px;font-size:20px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 8px}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+.pair figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px}
+.pair figure.after{border-color:var(--accent)}
+.pair img{display:block;width:100%;height:auto;border-radius:4px;border:1px solid var(--line)}
+.pair figcaption{font-size:13.5px;color:var(--ink2);margin-top:8px}
+.pair .tag{font:11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.pair .txt{font-size:14.5px;line-height:1.5}
+figure.wide{margin:14px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px}
+figure.wide img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:4px}
+figcaption{font-size:14px;color:var(--ink2);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface);border:1px solid var(--line);margin:14px 0 8px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-top:1px solid var(--line)}
+th{font-size:13px;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em;border-top:0}
+.check{padding-left:0} .check li{list-style:none} .check li::before{content:"☐ ";color:var(--muted)} .check li.done::before{content:"☑ ";color:var(--ok)}
+.callout{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:6px;padding:14px 18px;margin:16px 0}
+.callout.ok{border-left-color:var(--ok)}
+.verdict{margin:48px 0 0;padding:22px 24px;background:var(--accent-soft);border-radius:8px}
+.verdict h2{margin:0 0 10px}
+code{font:13px var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.shots{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin:14px 0 8px}
+@media (max-width:640px){.shots{grid-template-columns:1fr}}
+.shots figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px}
+.shots img{display:block;width:100%;height:auto;border-radius:4px;border:1px solid var(--line)}
+.shots figcaption{font-size:13px;color:var(--ink2);margin-top:6px}
+</style>
+<div class="wrap">
+<nav class="crumbs">романтика маршрутов → задача 01 → отчёт</nav>
+<h1>Харнес: что сделано</h1>
+<p class="lede">Отчёт по задаче 01 от 16 сентября 2026: в репозиторий бота положен порядок работы Милы через Claude Code. Код бота, приложения и воркера не менялся; участницы не заметят ничего. Читатели — Дима (принимает) и Мила (узнаёт, как теперь просить правки).</p>
+
+<aside class="tldr"><h2>Коротко</h2>
+<ul>
+  <li>Любая просьба Милы теперь начинается с маршрута: контент (админка, без кода), микро-правка, фича с планом и отчётом, авария. Восемь команд-скиллов отвечают на её обычные фразы — «хочу», «проверь», «выкатываем», «бот не работает».</li>
+  <li>На её маке поднимается копия продукта с тридцатью придуманными участницами — двумя командами, в двух режимах. Настоящие данные на мак не попадают никогда; это закреплено правилом, скриптами и тестом.</li>
+  <li>Проверено: 443 теста из 443 зелёные; стенд поднят в обоих режимах (в живом — тестовый бот отвечает в настоящем Telegram); скриншоты и макеты переписки собираются скриптами; снимок прода снят за 18 секунд только чтением; запрет на разрушительные команды сработал вживую.</li>
+  <li>Два независимых ревью (тексты для Милы и код) нашли восемь крупных проблем — все закрыты в тот же день, включая обход защиты прода через <code>rc.sh</code> и прод-логи, которые уезжали бы в git.</li>
+  <li>Что нужно от людей: Мила закрывает репозиторий на GitHub и выключает Pages, ставит Docker и один раз проходит <code>docs/SETUP-RU.md</code>; Дима вливает ветку <code>harness</code> в <code>master</code> и заводит <code>dev</code>.</li>
+</ul></aside>
+
+<h2>Что изменилось для Милы: было → стало</h2>
+<div class="pair">
+  <figure><div class="tag">было</div><div class="txt">Одна команда <code>/release-check</code> с описанием по-английски; всё остальное приходилось объяснять словами, а Claude вспоминал процедуру из длинного <code>CLAUDE.md</code>. Точек входа для человека, который не читает код, не было.</div><figcaption>Claude знал правила, но не знал, с чего начать разговор.</figcaption></figure>
+  <figure class="after"><div class="tag">стало</div><div class="txt">Восемь скиллов с русскими триггерами: <code>/zadacha</code> (принять задание), <code>/stend</code>, <code>/proverka</code>, <code>/relize</code>, <code>/otchet</code>, <code>/avaria</code>, <code>/status</code>, <code>/prod</code>. Мила говорит «хочу, чтобы…» — Claude сам называет маршрут и достаёт нужную процедуру.</div><figcaption>Команду с косой чертой запоминать не нужно — скиллы подхватываются по словам.</figcaption></figure>
+</div>
+<div class="pair">
+  <figure><div class="tag">было</div><div class="txt">Планов и отчётов как документов не было; память о задачах жила в чате и пропадала с сессией.</div><figcaption>Следующая сессия начиналась с нуля.</figcaption></figure>
+  <figure class="after"><div class="tag">стало</div><div class="txt">Папка <code>brain/</code>: карточка на каждую задачу, план и отчёт страницами рядом, автоматический список задач, баги, идеи, снимки прода, журнал самого харнеса. «Что у нас» — и Claude пересказывает, на чём остановились.</div><figcaption>Память проекта лежит в репозитории и переживает любую сессию.</figcaption></figure>
+</div>
+<div class="pair">
+  <figure><div class="tag">было</div><div class="txt">Стенд без Telegram с пустым сезоном: ни одной участницы, пустая админка, нечего показать в отчёте.</div><figcaption>Проверять фичи глазами было не на чем.</figcaption></figure>
+  <figure class="after"><div class="tag">стало</div><div class="txt">Тридцать придуманных участниц с отчётами, фотографиями-заглушками, штампами, заморозками, письмами. Два режима: «работа» (поддельный Telegram, агенты играют участниц) и «живой» (тестовый бот в настоящем Telegram). Скриншоты экранов и макеты переписки — одной командой.</div><figcaption>Так теперь выглядит стенд у Милы — ниже три снимка с него.</figcaption></figure>
+</div>
+<div class="shots">
+  <figure><img src="after/app-journal.png" alt="Журнал участницы на стенде"><figcaption>Журнал участницы: две недели, штампы, фотографии-заглушки.</figcaption></figure>
+  <figure><img src="after/app-admin.png" alt="Админка на стенде"><figcaption>Админка Милы: сводка недели, кто сдал, кто молчит, черновик «Привала».</figcaption></figure>
+  <figure><img src="after/chat-report-photo.png" alt="Макет переписки с ботом"><figcaption>Макет переписки: ответы бота настоящие, снятые со стенда.</figcaption></figure>
+</div>
+
+<h2>Что теперь обязательно перед выкаткой</h2>
+<table>
+  <tr><th>Ступень</th><th>Что проверяется</th><th>Кем</th><th>Слово Милы</th></tr>
+  <tr><td>Перед <code>dev</code></td><td><code>make check</code>, тесты самой правки, прогон фичи на стенде с чтением логов, ревью кода</td><td>верификатор + два критика</td><td>«ок» на план, потом «сливаем»</td></tr>
+  <tr><td>Перед продом</td><td>то же плюс сценарии e2e, регресс из тринадцати шагов, границы и параллелизм, данные и миграции, живой прогон в Telegram руками</td><td>четыре-пять критиков + Мила и Claude в Telegram</td><td>«выкатываем» — после числа активных участниц и предложенного окна</td></tr>
+  <tr><td>Микро-правка</td><td><code>make check</code>, ревью кода, экран с изменённым текстом</td><td>верификатор + критик кода</td><td>одно «ок»</td></tr>
+  <tr><td>Авария</td><td>бэкап → причина по логам → откат или минимальный фикс → проверка</td><td>Claude сам</td><td>не ждёт; сообщает после</td></tr>
+</table>
+<p>Каждый критик обязан приложить доказательство — файл и строку, запрос и ответ, строки логов, скриншот; «проверено» без доказательства не принимается. Правило «код по-английски, людям по-русски» держится тестом: кириллица в имени функции или файла роняет приёмку.</p>
+
+<h2>Что проверено и как</h2>
+<ul>
+  <li><code>make check</code> на ветке <code>harness</code>: ruff, формат, mypy, pytest — <b>444 теста из 444</b> (было 425; добавлены приёмка харнеса, приёмка языка кода, демо-данные, генератор бэклога, макет переписки).</li>
+  <li>Стенд, режим «работа»: <code>up</code> → 30 участниц, 44 отчёта, 22 фото, 5 писем; <code>down</code> сохраняет данные, <code>up</code> продолжает, <code>reset</code> пересобирает; <code>restart</code> помнит режим. Логи стенда без ошибок.</li>
+  <li>Стенд, режим «живой»: токен из файла на сервере, проверка доступа к Telegram, бот <code>@romantika_staging_bot</code> начал опрос — строка <code>bot_started</code> в <code>.dev/logs/bot.log</code>.</li>
+  <li>Скриншоты: <code>scripts/shots.sh --page all</code> — 8 экранов; макеты: три сценария (<code>start</code>, <code>report-photo</code>, <code>passport</code>).</li>
+  <li>Снимок прода: <code>scripts/prod-snapshot.sh</code> — 18 секунд, healthz ok, бэкап проверен восстановлением 13 сентября, ошибок в логах 0; снимок сохранён в <code>brain/ops/</code>, персональных данных в нём нет (проверено поиском по номерам и токенам).</li>
+  <li>Защита от разрушительных команд: <code>claude -p</code> попросили выполнить <code>rm -rf</code> — ответ «Permission … has been denied», папка цела. <code>scripts/rc.sh</code> отбивает 11 способов уронить прод, включая <code>down --volumes</code> и любой SQL, кроме одиночного <code>select</code>.</li>
+  <li>Скиллы прошли <code>claude plugin validate</code>.</li>
+  <li>Два ревью независимыми агентами (тексты для Милы; код) — 5 + 3 крупных находки, все закрыты; список — в <code>brain/skills-log.md</code>.</li>
+  <li>Сухой прогон «Claude Милы получает первое задание» — раздел ниже; после него ещё 8 правок скиллов и один починенный баг.</li>
+</ul>
+
+<h2 id="dry-run">Сухой прогон: первое задание от Милы</h2>
+<p>Отдельный агент сыграл Claude, которому Мила написала: «хочу, чтобы в паспорте было видно, с какого числа участница в сезоне; и поправь опечатку в приветствии». Он шёл строго по скиллам, ничего не зная о том, как они писались.</p>
+<div class="pair">
+  <figure><div class="tag">что получилось</div><div class="txt">Маршруты названы верно: дата в паспорте — фича, точка — микро-правка. Три вопроса Миле — по делу: считать ли «с начала сезона» 18 августа или первую неделю 31 августа, длинная или короткая дата, где ставить точку. По дороге нашёл настоящий факт: приложение сейчас вообще не отдаёт дату присоединения — то, что план обязан учитывать. План написал, проверил по рубрике редактора, четыре правки внёс сам.</div><figcaption>Процесс работает: без подсказок дошёл от «хочу» до плана с честными вопросами.</figcaption></figure>
+  <figure class="after"><div class="tag">что мешало — и починено</div><div class="txt">Восемь мест, где скилл говорил одно, а репозиторий позволял другое: ветка <code>dev</code> без upstream, снимки двух участниц перетирали друг друга, редактору не было обходного пути без агентов, приёмка тесна, бэклог ссылался на несуществующий план, «что у нас» молчал без снимков прода. И один настоящий баг: макет переписки показывал «Штампов: 45 из 12» вместо «2 из 12» — разделители в коде складывались с цифрами текста.</div><figcaption>Все восемь исправлены в тот же день, на баг написан регрессионный тест.</figcaption></figure>
+</div>
+<div class="callout ok"><p>Что важно: баг макета поймал сам процесс — правило «открой картинку глазами до показа Миле». Без него Мила утверждала бы план по картинке с неверной цифрой.</p></div>
+
+<h2>Что осталось и чего не трогала</h2>
+<ul>
+  <li>Не трогала код бота, приложения и воркера; прод не выкатывался и не требует выкатки.</li>
+  <li>Хуки, песочница и перехватчики команд не заводились — решение владельца; страховка ограничена списком запретов в настройках и гардом <code>rc.sh</code>. Обходы вроде <code>sh -c "rm -rf …"</code> запретами не ловятся — это осознанно.</li>
+  <li>Mini App из кнопки тестового бота в живом режиме не открывается (кнопка ведёт на настоящий сервер); приложение на стенде смотрят по ссылке в браузере. Идея с туннелем записана в <code>brain/ideas/</code>.</li>
+  <li>Число активных участниц на проде пока считает всех пользователей бота, включая админов: флаг админа в базе не ведётся. Пока в боте только Мила и Дима, это не мешает.</li>
+</ul>
+
+<section class="verdict"><h2>Что дальше</h2>
+<p><b>Дима:</b> посмотреть ветку <code>harness</code> (шесть коммитов от 1715df2), влить в <code>master</code>, создать <code>dev</code> от <code>master</code> и запушить обе; удалить временный форк после <code>gh auth refresh -s delete_repo</code>.</p>
+<p><b>Мила:</b> закрыть репозиторий и выключить Pages (раздел 1 в <code>docs/SETUP-RU.md</code>), поставить Docker и пройти остальные разделы — можно попросить Claude «сделай разовую настройку по docs/SETUP-RU.md». Первая настоящая задача — любая небольшая: она и станет обкаткой процесса.</p>
+</section>
+</div>

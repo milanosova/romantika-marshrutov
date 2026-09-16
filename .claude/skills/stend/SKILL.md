@@ -31,9 +31,10 @@ argument-hint: "[up | up --live | down | reset | link <id> <имя> [/app/...] |
    отказе говорит: «Telegram не отвечает — включи VPN».
 3. **Проверить глазами.** `curl -s http://127.0.0.1:8010/healthz` → `"status":"ok"`.
    `tail -n 20 .dev/logs/bot.log` — нет ошибок.
-4. **Ссылка для Милы.** `scripts/dev-stack.sh link 900001 Мила /app/admin` — админка;
-   `scripts/dev-stack.sh link 1001 Алиса /app` — приложение участницы. Ссылку открывают в
-   обычном браузере на маке.
+4. **Ссылка для Милы.** `scripts/dev-stack.sh link admin` — админка (в режиме «работа» это
+   900001, в живом — её настоящий Telegram-номер из `.dev/dev-bot.env`; другой id админом не
+   будет); `scripts/dev-stack.sh link 1001 Алиса /app` — приложение участницы. Команда печатает
+   две строки: Миле отдавай первую (ссылка для браузера), вторая — служебный заголовок для API.
 5. **Логи.** `scripts/dev-stack.sh logs` (все) или `.dev/logs/{bot,web,worker,telegram}.log`.
 6. **Пересоздать с нуля.** `scripts/dev-stack.sh reset` — удаляет ТОЛЬКО контейнер стенда и
    `.dev/media`, заливает демо-данные заново. К проду отношения не имеет.

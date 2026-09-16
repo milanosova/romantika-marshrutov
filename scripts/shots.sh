@@ -4,17 +4,19 @@
 #   scripts/shots.sh --as 900001 --name Мила --page /app/admin --out brain/tasks/03-x/before
 #   scripts/shots.sh --page all --dark                # both participant and admin screens, dark theme
 # Pages: /app (today) /app/passport /app/words /app/journal /app/more /app/admin / /calendar
-# Files: <out>/<page-slug>[-dark].png. Needs the stand up (scripts/dev-stack.sh up) and Chrome.
+# /app/admin is signed as ADMIN_UID (default 900001, the work-mode admin); --as applies to /app* pages.
+# Files: <out>/<page-slug>[-<id>][-dark].png (the id suffix appears when --as is given, so two
+# participants never overwrite each other). Needs the stand up (scripts/dev-stack.sh up) and Chrome.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-USER_ID=1001; NAME="Алиса"; PAGE=""; OUT=.dev/shots; DARK=0; WIDTH=500; HEIGHT=1100
+USER_ID=1001; NAME="Алиса"; PAGE=""; OUT=.dev/shots; DARK=0; WIDTH=500; HEIGHT=1100; AS_GIVEN=0
 PARTICIPANT_PAGES=(/app /app/passport /app/words /app/journal /app/more)
 ADMIN_PAGES=(/app/admin)
 PUBLIC_PAGES=(/ /calendar)
 while [ $# -gt 0 ]; do
   case "$1" in
-    --as) USER_ID=$2; shift 2 ;;
+    --as) USER_ID=$2; AS_GIVEN=1; shift 2 ;;
     --name) NAME=$2; shift 2 ;;
     --page) PAGE=$2; shift 2 ;;
     --out) OUT=$2; shift 2 ;;
@@ -55,7 +57,7 @@ shot() { # url, file
 
 for page in "${pages[@]}"; do
   slug=$(echo "$page" | sed 's#^/$#season#; s#^/##; s#/#-#g')
-  suffix=""; [ "$DARK" = 1 ] && suffix="-dark"
+  suffix=""; [ "$AS_GIVEN" = 1 ] && [ "$page" != /app/admin ] && suffix="-$USER_ID"; [ "$DARK" = 1 ] && suffix="$suffix-dark"
   file="$OUT/$slug$suffix.png"
   case "$page" in
     /app/admin) uid=${ADMIN_UID:-900001}; uname="Мила" ;;
@@ -63,10 +65,11 @@ for page in "${pages[@]}"; do
     *) uid=""; uname="" ;;
   esac
   if [ -n "$uid" ]; then
-    url=$(uv run python -m romantika.ops.dev_link --user "$uid" --name "$uname" --path "$page" | head -1)
+    signed=$(uv run python -m romantika.ops.dev_link --user "$uid" --name "$uname" --path "$page")
+    url=${signed%%$'\n'*}
   else
     url="http://127.0.0.1:8010$page"
   fi
-  shot "$url" "$file"
+  shot "$url" "$file" || true
   [ -s "$file" ] && echo "$file" || echo "failed: $page" >&2
 done

@@ -61,6 +61,10 @@ Every request from Mila starts with the route, said aloud in the first sentence 
 («это контент — сделаем в админке», «это микро-правка», «это фича — готовлю план», «это
 авария»). When in doubt take the heavier route; Mila can override.
 
+Mila's word is needed three times for a feature — «ок» on the plan, «сливаем» after the stand
+check, «выкатываем» before production — and once for a micro-change (her «ок» covers both `dev`
+and production). Nothing else waits for her.
+
 | Route | What it is | What runs |
 |---|---|---|
 | **Контент** | texts of weeks, words, facts, achievements, wishes, reminders toggle | nothing in the code: Admin Mini App or bot commands (`docs/GUIDE-RU.md`) |
@@ -74,7 +78,8 @@ Every request from Mila starts with the route, said aloud in the first sentence 
 release. `feature/NN-slug` branches from `dev` (`NN` is the task number in `brain/tasks/`). A
 hotfix branches from `master` and is merged into both `master` and `dev`. Nothing is committed
 directly to `master` except an avaria hotfix. Merging into `master` happens only inside
-`/relize`, after Mila said «выкатываем».
+`/relize` (after Mila said «выкатываем») or inside `/avaria` (a hotfix is merged and deployed
+without waiting for her word; she is told right after).
 
 ## Skills are the procedures
 
@@ -83,7 +88,7 @@ directly to `master` except an avaria hotfix. Merging into `master` happens only
 | `/zadacha` | take a request, name the route, ask at most three questions, write the plan page, create the task card and the branch |
 | `/stend` | start, stop, reset the local stand; `work` mode (fake Telegram + demo data) or `live` mode (test bot in real Telegram) |
 | `/proverka` | first gate before `dev`: `make check`, the feature on the stand, log reading, two critics |
-| `/relize` | second gate before `master`: full critics, regression list, live run, release window, deploy, watch, report |
+| `/relize` | second gate before `master`: full critics, regression list, live run, release window, deploy, watch, report. Only when Mila herself says «выкатываем», «релиз», «на прод»; never as a step of another skill |
 | `/otchet` | write the plan or the report page for Mila and have `editor-report` review it before she sees it |
 | `/avaria` | production is down: the emergency route |
 | `/status` | where we are: branch, open tasks, next step for Mila |
