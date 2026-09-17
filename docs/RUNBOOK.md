@@ -15,7 +15,7 @@ Operations guide for the person who runs the stack (English; the owner's guide i
   `ADMIN_CHAT_ID`, `POSTGRES_PASSWORD`, `PUBLIC_BASE_URL`, `BOT_USERNAME`, `CHANNEL_URL`.
 - Telegram from the containers goes through `HTTPS_PROXY` (set by `compose.vps.yml`); aiogram
   reads it via `TELEGRAM_PROXY`/`HTTPS_PROXY` (`romantika/bot/factory.py`, needs `aiohttp-socks`).
-- Season content: `rc exec -T bot python -m romantika.ops.seed --activate` (idempotent).
+- Season content: `rc exec -T bot python -m romantika.ops.seed --activate` — seeds a **fresh** season from `data/seasons/*.json` and is idempotent until then. Once weeks have been created, moved, deleted or announced in the admin app the file is no longer the source of truth and the seed **refuses** (SeedError names the actions): edit weeks in the app, or seed a new season.
 
 ## Access
 

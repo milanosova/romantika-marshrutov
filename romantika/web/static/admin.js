@@ -83,7 +83,11 @@
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Сводка недели</p><h1>Неделя</h1></header><label>Какая неделя<select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
     $("week-pick").addEventListener("change", () => { const n = +$("week-pick").value; guarded(() => renderWeek(n), () => renderWeek(n)); });
     const picked = state.weeks.find((w) => w.number === pick);
-    if (picked && isDraft(picked)) {
+    if (pick == null || !picked) {
+      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Пока нечего сводить</h2><p class="muted">Все недели сезона — черновики. Объяви первую в «Заданиях», и здесь появится сводка.</p></div>`;
+      return;
+    }
+    if (isDraft(picked)) {
       // Nobody has seen a draft: there is nothing to sum up and no «Привал» to draft.
       $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели — сводки и черновика «Привала» у неё нет. Объявить её можно в «Заданиях».</p></div>`;
       return;
@@ -298,6 +302,7 @@
     if (/not after today/.test(m)) return "Новую неделю можно ставить только на будущее";
     if (/outside the season/.test(m)) return "Эти даты за пределами сезона";
     if (/cannot be announced/.test(m)) return "Чтобы объявить, нужны название и минимум";
+    if (/cannot be emptied/.test(m)) return "У объявленной недели название и минимум не стираются";
     if (/move the draft into the future first/.test(m)) return "Даты черновика уже прошли — сначала переставь его вперёд";
     if (/frozen/.test(m)) return "Неделя уже началась — даты не меняются";
     if (/participant data/.test(m)) return "К этой неделе уже что-то привязано — штамп, отчёт, слово или факт. Её нельзя удалить";

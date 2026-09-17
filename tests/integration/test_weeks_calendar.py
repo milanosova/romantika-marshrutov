@@ -694,3 +694,33 @@ async def test_a_draft_has_no_summary_no_draft_post_and_no_reminder(app: App) ->
         app.session, telegram=Silent(), season_id=app.season_id, week_number=13, now=moscow(2026, 11, 17, 19)
     )
     assert (result.sent, result.total) == (0, 0) and not sent, "a draft by number is «no week»"
+
+
+# --- the season file is for a fresh season only ---------------------------------------
+
+
+async def test_reseeding_refuses_after_the_admin_app_shaped_the_calendar(db_session: AsyncSession, season: int) -> None:
+    """Release check, 17.09 (critical): the file import keyed on week number and would have
+    overwritten a draft Mila made in the freed number 12 — announcing it, unaudited."""
+    from pathlib import Path
+
+    from romantika.services import seed
+
+    season_json = Path(__file__).resolve().parents[2] / "data" / "seasons" / "mexico-2026.json"
+    assert (await seed.import_season(db_session, season_json)).weeks_created == 0, "untouched: still idempotent"
+
+    await _free_last_slot(db_session, season)
+    draft = await content.create_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=season,
+        number=12,
+        starts_on=SLOT[0],
+        ends_on=SLOT[1],
+        today=TODAY,
+        texts={"title": "Мой черновик", "task_min": "мой минимум"},
+    )
+    with pytest.raises(seed.SeedError, match="edited in the admin app"):
+        await seed.import_season(db_session, season_json)
+    kept = await content.week_by_number(db_session, season, 12)
+    assert kept is not None and kept.id == draft.id and kept.is_draft and kept.title == "Мой черновик"

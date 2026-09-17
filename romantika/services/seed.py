@@ -146,6 +146,15 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
     }
     numbers = [int(_required(item, "num", "week")) for item in weeks]
     _reject_duplicates(numbers, "week")
+    # Once Mila has shaped the calendar in the admin app the file is no longer the source of
+    # truth: re-importing would overwrite her drafts (and announce them unaudited) or collide
+    # with her renumbered weeks. The file seeds a season; the admin app owns it afterwards.
+    touched = await _calendar_touched(session, season.id)
+    if touched and existing:
+        raise SeedError(
+            f"season {season.slug}: weeks were edited in the admin app ({touched}); the file no longer describes "
+            "the calendar. Edit weeks in the app instead of re-seeding, or seed a fresh season."
+        )
     created = 0
     for number, item in zip(numbers, weeks, strict=True):
         where = f"week {number}"
@@ -170,6 +179,31 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
     await session.execute(text("SET CONSTRAINTS weeks_no_overlap IMMEDIATE"))
     described = set(numbers)
     return created, len([number for number in existing if number not in described])
+
+
+async def _calendar_touched(session: AsyncSession, season_id: int) -> str | None:
+    """Has the admin app created, moved, deleted or announced a week of this season?
+
+    Every calendar action writes an audit row; an untouched season has none. Rows of deleted
+    weeks no longer resolve to a season, so a deletion anywhere counts — the file cannot be
+    trusted after one either way.
+    """
+    ids_of_season = {
+        str(week_id)
+        for (week_id,) in (
+            await session.execute(select(models.Week.id).where(models.Week.season_id == season_id))
+        ).all()
+    }
+    rows = await session.execute(
+        select(models.AuditLog.action, models.AuditLog.entity_id).where(
+            models.AuditLog.entity == "week", models.AuditLog.action.in_(["create", "move", "delete", "announce"])
+        )
+    )
+    actions = [action for action, entity_id in rows.all() if action == "delete" or entity_id in ids_of_season]
+    if not actions:
+        return None
+    counts = {action: actions.count(action) for action in sorted(set(actions))}
+    return ", ".join(f"{count} {action}" for action, count in counts.items())
 
 
 async def _import_achievement_types(
