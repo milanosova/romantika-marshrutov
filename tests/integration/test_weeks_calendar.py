@@ -12,6 +12,7 @@ from datetime import date
 
 import pytest
 from sqlalchemy import select
+from sqlalchemy import update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
@@ -555,3 +556,100 @@ async def test_a_hidden_fact_still_pins_its_week(db_session: AsyncSession, seaso
     with pytest.raises(content.ContentError, match="participant data"):
         await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY)
     assert await content.week_by_number(db_session, season, 12) is not None
+
+
+# --- an expired draft is never stuck ------------------------------------------------
+
+
+async def test_an_expired_draft_can_still_be_edited_moved_and_deleted(db_session: AsyncSession, season: int) -> None:
+    """Release check, 15.09 (rounds 3–4): a draft whose dates passed un-announced became an
+    immortal row that blocked its slot for the rest of the season. A draft never «starts»."""
+    await _free_last_slot(db_session, season)
+    draft = await content.create_week(
+        db_session, actor_id=ADMIN_ID, season_id=season, number=13, starts_on=SLOT[0], ends_on=SLOT[1], today=TODAY
+    )
+    late = date(2026, 11, 20)  # the draft's dates are behind us
+
+    edited = await content.update_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        week_id=draft.id,
+        today=late,
+        changes={"title": "Опоздала", "task_min": "Всё же."},
+    )
+    assert edited.title == "Опоздала", "a draft is editable however late"
+    with pytest.raises(content.ContentError, match="move the draft into the future first"):
+        await content.announce_week(db_session, actor_id=ADMIN_ID, week_id=draft.id, now=moscow(2026, 11, 20, 12))
+
+    # It can still be deleted — or, in a longer season, moved forward; here the season ends
+    # 18.11, so forward is outside it and the move is refused for that reason, not «frozen».
+    with pytest.raises(content.ContentError, match="outside the season"):
+        await content.move_week(
+            db_session,
+            actor_id=ADMIN_ID,
+            week_id=draft.id,
+            today=late,
+            starts_on=date(2026, 11, 23),
+            ends_on=date(2026, 11, 29),
+        )
+    await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=draft.id, today=late)
+    assert await content.week_by_number(db_session, season, 13) is None
+
+
+async def test_edit_is_scoped_to_the_active_season(app: App) -> None:
+    """PUT /api/admin/weeks/{id} must not reach a week of another season by a guessed id."""
+    other = models.Season(
+        slug="japan-2027",
+        title="Япония",
+        title_accusative="Японию",
+        hashtag="#япония",
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2027, 2, 21),
+        status=models.SeasonStatus.DRAFT.value,
+        daily_kind=None,
+        daily_title="",
+        daily_note="",
+        base_freezes=2,
+        max_freezes=5,
+        level_tourist=3,
+        level_traveler=6,
+        level_resident=9,
+    )
+    app.session.add(other)
+    await app.session.flush()
+    foreign = await content.create_week(
+        app.session,
+        actor_id=ADMIN_ID,
+        season_id=other.id,
+        number=1,
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2026, 11, 29),
+        today=app.now.date(),
+    )
+    r = await app.client.put(
+        f"/api/admin/weeks/{foreign.id}", json={"title": "Чужое"}, headers=app.headers(ADMIN_ID, "Мила")
+    )
+    assert r.status_code == 404
+    assert (await content.week_by_number(app.session, other.id, 1)).title == ""  # type: ignore[union-attr]
+
+
+async def test_admin_list_marks_a_late_draft_locked_not_current(app: App) -> None:
+    """A draft whose dates include today is still not «current» to the admin either."""
+    admin = app.headers(ADMIN_ID, "Мила")
+    weeks = {w["number"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert (await app.client.delete(f"/api/admin/weeks/{weeks[12]['id']}", headers=admin)).status_code == 204
+    r = await app.client.post(
+        "/api/admin/weeks", json={"number": 13, "starts_on": "2026-11-16", "ends_on": "2026-11-18"}, headers=admin
+    )
+    assert r.status_code == 201
+    draft_id = r.json()["id"]
+    await app.session.execute(
+        select(models.Week).where(models.Week.id == draft_id)
+    )  # exists; now age it: the stand clock is fixed, so age the row instead
+    await app.session.execute(sa_update_week_dates(draft_id, date(2026, 8, 24), date(2026, 8, 30)))
+    listed = {w["id"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert listed[draft_id]["state"] == "locked" and listed[draft_id]["announced_at"] is None
+
+
+def sa_update_week_dates(week_id: int, starts_on: date, ends_on: date):  # type: ignore[no-untyped-def]
+    return sa_update(models.Week).where(models.Week.id == week_id).values(starts_on=starts_on, ends_on=ends_on)

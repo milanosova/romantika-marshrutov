@@ -8,6 +8,10 @@ that carries stamps can never fall back to a draft and orphan them.
 Every week that exists today was announced by construction (it came from the season
 import), so the column is backfilled from `created_at`; new rows default to NULL.
 
+The downgrade drops the only record of which weeks are drafts, and the previous release
+shows every week to participants. With drafts present it therefore refuses: delete or
+announce them first (RUNBOOK «Rollback»). Without drafts the round trip is exact.
+
 Revision ID: c4e8f1a2b9d3
 Revises: b7d4e2a90c15
 Create Date: 2026-09-15 01:30:00.000000
@@ -33,4 +37,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    drafts = op.get_bind().execute(sa.text("SELECT count(*) FROM weeks WHERE announced_at IS NULL")).scalar_one()
+    if drafts:
+        raise RuntimeError(
+            f"{drafts} draft week(s) exist; the previous release would show them to participants. "
+            "Announce or delete them in the admin app, then downgrade."
+        )
     op.drop_column("weeks", "announced_at")

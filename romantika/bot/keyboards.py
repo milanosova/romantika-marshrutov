@@ -221,14 +221,10 @@ def achievement_choices(user_id: int, catalogue: list[AchievementTypeDTO]) -> In
 def week_choices(weeks: list[WeekDTO], *, today: date) -> InlineKeyboardMarkup:
     rows = []
     for week in weeks:
-        prefix = "▶ " if week.starts_on <= today else "🔒 "
-        rows.append(
-            [
-                InlineKeyboardButton(
-                    text=f"{prefix}{week.number} · {week.title}"[:60], callback_data=f"adm:week:{week.number}"
-                )
-            ]
-        )
+        prefix = "✏️ " if week.is_draft else "▶ " if week.starts_on <= today else "🔒 "
+        title = week.title or "без названия"
+        label = f"{prefix}{week.number} · {title}"[:60]
+        rows.append([InlineKeyboardButton(text=label, callback_data=f"adm:week:{week.number}")])
     rows.append([InlineKeyboardButton(text="‹ назад", callback_data="adm:panel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

@@ -322,11 +322,15 @@ async def handle_admin(
             "Попадёт в его журнал в конце сезона.",
         )
     elif action == "edit":
-        weeks = [week for week in await content.weeks(session, season.id) if week.ends_on >= today]
+        weeks = [
+            week
+            for week in await content.weeks(session, season.id, include_drafts=True)
+            if week.is_draft or week.ends_on >= today
+        ]
         await safe_send(
             bot,
             chat_id,
-            "Какую неделю правим?\n\n<i>▶ — идёт сейчас, 🔒 — ещё закрыта. "
+            "Какую неделю правим?\n\n<i>▶ — идёт сейчас, 🔒 — ещё закрыта, ✏️ — черновик, его видишь только ты. "
             "Прошедшие не показываю: люди их уже прожили, задним числом не меняем.</i>",
             reply_markup=keyboards.week_choices(weeks, today=today),
         )

@@ -291,9 +291,9 @@
     if (/not after today/.test(m)) return "Новую неделю можно ставить только на будущее";
     if (/outside the season/.test(m)) return "Эти даты за пределами сезона";
     if (/cannot be announced/.test(m)) return "Чтобы объявить, нужны название и минимум";
-    if (/not announced afterwards/.test(m)) return "Неделя уже прошла — объявлять поздно";
+    if (/move the draft into the future first/.test(m)) return "Даты черновика уже прошли — сначала переставь его вперёд";
     if (/frozen/.test(m)) return "Неделя уже началась — даты не меняются";
-    if (/participant data/.test(m)) return "По этой неделе уже есть штампы или отчёты — её нельзя удалить";
+    if (/participant data/.test(m)) return "К этой неделе уже что-то привязано — штамп, отчёт, слово или факт. Её нельзя удалить";
     if (/before it starts/.test(m)) return "Конец недели раньше её начала";
     if (/is not deleted/.test(m)) return "Неделя уже началась — её нельзя удалить";
     if (/does not exist/.test(m)) return "Такой недели уже нет — обнови список";
@@ -309,7 +309,7 @@
       ${future ? `<form class="stack" id="week-cal"><div class="row"><label style="flex:0 0 72px">Номер<input name="number" type="number" min="1" value="${w.number}"></label><label style="flex:1">Начало<input name="starts_on" type="date" value="${w.starts_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${w.ends_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label></div><button class="btn soft small" type="submit">Переставить</button></form>` : ""}
       <form class="stack" id="week-form">${FIELDS.map(([f, label, kind]) => `<label>${label}${kind === "textarea" ? `<textarea name="${f}" ${past ? "readonly" : ""}>${esc(w[f])}</textarea>` : `<input name="${f}" value="${esc(w[f])}" ${past ? "readonly" : ""}>`}</label>`).join("")}
       ${past ? "" : `<button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.</p>`}</form>
-      ${future ? `<button class="btn soft small danger" id="week-del" style="margin-top:16px">Удалить неделю</button><p class="note">Удалить можно только неделю, по которой ещё ничего нет — ни штампов, ни отчётов.</p>` : ""}`, () => {
+      ${future ? `<button class="btn soft small danger" id="week-del" style="margin-top:16px">Удалить неделю</button><p class="note">Удалить можно только неделю, к которой ещё ничего не привязано — ни штампов, ни отчётов, ни слов, ни фактов.</p>` : ""}`, () => {
       $("week-form").addEventListener("submit", async (e) => {
         e.preventDefault();
         const body = {};
@@ -426,7 +426,7 @@
   function diff(before, after) {
     const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => k !== "edit_key")
       .sort((a, b) => (FIELD_ORDER.indexOf(a) + 1 || 999) - (FIELD_ORDER.indexOf(b) + 1 || 999));
-    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || (v === "" ? "—" : short(v));
+    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || (v === "" ? "—" : /^\d{4}-\d{2}-\d{2}T/.test(String(v)) ? fmt(String(v).slice(0, 10)) : short(v));
     const empty = (v) => v == null || v === "" || (Array.isArray(v) && !v.length);
     return keys.filter((k) => !(empty((before || {})[k]) && empty((after || {})[k])))
       .map((k) => `${esc(AUDIT_FIELDS[k] || k)}: ${esc(value((before || {})[k]))} → ${esc(value((after || {})[k]))}`).join("\n") || "—";

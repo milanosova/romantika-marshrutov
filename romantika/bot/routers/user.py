@@ -266,6 +266,10 @@ async def answer_dialog(
             # this the whole update transaction would roll back and Mila would get no answer.
             await safe_send(bot, chat_id, ru.WEEK_ALREADY_OVER)
             return
+        except ValueError:
+            # An announced week keeps its title and minimum (DOMAIN §1).
+            await safe_send(bot, chat_id, ru.WEEK_FIELD_REQUIRED)
+            return
         await safe_send(
             bot,
             chat_id,

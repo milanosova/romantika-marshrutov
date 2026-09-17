@@ -163,6 +163,9 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   image is rebuilt from the checked-out tree).
 - Database: migrations are reversible (`rc run --rm migrate alembic downgrade -1`), but prefer
   a forward fix; restore from the nightly dump only if data is corrupted.
+  `c4e8f1a2b9d3` (weeks.announced_at) **refuses to downgrade while draft weeks exist**: the
+  previous release would show them to participants. Announce or delete the drafts in the
+  admin app («Задания»), then downgrade.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h).
 

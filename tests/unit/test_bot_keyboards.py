@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -185,12 +185,14 @@ def test_week_choices_mark_the_running_week() -> None:
             word="",
             word_ru="",
             word_meaning="",
+            announced_at=None if index == 3 else datetime(2026, 8, 20, tzinfo=UTC),
         )
-        for index in (1, 2)
+        for index in (1, 2, 3)
     ]
     markup = keyboards.week_choices(weeks, today=date(2026, 9, 2))
     assert labels_of(markup)[0].startswith("▶ 1"), "the running week is marked"
     assert labels_of(markup)[1].startswith("🔒 2"), "a future week is still closed"
+    assert labels_of(markup)[2].startswith("✏️ 3"), "a draft is marked as Mila's own, whatever its dates"
     assert "adm:panel" in data_of(markup)
 
 

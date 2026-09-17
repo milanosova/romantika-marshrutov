@@ -247,6 +247,7 @@ async def update_week(
     week_id: int,
     changes: Mapping[str, str],
     today: date | None = None,
+    season_id: int | None = None,
 ) -> WeekDTO:
     """Edit the texts of a week. Only content fields; the calendar is not editable here.
 
@@ -258,10 +259,8 @@ async def update_week(
     unknown = sorted(set(changes) - EDITABLE_WEEK_FIELDS)
     if unknown:
         raise ValueError(f"week fields {unknown} are not editable (allowed: {sorted(EDITABLE_WEEK_FIELDS)})")
-    row = await session.get(models.Week, week_id)
-    if row is None:
-        raise ContentError(f"week {week_id} does not exist")
-    if today is not None and row.ends_on < today:
+    row = await _week_of_season(session, week_id, season_id)
+    if today is not None and row.announced_at is not None and row.ends_on < today:
         raise ContentError(f"week {row.number} ended on {row.ends_on} and is not edited afterwards")
     if row.announced_at is not None:
         # An announced week never falls back to a draft: its stamps would be orphaned.
@@ -296,7 +295,9 @@ async def update_week(
 
 
 def _week_started(row: models.Week, today: date) -> bool:
-    return row.starts_on <= today
+    """An announced week whose first day has come. A draft never starts: nobody saw it, so
+    its calendar stays free to move or delete however late Mila gets to it (DOMAIN §1)."""
+    return row.announced_at is not None and row.starts_on <= today
 
 
 async def _week_of_season(session: AsyncSession, week_id: int, season_id: int | None) -> models.Week:
@@ -358,8 +359,10 @@ async def announce_week(
         return _week_dto(row)
     if not ready_to_announce(row):
         raise ValueError(f"week {row.number} cannot be announced without a title and a minimum task")
-    if row.ends_on < now.date():
-        raise ContentError(f"week {row.number} ended on {row.ends_on} and is not announced afterwards")
+    if row.starts_on <= now.date():
+        # Its dates are gone or going: announcing now would create a week nobody could do in
+        # full. Move it first (drafts move freely), then announce.
+        raise ContentError(f"week {row.number} starts on {row.starts_on}: move the draft into the future first")
     row.announced_at = now
     audit(
         session,

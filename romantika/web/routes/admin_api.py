@@ -51,8 +51,12 @@ async def list_weeks(
 
 
 def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
-    """Mila's calendar view of a week: locked (future), current, or over (`stamped` here means past)."""
-    if week.starts_on > today:
+    """Mila's calendar view of a week: locked (future), current, or over (`stamped` here means past).
+
+    A draft is `locked` whatever its dates: it never ran and nobody lived through it, so it
+    is neither current nor past — and stays editable, movable and deletable.
+    """
+    if week.is_draft or week.starts_on > today:
         state = WeekState.LOCKED
     elif week.ends_on >= today:
         state = WeekState.CURRENT
@@ -63,13 +67,15 @@ def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
 
 @router.put("/weeks/{week_id}", response_model=schemas.AdminWeekOut)
 async def edit_week(
-    week_id: int, body: schemas.WeekEdit, admin: AdminDep, session: SessionDep, today: TodayDep
+    week_id: int, body: schemas.WeekEdit, admin: AdminDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> schemas.AdminWeekOut:
     changes = {key: value for key, value in body.model_dump().items() if value is not None}
     if not changes:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "nothing to change")
     try:
-        week = await content.update_week(session, actor_id=admin.user.id, week_id=week_id, changes=changes, today=today)
+        week = await content.update_week(
+            session, actor_id=admin.user.id, week_id=week_id, changes=changes, today=today, season_id=season.id
+        )
     except content.ContentError as exc:
         code = status.HTTP_404_NOT_FOUND if "does not exist" in str(exc) else status.HTTP_409_CONFLICT
         raise HTTPException(code, str(exc)) from exc

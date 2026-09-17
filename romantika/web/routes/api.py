@@ -543,7 +543,8 @@ async def fix_level(
     now: NowDep,
 ) -> schemas.LevelOut:
     """«Это был максимум/минимум»: upgrade only, and only with a report (DOMAIN §2)."""
-    if await content.week_by_number(session, season.id, week_number) is None:
+    week = await content.week_by_number(session, season.id, week_number)
+    if week is None or week.is_draft:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
     level = StampLevel(body.level)
     result = await reports.fix_level(
