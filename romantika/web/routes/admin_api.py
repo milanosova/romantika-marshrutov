@@ -410,7 +410,7 @@ async def add_fact(
     week_id: int | None = None
     if body.week_number is not None:
         week = await content.week_by_number(session, season.id, body.week_number)
-        if week is None:
+        if week is None or week.is_draft:
             raise HTTPException(status.HTTP_404_NOT_FOUND, f"недели {body.week_number} в этом сезоне нет")
         week_id = week.id
     else:

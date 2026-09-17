@@ -1,7 +1,10 @@
 """`python -m romantika.ops.seed [--file data/seasons/mexico-2026.json] [--activate]`.
 
-Imports (or re-imports) a season description and optionally makes it the active season.
-Safe to run again: the import is an upsert and never deletes rows.
+Imports a season description and optionally makes it the active season.
+Safe to run again while the season is untouched: the import is an upsert and never
+deletes rows. Once the admin app has created, moved, deleted or announced a week the
+file is no longer the source of truth — the import is then skipped with a line saying so
+(exit 0: a stand or a deploy keeps starting), and `--activate` still runs.
 """
 
 from __future__ import annotations
@@ -19,10 +22,21 @@ async def run(path: Path, *, activate: bool) -> None:
     settings = get_settings()
     factory = make_session_factory(settings.database_url)
     async with factory() as session, session.begin():
-        result = await seed.import_season(session, path)
+        try:
+            result = await seed.import_season(session, path)
+        except seed.SeedError as exc:
+            if "edited in the admin app" not in str(exc):
+                raise
+            # The calendar belongs to the admin app now; the season itself already exists.
+            print(f"seed skipped: {exc}")
+            if activate:
+                season = await seed.season_by_file(session, path)
+                activated = await content.activate_season(session, season.id, actor_id=None)
+                print(f"season {season.slug}: status={activated.status.value}")
+            return
         status = "unchanged"
         if activate:
-            status = (await content.activate_season(session, result.season_id, actor_id=None)).status
+            status = (await content.activate_season(session, result.season_id, actor_id=None)).status.value
         print(
             f"season {result.slug}: created={result.created} weeks={result.weeks} "
             f"achievement_types={result.achievement_types} status={status}"

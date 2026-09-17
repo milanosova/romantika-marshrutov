@@ -1,8 +1,10 @@
 """Import a season description (`data/seasons/*.json`) into the database.
 
-Idempotent: rerunning updates the rows in place, so content fixes — including a moved
-calendar — can be re-imported. Rows the file no longer describes are never deleted (stamps
-and reports point at them); `SeedResult` counts them as `*_stale` instead.
+Idempotent while the season is untouched: rerunning updates the rows in place, so content
+fixes can be re-imported. Once the admin app has created, moved, deleted or announced a
+week of the season, the file no longer describes the calendar and the import refuses
+(`_calendar_touched`). Rows the file no longer describes are never deleted (stamps and
+reports point at them); `SeedResult` counts them as `*_stale` instead.
 Like every service, it flushes but never commits — the caller owns the transaction.
 """
 
@@ -75,6 +77,16 @@ def _required(payload: dict[str, Any], key: str, where: str) -> str:
     if not filled:
         raise SeedError(f"{where}: required field '{key}' is missing or empty")
     return filled
+
+
+async def season_by_file(session: AsyncSession, path: Path) -> models.Season:
+    """The season row a file describes (by slug), for callers that skip the import."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    slug = _required(payload, "slug", "season")
+    row = (await session.execute(select(models.Season).where(models.Season.slug == slug))).scalar_one_or_none()
+    if row is None:
+        raise SeedError(f"season {slug} does not exist")
+    return row
 
 
 async def import_season(session: AsyncSession, path: Path) -> SeedResult:
@@ -150,7 +162,7 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
     # truth: re-importing would overwrite her drafts (and announce them unaudited) or collide
     # with her renumbered weeks. The file seeds a season; the admin app owns it afterwards.
     touched = await _calendar_touched(session, season.id)
-    if touched and existing:
+    if touched:
         raise SeedError(
             f"season {season.slug}: weeks were edited in the admin app ({touched}); the file no longer describes "
             "the calendar. Edit weeks in the app instead of re-seeding, or seed a fresh season."
@@ -184,9 +196,8 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
 async def _calendar_touched(session: AsyncSession, season_id: int) -> str | None:
     """Has the admin app created, moved, deleted or announced a week of this season?
 
-    Every calendar action writes an audit row; an untouched season has none. Rows of deleted
-    weeks no longer resolve to a season, so a deletion anywhere counts — the file cannot be
-    trusted after one either way.
+    Every calendar action writes an audit row; an untouched season has none. Live weeks are
+    matched by id; a deleted week's row carries `season_id` in its `before` snapshot.
     """
     ids_of_season = {
         str(week_id)
@@ -195,11 +206,15 @@ async def _calendar_touched(session: AsyncSession, season_id: int) -> str | None
         ).all()
     }
     rows = await session.execute(
-        select(models.AuditLog.action, models.AuditLog.entity_id).where(
+        select(models.AuditLog.action, models.AuditLog.entity_id, models.AuditLog.before).where(
             models.AuditLog.entity == "week", models.AuditLog.action.in_(["create", "move", "delete", "announce"])
         )
     )
-    actions = [action for action, entity_id in rows.all() if action == "delete" or entity_id in ids_of_season]
+    actions = [
+        action
+        for action, entity_id, before in rows.all()
+        if entity_id in ids_of_season or (action == "delete" and (before or {}).get("season_id") == season_id)
+    ]
     if not actions:
         return None
     counts = {action: actions.count(action) for action in sorted(set(actions))}

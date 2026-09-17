@@ -724,3 +724,87 @@ async def test_reseeding_refuses_after_the_admin_app_shaped_the_calendar(db_sess
         await seed.import_season(db_session, season_json)
     kept = await content.week_by_number(db_session, season, 12)
     assert kept is not None and kept.id == draft.id and kept.is_draft and kept.title == "Мой черновик"
+
+
+async def test_reseed_guard_is_per_season_and_survives_deleting_every_week(
+    db_session: AsyncSession, season: int
+) -> None:
+    """Round seven: a deletion in another season must not block this one; deleting all
+    weeks of this season must not re-open the file as a source of truth."""
+    from pathlib import Path
+
+    from romantika.services import seed
+
+    season_json = Path(__file__).resolve().parents[2] / "data" / "seasons" / "mexico-2026.json"
+
+    other = models.Season(
+        slug="japan-2027",
+        title="Япония",
+        title_accusative="Японию",
+        hashtag="#япония",
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2027, 2, 21),
+        status=models.SeasonStatus.DRAFT.value,
+        daily_kind=None,
+        daily_title="",
+        daily_note="",
+        base_freezes=2,
+        max_freezes=5,
+        level_tourist=3,
+        level_traveler=6,
+        level_resident=9,
+    )
+    db_session.add(other)
+    await db_session.flush()
+    foreign = await content.create_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=other.id,
+        number=1,
+        starts_on=date(2026, 11, 23),
+        ends_on=date(2026, 11, 29),
+        today=TODAY,
+    )
+    await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=foreign.id, today=TODAY)
+    assert (await seed.import_season(db_session, season_json)).weeks_created == 0, "Mexico untouched: still seeds"
+
+    for number in range(2, 13):  # week 1 is running and cannot be deleted; the rest can
+        week = await content.week_by_number(db_session, season, number)
+        assert week is not None
+        await content.delete_week(db_session, actor_id=ADMIN_ID, week_id=week.id, today=TODAY)
+    with pytest.raises(seed.SeedError, match="11 delete"):
+        await seed.import_season(db_session, season_json)
+    assert len(await content.weeks(db_session, season, include_drafts=True)) == 1, "nothing was re-created"
+
+
+async def test_announce_uses_the_moscow_day(db_session: AsyncSession, season: int) -> None:
+    """01:00 MSK on the draft's first day is still «yesterday» in UTC; the guard must not care."""
+    from datetime import UTC, datetime
+
+    await _free_last_slot(db_session, season)
+    draft = await content.create_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        season_id=season,
+        number=13,
+        starts_on=SLOT[0],
+        ends_on=SLOT[1],
+        today=TODAY,
+        texts={"title": "Эпилог", "task_min": "Скажи."},
+    )
+    with pytest.raises(content.ContentError, match="move the draft into the future first"):
+        await content.announce_week(
+            db_session, actor_id=ADMIN_ID, week_id=draft.id, now=datetime(2026, 11, 15, 22, 0, tzinfo=UTC)
+        )
+
+
+async def test_facts_do_not_attach_to_a_draft(app: App) -> None:
+    admin = app.headers(ADMIN_ID, "Мила")
+    weeks = {w["number"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert (await app.client.delete(f"/api/admin/weeks/{weeks[12]['id']}", headers=admin)).status_code == 204
+    r = await app.client.post(
+        "/api/admin/weeks", json={"number": 13, "starts_on": "2026-11-16", "ends_on": "2026-11-18"}, headers=admin
+    )
+    assert r.status_code == 201
+    r = await app.client.post("/api/admin/facts", json={"text": "Факт про черновик", "week_number": 13}, headers=admin)
+    assert r.status_code == 404

@@ -84,7 +84,8 @@
     $("week-pick").addEventListener("change", () => { const n = +$("week-pick").value; guarded(() => renderWeek(n), () => renderWeek(n)); });
     const picked = state.weeks.find((w) => w.number === pick);
     if (pick == null || !picked) {
-      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Пока нечего сводить</h2><p class="muted">Все недели сезона — черновики. Объяви первую в «Заданиях», и здесь появится сводка.</p></div>`;
+      const why = state.weeks.length ? "Все недели сезона — черновики. Объяви первую в «Заданиях», и здесь появится сводка." : "В сезоне ещё нет недель. Добавь первую в «Заданиях».";
+      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Пока нечего сводить</h2><p class="muted">${why}</p></div>`;
       return;
     }
     if (isDraft(picked)) {

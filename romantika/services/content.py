@@ -332,6 +332,7 @@ def _check_calendar(number: int, starts_on: date, ends_on: date, *, today: date,
 
 def _week_row_snapshot(row: models.Week) -> dict[str, Any]:
     return {
+        "season_id": row.season_id,
         "number": row.number,
         "title": row.title,
         "starts_on": row.starts_on.isoformat(),
@@ -359,9 +360,11 @@ async def announce_week(
         return _week_dto(row)
     if not ready_to_announce(row):
         raise ValueError(f"week {row.number} cannot be announced without a title and a minimum task")
-    if row.starts_on <= now.date():
-        # Its dates are gone or going: announcing now would create a week nobody could do in
-        # full. Move it first (drafts move freely), then announce.
+    from romantika.domain.calendar import to_moscow
+
+    if row.starts_on <= to_moscow(now).date():
+        # Its dates are gone or going (Moscow day, like every calendar rule): announcing now
+        # would create a week nobody could do in full. Move it first, then announce.
         raise ContentError(f"week {row.number} starts on {row.starts_on}: move the draft into the future first")
     row.announced_at = now
     audit(

@@ -55,12 +55,19 @@ async def test_announced_at_downgrade_refuses_while_drafts_exist(engine: AsyncEn
     assert still_there == 1, "the refusal left the draft untouched"
 
     async with engine.begin() as connection:
-        await connection.execute(sa.text("UPDATE weeks SET announced_at = now() WHERE season_id = 9001"))
+        await connection.execute(
+            sa.text(
+                "UPDATE weeks SET announced_at = '2026-01-04 10:00+00', created_at = '2025-12-01 10:00+00' "
+                "WHERE season_id = 9001"
+            )
+        )
     await asyncio.to_thread(run_alembic, database_url, "-1", downgrade=True)
     await asyncio.to_thread(run_alembic, database_url, "head")
     async with engine.connect() as connection:
-        announced = await connection.scalar(sa.text("SELECT count(announced_at) FROM weeks WHERE season_id = 9001"))
-    assert announced == 1, "an announced week comes back announced"
+        announced = await connection.scalar(sa.text("SELECT announced_at FROM weeks WHERE season_id = 9001"))
+    # The exact moment is not kept across a round trip (the column is dropped); the state is.
+    # The backfill restores «announced», dated by created_at — documented in the migration.
+    assert announced is not None and announced.date().isoformat() == "2025-12-01", "announced, dated by created_at"
     async with engine.begin() as connection:
         await connection.execute(sa.text("DELETE FROM weeks WHERE season_id = 9001"))
         await connection.execute(sa.text("DELETE FROM seasons WHERE id = 9001"))

@@ -10,7 +10,8 @@ import), so the column is backfilled from `created_at`; new rows default to NULL
 
 The downgrade drops the only record of which weeks are drafts, and the previous release
 shows every week to participants. With drafts present it therefore refuses: delete or
-announce them first (RUNBOOK «Rollback»). Without drafts the round trip is exact.
+announce them first (RUNBOOK «Rollback»). Without drafts the round trip keeps every week
+announced; the exact announcement moment is not kept (it comes back as `created_at`).
 
 Revision ID: c4e8f1a2b9d3
 Revises: b7d4e2a90c15
