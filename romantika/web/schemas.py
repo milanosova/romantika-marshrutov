@@ -173,7 +173,8 @@ class WeekMove(BaseModel):
 
 
 class AdminWeekOut(WeekOut):
-    pass
+    stale_draft: bool = False
+    """A draft whose dates have arrived: participants see nothing there until it is moved."""
 
 
 class ParticipantOut(BaseModel):

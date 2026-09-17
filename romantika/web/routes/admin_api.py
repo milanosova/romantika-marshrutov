@@ -54,7 +54,9 @@ def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
     """Mila's calendar view of a week: locked (future), current, or over (`stamped` here means past).
 
     A draft is `locked` whatever its dates: it never ran and nobody lived through it, so it
-    is neither current nor past — and stays editable, movable and deletable.
+    is neither current nor past — and stays editable, movable and deletable. A draft whose
+    dates have arrived is flagged `stale` on top, so the admin UI can say so instead of
+    «ещё закрыта»: for participants those days are dead air.
     """
     if week.is_draft or week.starts_on > today:
         state = WeekState.LOCKED
@@ -62,7 +64,8 @@ def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
         state = WeekState.CURRENT
     else:
         state = WeekState.STAMPED
-    return schemas.AdminWeekOut(**views.week_out(week, state, None, reveal=True).model_dump())
+    out = views.week_out(week, state, None, reveal=True).model_dump()
+    return schemas.AdminWeekOut(**out, stale_draft=week.is_draft and week.starts_on <= today)
 
 
 @router.put("/weeks/{week_id}", response_model=schemas.AdminWeekOut)
@@ -282,7 +285,11 @@ async def set_stamp(
             now=now,
         )
     except content.ContentError as exc:
-        code = status.HTTP_409_CONFLICT if "not started" in str(exc) else status.HTTP_404_NOT_FOUND
+        code = (
+            status.HTTP_409_CONFLICT
+            if ("not started" in str(exc) or "draft" in str(exc))
+            else status.HTTP_404_NOT_FOUND
+        )
         raise HTTPException(code, str(exc)) from exc
     return schemas.StampOut(level=level.value if level else None)
 

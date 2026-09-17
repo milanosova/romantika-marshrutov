@@ -864,3 +864,57 @@ async def test_ops_seed_refuses_before_writing_and_still_activates(
     async with engine.begin() as connection:
         for table in ("audit_log", "achievement_types", "weeks", "season_members", "seasons"):
             await connection.execute(sa_text(f"DELETE FROM {table}"))
+
+
+async def test_reseed_refuses_after_a_text_edit_too(db_session: AsyncSession, season: int) -> None:
+    """Round nine: the guard watched four of the five week actions; an edited minimum was
+    silently reverted by the file."""
+    from romantika.services import seed
+
+    season_json = Path(__file__).resolve().parents[2] / "data" / "seasons" / "mexico-2026.json"
+    week2 = await content.week_by_number(db_session, season, 2)
+    assert week2 is not None
+    await content.update_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        week_id=week2.id,
+        today=TODAY,
+        changes={"task_min": "Мила поправила в приложении."},
+    )
+    with pytest.raises(seed.CalendarOwnedByAdmin, match="1 update"):
+        await seed.import_season(db_session, season_json)
+    kept = await content.week_by_number(db_session, season, 2)
+    assert kept is not None and kept.task_min == "Мила поправила в приложении."
+
+
+async def test_a_running_draft_names_itself(app: App) -> None:
+    """Round nine: a draft whose dates arrived read «ещё закрыта» in the admin and left the
+    worker silent. The admin API flags it; the worker logs it."""
+    from romantika.worker import schedulers
+
+    admin = app.headers(ADMIN_ID, "Мила")
+    weeks = {w["number"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert weeks[1]["stale_draft"] is False
+    # Age a draft into today: create it, then move its dates under the stand's fixed clock.
+    assert (await app.client.delete(f"/api/admin/weeks/{weeks[12]['id']}", headers=admin)).status_code == 204
+    r = await app.client.post(
+        "/api/admin/weeks", json={"number": 13, "starts_on": "2026-11-16", "ends_on": "2026-11-18"}, headers=admin
+    )
+    draft_id = r.json()["id"]
+    await app.session.execute(
+        sa_update_week_dates(weeks[1]["id"], date(2026, 8, 24), date(2026, 8, 30))
+    )  # free the slot
+    await app.session.execute(sa_update_week_dates(draft_id, date(2026, 8, 31), date(2026, 9, 6)))  # = today's week
+    listed = {w["id"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert listed[draft_id]["stale_draft"] is True and listed[draft_id]["state"] == "locked"
+
+    sent: list[tuple[int, str]] = []
+
+    class Silent:
+        async def send_message(self, user_id: int, text: str) -> None:
+            sent.append((user_id, text))
+
+    got = await schedulers.reminders_tick(app.session, telegram=Silent(), now=moscow(2026, 9, 3, 19))  # Thursday
+    assert got == 0 and not sent, "nothing goes out for a draft"
+    stale = await schedulers.running_draft(app.session, app.season_id, today=date(2026, 9, 3))
+    assert stale is not None and stale.number == 13, "the worker sees the dead air it logs"

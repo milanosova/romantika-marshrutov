@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,6 +27,14 @@ BACKUP_STALE_AFTER = timedelta(days=8)
 JOURNALS_HOUR = 12
 
 
+async def running_draft(session: AsyncSession, season_id: int, *, today: date) -> content.WeekDTO | None:
+    """A draft whose dates include today — participants are «between weeks» on those days."""
+    for week in await content.weeks(session, season_id, include_drafts=True):
+        if week.is_draft and week.contains(today):
+            return week
+    return None
+
+
 async def reminders_tick(
     session: AsyncSession,
     *,
@@ -43,6 +51,18 @@ async def reminders_tick(
         return 0
     week = await content.current_week(session, season.id, today=local.date())
     if week is None:
+        # Silence must name itself: a draft covering today is dead air for participants,
+        # not a planned gap. Say so in the log, so it does not pass unnoticed.
+        stale = await running_draft(session, season.id, today=local.date())
+        if stale is not None:
+            logger.warning(
+                "draft_week_running",
+                extra={
+                    "week": stale.number,
+                    "starts_on": stale.starts_on.isoformat(),
+                    "date": local.date().isoformat(),
+                },
+            )
         return 0
 
     sent_total = 0

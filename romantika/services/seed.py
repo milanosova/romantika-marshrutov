@@ -1,9 +1,9 @@
 """Import a season description (`data/seasons/*.json`) into the database.
 
 Idempotent while the season is untouched: rerunning updates the rows in place, so content
-fixes can be re-imported. Once the admin app has created, moved, deleted or announced a
-week of the season, the file no longer describes the calendar and the import refuses
-(`_calendar_touched`). Rows the file no longer describes are never deleted (stamps and
+fixes can be re-imported. Once the admin app has created, edited, moved, deleted or
+announced a week of the season, the file no longer describes it — texts included — and the
+import refuses (`_calendar_touched`). Rows the file no longer describes are never deleted (stamps and
 reports point at them); `SeedResult` counts them as `*_stale` instead.
 Like every service, it flushes but never commits — the caller owns the transaction.
 """
@@ -197,10 +197,11 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
 
 
 async def _calendar_touched(session: AsyncSession, season_id: int) -> str | None:
-    """Has the admin app created, moved, deleted or announced a week of this season?
+    """Has the admin app created, edited, moved, deleted or announced a week of this season?
 
-    Every calendar action writes an audit row; an untouched season has none. Live weeks are
-    matched by id; a deleted week's row carries `season_id` in its `before` snapshot.
+    Every such action writes an audit row; an untouched season has none. Text edits count
+    too: re-importing the file would revert them. Live weeks are matched by id; a deleted
+    week's row carries `season_id` in its `before` snapshot.
     """
     ids_of_season = {
         str(week_id)
@@ -210,7 +211,8 @@ async def _calendar_touched(session: AsyncSession, season_id: int) -> str | None
     }
     rows = await session.execute(
         select(models.AuditLog.action, models.AuditLog.entity_id, models.AuditLog.before).where(
-            models.AuditLog.entity == "week", models.AuditLog.action.in_(["create", "move", "delete", "announce"])
+            models.AuditLog.entity == "week",
+            models.AuditLog.action.in_(["create", "update", "move", "delete", "announce"]),
         )
     )
     actions = [
