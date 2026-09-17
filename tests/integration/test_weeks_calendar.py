@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from pathlib import Path
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy import text as sa_text
 from sqlalchemy import update as sa_update
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from romantika.db import models
 from romantika.domain.types import ReportKind, StampLevel
@@ -808,3 +810,57 @@ async def test_facts_do_not_attach_to_a_draft(app: App) -> None:
     assert r.status_code == 201
     r = await app.client.post("/api/admin/facts", json={"text": "Факт про черновик", "week_number": 13}, headers=admin)
     assert r.status_code == 404
+
+
+async def test_ops_seed_refuses_before_writing_and_still_activates(
+    engine: AsyncEngine, database_url: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Round eight (critical): the refusal came after the season row was rewritten from the
+    file and the skip path committed it — «seed skipped» with a changed title and dates.
+    Now the guard runs first, and `python -m romantika.ops.seed --activate` still exits 0."""
+    import json
+
+    from romantika.ops import seed as ops_seed
+    from romantika.services import content, seed
+
+    original = Path(__file__).resolve().parents[2] / "data" / "seasons" / "mexico-2026.json"
+    file_path = tmp_path / "ops-probe.json"
+    payload = json.loads(original.read_text(encoding="utf-8"))
+    file_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    factory = async_sessionmaker(bind=engine, expire_on_commit=False)
+    async with factory() as session, session.begin():
+        result = await seed.import_season(session, file_path)
+        season_id = result.season_id
+        week12 = await content.week_by_number(session, season_id, 12)
+        assert week12 is not None
+        await content.move_week(session, actor_id=ADMIN_ID, week_id=week12.id, today=TODAY, ends_on=date(2026, 11, 17))
+
+    # A stale file: title, hashtag and end date differ from what the database holds.
+    payload["season"], payload["hashtag"], payload["end"] = "СТАРОЕ ИЗ ФАЙЛА", "#старый", "2026-10-31"
+    file_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+    monkeypatch.setenv("DATABASE_URL", database_url)
+    monkeypatch.setenv("MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setenv("BOT_TOKEN", "1:test")
+    monkeypatch.setenv("ADMIN_IDS", str(ADMIN_ID))
+    ops_seed.get_settings.cache_clear()
+    try:
+        await ops_seed.run(file_path, activate=True)  # must not raise: exit 0 for the stand and the RUNBOOK
+    finally:
+        ops_seed.get_settings.cache_clear()
+
+    async with factory() as session:
+        row = await session.get(models.Season, season_id)
+        assert row is not None
+        assert (row.title, row.hashtag, row.ends_on) == ("Мексика", "#мексика", date(2026, 11, 18)), "nothing rewritten"
+        assert row.status == models.SeasonStatus.ACTIVE.value, "--activate still worked"
+        types = await session.scalar(
+            select(func.count())
+            .select_from(models.AchievementType)
+            .where(models.AchievementType.season_id == season_id)
+        )
+        assert types == 9, "nothing half-imported"
+    async with engine.begin() as connection:
+        for table in ("audit_log", "achievement_types", "weeks", "season_members", "seasons"):
+            await connection.execute(sa_text(f"DELETE FROM {table}"))

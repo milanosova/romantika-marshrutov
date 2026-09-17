@@ -24,10 +24,9 @@ async def run(path: Path, *, activate: bool) -> None:
     async with factory() as session, session.begin():
         try:
             result = await seed.import_season(session, path)
-        except seed.SeedError as exc:
-            if "edited in the admin app" not in str(exc):
-                raise
-            # The calendar belongs to the admin app now; the season itself already exists.
+        except seed.CalendarOwnedByAdmin as exc:
+            # Raised before any write, so the session holds nothing to undo; the season row
+            # already exists, and activating it is still a valid ask.
             print(f"seed skipped: {exc}")
             if activate:
                 season = await seed.season_by_file(session, path)

@@ -80,13 +80,16 @@ def _required(payload: dict[str, Any], key: str, where: str) -> str:
 
 
 async def season_by_file(session: AsyncSession, path: Path) -> models.Season:
-    """The season row a file describes (by slug), for callers that skip the import."""
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    slug = _required(payload, "slug", "season")
+    """The season row a file describes — the slug is the file name, as in `import_season`."""
+    slug = Path(path).stem
     row = (await session.execute(select(models.Season).where(models.Season.slug == slug))).scalar_one_or_none()
     if row is None:
         raise SeedError(f"season {slug} does not exist")
     return row
+
+
+class CalendarOwnedByAdmin(SeedError):
+    """The admin app has shaped this season's calendar; the file no longer describes it."""
 
 
 async def import_season(session: AsyncSession, path: Path) -> SeedResult:
@@ -97,6 +100,15 @@ async def import_season(session: AsyncSession, path: Path) -> SeedResult:
 
     season = (await session.execute(select(models.Season).where(models.Season.slug == slug))).scalar_one_or_none()
     created = season is None
+    if season is not None:
+        # Before touching a single field: once the admin app has created, moved, deleted or
+        # announced a week, the file is stale for the whole season — title and dates included.
+        touched = await _calendar_touched(session, season.id)
+        if touched:
+            raise CalendarOwnedByAdmin(
+                f"season {slug}: weeks were edited in the admin app ({touched}); the file no longer describes "
+                "the calendar. Edit weeks in the app instead of re-seeding, or seed a fresh season."
+            )
     if season is None:
         season = models.Season(slug=slug, status=models.SeasonStatus.DRAFT.value)
         session.add(season)
@@ -158,15 +170,6 @@ async def _import_weeks(session: AsyncSession, season: models.Season, weeks: lis
     }
     numbers = [int(_required(item, "num", "week")) for item in weeks]
     _reject_duplicates(numbers, "week")
-    # Once Mila has shaped the calendar in the admin app the file is no longer the source of
-    # truth: re-importing would overwrite her drafts (and announce them unaudited) or collide
-    # with her renumbered weeks. The file seeds a season; the admin app owns it afterwards.
-    touched = await _calendar_touched(session, season.id)
-    if touched:
-        raise SeedError(
-            f"season {season.slug}: weeks were edited in the admin app ({touched}); the file no longer describes "
-            "the calendar. Edit weeks in the app instead of re-seeding, or seed a fresh season."
-        )
     created = 0
     for number, item in zip(numbers, weeks, strict=True):
         where = f"week {number}"
