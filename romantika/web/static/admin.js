@@ -78,9 +78,16 @@
 
   async function renderWeek(number) {
     const cur = currentWeek();
-    const pick = number || (state.week && state.week.week_number) || (cur ? cur.number : state.weeks[0] && state.weeks[0].number);
+    const firstReal = state.weeks.find((w) => !isDraft(w));
+    const pick = number || (state.week && state.week.week_number) || (cur ? cur.number : firstReal && firstReal.number);
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Сводка недели</p><h1>Неделя</h1></header><label>Какая неделя<select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
     $("week-pick").addEventListener("change", () => { const n = +$("week-pick").value; guarded(() => renderWeek(n), () => renderWeek(n)); });
+    const picked = state.weeks.find((w) => w.number === pick);
+    if (picked && isDraft(picked)) {
+      // Nobody has seen a draft: there is nothing to sum up and no «Привал» to draft.
+      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели — сводки и черновика «Привала» у неё нет. Объявить её можно в «Заданиях».</p></div>`;
+      return;
+    }
     let s;
     try { s = await RM.api("/api/admin/summary?week=" + pick); } catch (e) { failed($("week-body"), e, () => renderWeek(pick)); return; }
     state.week = s;
@@ -426,7 +433,7 @@
   function diff(before, after) {
     const keys = [...new Set([...Object.keys(before || {}), ...Object.keys(after || {})])].filter((k) => k !== "edit_key")
       .sort((a, b) => (FIELD_ORDER.indexOf(a) + 1 || 999) - (FIELD_ORDER.indexOf(b) + 1 || 999));
-    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || (v === "" ? "—" : /^\d{4}-\d{2}-\d{2}T/.test(String(v)) ? fmt(String(v).slice(0, 10)) : short(v));
+    const value = (v) => Array.isArray(v) ? (v.length ? v.join(", ") : "—") : (v != null && AUDIT_VALUES[v]) || (v === "" ? "—" : /^\d{4}-\d{2}-\d{2}(T|$)/.test(String(v)) ? fmt(String(v).slice(0, 10)) : short(v));
     const empty = (v) => v == null || v === "" || (Array.isArray(v) && !v.length);
     return keys.filter((k) => !(empty((before || {})[k]) && empty((after || {})[k])))
       .map((k) => `${esc(AUDIT_FIELDS[k] || k)}: ${esc(value((before || {})[k]))} → ${esc(value((after || {})[k]))}`).join("\n") || "—";

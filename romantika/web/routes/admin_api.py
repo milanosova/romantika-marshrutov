@@ -478,7 +478,7 @@ async def remind_now(
     week_number = body.week_number if body else None
     if week_number is not None:
         week = await content.week_by_number(session, season.id, week_number)
-        if week is None:
+        if week is None or week.is_draft:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
         if week.ends_on < views.moscow_today(now):
             raise HTTPException(status.HTTP_409_CONFLICT, "неделя уже прошла — напоминать не о чем")

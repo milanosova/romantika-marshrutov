@@ -193,8 +193,10 @@ async def breakdowns_for_season(session: AsyncSession, *, season: SeasonDTO, tod
 
 
 async def _require_week(session: AsyncSession, season_id: int, week_number: int) -> WeekDTO:
+    """A week people could have acted on: announced. A draft has no summary, no recipients
+    and no «Привал» — nobody has seen it (DOMAIN §1)."""
     target = await content.week_by_number(session, season_id, week_number)
-    if target is None:
+    if target is None or target.is_draft:
         raise content.ContentError(f"season {season_id} has no week {week_number}")
     return target
 

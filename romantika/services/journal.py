@@ -97,7 +97,10 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
             texts=texts.get(weeks[number].id, []),
             media=[item for item in media if item.week_id == weeks[number].id],
         )
-        for number, level in sorted(levels.items())
+        for number, level in sorted(
+            levels.items(),
+            key=lambda item: (weeks[item[0]].starts_on, item[0]) if item[0] in weeks else (date.max, item[0]),
+        )
         if number in weeks and weeks[number].starts_on <= today
     ]
     walk = await passport.build(session, season_id=season_id, user_id=user_id, today=today)

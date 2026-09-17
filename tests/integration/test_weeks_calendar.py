@@ -653,3 +653,44 @@ async def test_admin_list_marks_a_late_draft_locked_not_current(app: App) -> Non
 
 def sa_update_week_dates(week_id: int, starts_on: date, ends_on: date):  # type: ignore[no-untyped-def]
     return sa_update(models.Week).where(models.Week.id == week_id).values(starts_on=starts_on, ends_on=ends_on)
+
+
+# --- a draft has no summary and no reminders -------------------------------------------
+
+
+async def test_a_draft_has_no_summary_no_draft_post_and_no_reminder(app: App) -> None:
+    """Release check, 17.09: «Напомнить сейчас» and the week summary took a draft by number
+    and would have reminded people about a week they had never seen."""
+    from romantika.services import reminders, summary
+
+    admin = app.headers(ADMIN_ID, "Мила")
+    weeks = {w["number"]: w for w in (await app.client.get("/api/admin/weeks", headers=admin)).json()}
+    assert (await app.client.delete(f"/api/admin/weeks/{weeks[12]['id']}", headers=admin)).status_code == 204
+    r = await app.client.post(
+        "/api/admin/weeks",
+        json={
+            "number": 13,
+            "starts_on": "2026-11-16",
+            "ends_on": "2026-11-18",
+            "title": "Эпилог",
+            "task_min": "Скажи.",
+        },
+        headers=admin,
+    )
+    assert r.status_code == 201 and r.json()["announced_at"] is None
+
+    assert (await app.client.get("/api/admin/summary?week=13", headers=admin)).status_code == 404
+    with pytest.raises(content.ContentError):
+        await summary.draft_post(app.session, season_id=app.season_id, week_number=13, today=date(2026, 11, 19))
+    assert (await app.client.post("/api/admin/remind", json={"week_number": 13}, headers=admin)).status_code == 404
+
+    sent: list[tuple[int, str]] = []
+
+    class Silent:
+        async def send_message(self, user_id: int, text: str) -> None:
+            sent.append((user_id, text))
+
+    result = await reminders.send(
+        app.session, telegram=Silent(), season_id=app.season_id, week_number=13, now=moscow(2026, 11, 17, 19)
+    )
+    assert (result.sent, result.total) == (0, 0) and not sent, "a draft by number is «no week»"

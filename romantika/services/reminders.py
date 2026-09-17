@@ -67,7 +67,7 @@ async def send(
         if week_number is not None
         else await content.current_week(session, season_id, today=to_moscow(now).date())
     )
-    if week is None:
+    if week is None or week.is_draft:
         return ReminderResult(sent=0, total=0, week_title=None)
     recipients = await summary.reminder_recipients(session, season_id=season_id, week_number=week.number)
     if text_for is None:
