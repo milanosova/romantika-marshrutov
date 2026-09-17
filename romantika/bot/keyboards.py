@@ -222,7 +222,7 @@ def week_choices(weeks: list[WeekDTO], *, today: date) -> InlineKeyboardMarkup:
     rows = []
     for week in weeks:
         prefix = "✏️ " if week.is_draft else "▶ " if week.starts_on <= today else "🔒 "
-        title = week.title or "без названия"
+        title = week.title or ru.WEEK_UNTITLED
         label = f"{prefix}{week.number} · {title}"[:60]
         rows.append([InlineKeyboardButton(text=label, callback_data=f"adm:week:{week.number}")])
     rows.append([InlineKeyboardButton(text="‹ назад", callback_data="adm:panel")])

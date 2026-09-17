@@ -185,7 +185,7 @@ async def activate_season(session: AsyncSession, season_id: int, *, actor_id: in
 
 def _announced_filter() -> Any:
     """Weeks participants may see. A draft (`announced_at IS NULL`) must never become the
-    current week — the bot would remind about «задание «»» and the passport would count it
+    current week — the bot would remind about an empty task and the passport would count it
     as a miss that costs everyone a freeze — so every participant-facing reader gets only
     announced weeks. The admin lists drafts too (`weeks(..., include_drafts=True)`)."""
     return models.Week.announced_at.is_not(None)

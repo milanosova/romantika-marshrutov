@@ -330,8 +330,7 @@ async def handle_admin(
         await safe_send(
             bot,
             chat_id,
-            "Какую неделю правим?\n\n<i>▶ — идёт сейчас, 🔒 — ещё закрыта, ✏️ — черновик, его видишь только ты. "
-            "Прошедшие не показываю: люди их уже прожили, задним числом не меняем.</i>",
+            ru.WEEK_PICKER_HINT,
             reply_markup=keyboards.week_choices(weeks, today=today),
         )
     elif action == "week" and len(parts) == 2:

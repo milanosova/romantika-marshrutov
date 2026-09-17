@@ -56,7 +56,7 @@ def _admin_week(week: WeekDTO, today: date) -> schemas.AdminWeekOut:
     A draft is `locked` whatever its dates: it never ran and nobody lived through it, so it
     is neither current nor past — and stays editable, movable and deletable. A draft whose
     dates have arrived is flagged `stale` on top, so the admin UI can say so instead of
-    «ещё закрыта»: for participants those days are dead air.
+    "still closed": for participants those days are dead air.
     """
     if week.is_draft or week.starts_on > today:
         state = WeekState.LOCKED
