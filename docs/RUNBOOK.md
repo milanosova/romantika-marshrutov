@@ -70,6 +70,7 @@ Alias it as `rc` in your shell.
 rc logs --tail 100 -f bot          # or web / worker / backup / db
 rc ps                              # health of every service
 docker stats --no-stream           # CPU/RAM against the limits in compose.vps.yml
+scripts/rc.sh logs --since 30m bot web worker   # the same from a laptop, over ssh
 ```
 
 Logs are JSON lines in prod (`ENV=prod`). The worker logs every job (`job_finished`,
@@ -117,15 +118,25 @@ Switching the token: edit `BOT_TOKEN` / `BOT_USERNAME` in the VPS `.env`, `scrip
 (or `rc up -d bot web worker`), then `telegram_setup`. Sessions of the Mini App are signed with
 the token, so open links get re-issued by Telegram on the next tap — nothing to migrate.
 
-## Local stand (no Telegram)
+## Local stand
 
-`scripts/dev-stack.sh up` — Postgres in Docker (port 55442), a fake Bot API on :8081, web on
-:8010, bot polling the fake, worker delivering through it; season seeded and activated.
-`scripts/dev-stack.sh link 1001 Алиса /app/journal` prints a signed link; `/_control/*` on :8081
-acts as a user (`text`, `media`, `callback`) and reads what the bot sent (`sent?chat_id=`).
-Logs under `.dev/logs/`. `down` removes everything. On macOS WeasyPrint needs
-`DYLD_FALLBACK_LIBRARY_PATH=/opt/homebrew/lib` (the script sets it; do not wrap the processes in
-`nohup`/`env`, macOS strips `DYLD_*` for system binaries).
+`scripts/dev-stack.sh up` — Postgres 16 in Docker (`romantika-dev-pg`, port 55442), migrations,
+the season, thirty invented participants (`romantika/ops/demo_data.py`), the fake Bot API on
+`:8081`, web on `:8010`, bot and worker. Everything under `.dev/` (git-ignored). Modes:
+
+- **work** (default): the bot polls the fake Bot API; agents and scripts play participants
+  through `/_control/text`, `/_control/media`, `/_control/callback` and read `/_control/sent`.
+- **live** (`up --live`): the test bot in real Telegram; token, username and admin ids come from
+  `.dev/dev-bot.env` (fetched from the VPS, `docs/SETUP-RU.md`); the script checks `getMe`
+  first and says «включи VPN» when Telegram is unreachable. The Mini App is opened through a
+  signed link, not from the bot's menu button (that button points at production).
+
+`scripts/dev-stack.sh reset` drops the stand database and `.dev/media` and seeds again;
+`status`, `logs`, `link <id> <name> [/path]`, `down`. Production data never reaches the stand.
+
+Screenshots: `scripts/shots.sh [--as 1001] [--page /app/journal|all] [--out DIR] [--dark]` (headless
+Google Chrome, 500px wide). Conversation mock-ups from the bot's real answers:
+`uv run python -m romantika.ops.chat_mockup --scenario start --out DIR`.
 
 ## Cut-over from the legacy bot (kept for reference, not used)
 
@@ -168,6 +179,25 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   admin app («Задания»), then downgrade.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h).
+
+## Read-only queries
+
+The only SQL run against the production database outside a restore (CLAUDE.md rule 10). All of
+them are read-only and are what `scripts/prod-snapshot.sh` executes for `/prod` and for the
+release-window question in `/relize`:
+
+```sql
+select count(*) from users where blocked_at is null and is_admin = false;                       -- participants in the bot
+select count(distinct user_id) from reports where created_at > now() - interval '1 hour';       -- active in the last hour
+select count(distinct user_id) from reports where created_at > now() - interval '24 hours';     -- active today
+select count(distinct user_id) from reports where created_at > now() - interval '7 days';       -- active this week
+select count(*) from reports where created_at > now() - interval '7 days' and deleted_at is null; -- reports this week
+select count(*) from letters where replied_at is null;                                           -- unanswered letters
+select count(*) from jobs where status = 'failed' and finished_at > now() - interval '24 hours'; -- failed worker jobs
+```
+
+Run by hand: `scripts/rc.sh exec -T db psql -U romantika -d romantika -Atc "<one of the above>"`.
+Anything else against production is a RUNBOOK change first.
 
 ## Common problems
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.2.0 — 2026-09-15 (Mila edits the season's calendar herself)
+## v2.2.1 — 2026-09-18 (Mila edits the season's calendar herself; deployed)
 
 For Mila: in the admin's «Задания» a week can be added («＋ Добавить неделю»), a future
 week's number and dates can be changed («Переставить») and an untouched future week can be
@@ -16,6 +16,27 @@ Every calendar change is in «Изменения», named by the week's number.
 For participants: nothing new to do. Week numbers may now have gaps; the passport, the PDF
 grid, the public progress bar and «N-я из M» on the home screen follow the season's real
 weeks in calendar order instead of assuming 1..N.
+
+## v2.2.0 — 2026-09-16 (the owner's harness)
+
+Nothing changes for participants: the bot, the app and the worker are the same code.
+
+For Mila: every request is sorted into one of four routes (content in the admin app, a
+micro-change, a feature with a plan page and a «было — стало» report, an emergency); eight
+Claude Code skills carry the procedures and answer to Russian phrases; a local stand on her
+Mac with thirty invented participants (never production data) in a work mode (fake Telegram)
+and a live mode (the test bot in real Telegram); screenshots and conversation mock-ups for the
+reports; a project memory `brain/` with task cards, a generated backlog, bugs, ideas and
+production snapshots; `docs/SETUP-RU.md` for the one-time setup and a rewritten «how to ask
+Claude» in `docs/GUIDE-RU.md`.
+
+Under the hood: `CLAUDE.md` rewritten around the routes and the branch model
+`master ← dev ← feature/NN-slug`; `.claude/settings.json` (Russian answers, deny on destructive
+commands, ask on deploy); critic agents replace the `forge-*` roles and the Workflow-based
+release check; `romantika/ops/demo_data.py`, `romantika/ops/chat_mockup.py`, `scripts/shots.sh`,
+`scripts/rc.sh`, `scripts/prod-snapshot.sh`, `scripts/brain_index.py`; acceptance stage 7 mirrors
+the new process and stage 8 forbids Cyrillic identifiers and ratchets Russian literals outside
+`romantika/texts/`; `scripts/mac-pull-backups.sh` defaults to the `romantika-vps` alias.
 
 ## v2.1.1 — 2026-09-05 (hotfix: photo reports from the app)
 
