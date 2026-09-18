@@ -29,6 +29,7 @@ echo "- писали боту за сутки: $(q "select count(distinct user_i
 echo "- писали боту за неделю: $(q "select count(distinct user_id) from reports where created_at > now() - interval '7 days'")"
 echo "- отчётов за неделю: $(q "select count(*) from reports where created_at > now() - interval '7 days' and deleted_at is null")"
 echo "- писем без ответа: $(q "select count(*) from letters where replied_at is null")"
+echo "- поздних отчётов (в журнал, без штампа): $(q "select count(*) from reports where late and deleted_at is null")"
 if [ "$BRIEF" = 1 ]; then [ "$FAILED" = 0 ] || { echo; echo "**снимок неполный: часть запросов не выполнилась (ssh? rc.sh?)**"; exit 1; }; exit 0; fi
 
 echo

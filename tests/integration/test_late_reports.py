@@ -126,6 +126,22 @@ async def test_late_reports_are_refused_for_the_running_and_future_weeks(app: Ap
     assert to_mila == [], "nothing reached Mila"
 
 
+async def test_the_last_day_of_the_season_still_takes_a_late_report(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """«до season.ends_on включительно» (DOMAIN §2): 18.11 open, 19.11 closed."""
+    last_day = await make_app(db_session, tmp_path, monkeypatch, moscow(2026, 11, 18, 12))
+    r = await last_day.client.post(
+        "/api/reports", data={"text": "x", "week_number": "1"}, headers=last_day.headers(ALICE)
+    )
+    assert r.status_code == 201 and r.json()["late"] is True
+    day_after = await make_app(db_session, tmp_path, monkeypatch, moscow(2026, 11, 19, 12))
+    r = await day_after.client.post(
+        "/api/reports", data={"text": "y", "week_number": "1"}, headers=day_after.headers(ALICE)
+    )
+    assert r.status_code == 422 and "сезон закончился" in r.json()["detail"]
+
+
 async def test_after_the_season_nothing_can_be_added(
     db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
