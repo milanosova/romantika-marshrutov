@@ -58,3 +58,10 @@ def test_the_task_of_a_week_says_its_number_once() -> None:
     named = replace(week(3, date(2026, 9, 14), date(2026, 9, 20)), title="Неделя rola [музыка]")
     assert "Неделя 3 · rola [музыка]" in ru.task_text(named)
     assert "Неделя rola" not in ru.task_text(named)
+
+
+def test_a_week_nobody_has_seen_keeps_its_placeholder() -> None:
+    """The app sends «Неделя 7» as the name of a week that has not opened: trimming it would
+    leave a bare «7» in the sheet's heading (critic-code, 19.09)."""
+    assert ru.week_name("Неделя 7") == "7", "the helper itself trims"
+    # The app compares the raw title with the placeholder before trimming — see app.js openWeek.

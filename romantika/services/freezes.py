@@ -24,6 +24,10 @@ AUTO_REASONS: frozenset[models.FreezeReason] = frozenset(
 #: The partial unique index behind the «once per season» rule (migrations 8f1c2a6d94b7, e7f8a9b0c1d2).
 AUTO_REASON_INDEX = "uq_freezes_auto_reason"
 
+#: Its predicate, written exactly as the migration writes it: `ON CONFLICT` has to name the
+#: same one, or Postgres stops finding the index the moment the two drift apart.
+AUTO_REASON_WHERE = "reason IN ('word', 'max', 'fact')"
+
 #: Advisory lock keys are `int4`; Telegram ids are wider, so they are folded into the range.
 _LOCK_MODULUS = 2**31 - 1
 
@@ -77,7 +81,7 @@ async def grant(
         )
         .on_conflict_do_nothing(
             index_elements=[models.Freeze.season_id, models.Freeze.user_id, models.Freeze.reason],
-            index_where=text("reason IN ('word', 'max')"),
+            index_where=text(AUTO_REASON_WHERE),
         )
         .returning(models.Freeze.id)
     )

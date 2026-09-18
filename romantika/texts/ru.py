@@ -95,13 +95,17 @@ def deadline_text(week: WeekDTO) -> str:
     return f"{WEEKDAYS_NOMINATIVE[week.ends_on.weekday()]} {week.ends_on:%d.%m}, 18:00"
 
 
-def week_name(title: str) -> str:
-    """The name without the «Неделя» Mila writes in it («Неделя rola [музыка]» → «rola [музыка]»).
+#: The word Mila writes in a week's name («Неделя rola [музыка]», as the channel names it).
+_LEADING_WEEK = re.compile(r"^\s*неделя\s+", re.IGNORECASE)
 
-    Screens that print the number themselves («Неделя 3 · …», «3. …») would otherwise say it
-    twice; a name written any other way comes back untouched.
+
+def week_name(title: str) -> str:
+    """The name without that word: «Неделя rola [музыка]» → «rola [музыка]».
+
+    Every screen that prints the number itself («Неделя 3 · …», «3. …») would otherwise say
+    it twice. The stored name is never touched — only the printing side trims (DOMAIN §7).
     """
-    return re.sub(r"^\s*неделя\s+", "", title, flags=re.IGNORECASE) or title
+    return _LEADING_WEEK.sub("", title) or title
 
 
 def deadline_short(week: WeekDTO) -> str:
@@ -200,6 +204,7 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         "Как заработать ещё заморозку",
         "Всего можно накопить пять. Сверх двух базовых:\n"
         "· +1 за своё слово в словарике — сразу, автоматически\n"
+        "· +1 за свой первый факт про страну — тоже автоматически\n"
         "· +1 за первый выполненный максимум — тоже автоматически\n"
         "· +1 от меня за комментарий в канале, приход на встречу или приведённого друга",
         None,
@@ -332,7 +337,10 @@ FACT_PROMPT_ADMIN = (
     "его увидят все в «Сезоне», и он попадёт в журналы всех.</i>"
 )
 FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
-FACT_FREEZE_BONUS = WORD_FREEZE_BONUS
+FACT_FREEZE_BONUS = (
+    "\n\n❄️ И тебе +1 заморозка — это право пропустить неделю так, чтобы цепочка не порвалась. "
+    "Все заморозки — в «Рюкзаке»."
+)
 """The first own fact of a season earns a freeze too (DOMAIN §3, 19.09.2026)."""
 FACT_DUPLICATE = "такой факт у тебя уже записан"
 FACT_TOO_LONG = "факт длиннее 4000 знаков — сократи, пожалуйста"
@@ -586,9 +594,10 @@ def facts_text(
             line += f" <i>— {who}</i>"
         lines += [line, ""]
     text = "\n".join(lines).rstrip()
-    return text + (
-        "\n\n<i>Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале.</i>"
-    )
+    tail = "Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале."
+    if viewer_id is not None and not any(fact.author_id == viewer_id for fact in facts):
+        tail += " За первый свой факт — ❄️ +1 заморозка."
+    return f"{text}\n\n<i>{tail}</i>"
 
 
 def journal_text(view: JournalView, level: Level | None) -> str:

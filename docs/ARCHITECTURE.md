@@ -259,7 +259,8 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 - `romantika.bot.send.split_text(text: str, limit: int = 4096) -> list[str]` splits on
   paragraph, then line, then space boundaries; never returns an empty piece; every outgoing
   text passes through it (`safe_send`).
-- `romantika.texts.ru.week_name(title) -> str` (and `RM.weekName` in `static/tg.js`) drops the
+- `romantika.texts.ru.week_name(title) -> str` (mirrored by `RM.weekName` in `static/tg.js` and
+  exposed to the public page as the `week_name` Jinja filter) drops the
   leading «Неделя » Mila writes in a week's name, so a screen that prints the number itself
   («Неделя N ·», «N. ») never says the word twice (DOMAIN §7). The name is stored as she typed
   it; only the printing side trims.

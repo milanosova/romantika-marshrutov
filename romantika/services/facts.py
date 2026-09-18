@@ -84,6 +84,9 @@ async def add_own(
     now: datetime,
 ) -> FactResult:
     """A participant's own fact. Mila's facts go through `add`: hers are the club's, not personal."""
+    # The lock first, then the count — as in `words.add`: two first facts sent at once must
+    # not both read «ноль» (the partial unique index is the second line of defence, not the first).
+    await locks.serialise(session, f"fact:{season_id}:{author_id}")
     first = await _count_of(session, season_id=season_id, author_id=author_id) == 0
     fact_id = await add(session, season_id=season_id, week_id=week_id, text=text, author_id=author_id, now=now)
     granted = first and await freezes.grant(

@@ -405,7 +405,7 @@
   function stampHtml(w) {
     const cls = w.state === "stamped" ? w.level : w.state;
     const mark = w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : w.state === "current" ? "▸" : RM.stateMark[w.state] || "·";
-    return `<button class="stamp ${cls}" data-n="${w.number}"><span class="n">${w.number}</span><span class="m">${mark}</span><span class="t">${esc(w.state === "locked" ? fmt(w.starts_on) : w.title)}</span></button>`;
+    return `<button class="stamp ${cls}" data-n="${w.number}"><span class="n">${w.number}</span><span class="m">${mark}</span><span class="t">${esc(w.state === "locked" ? fmt(w.starts_on) : RM.weekName(w.title))}</span></button>`;
   }
 
   function openWeek(n) {
@@ -420,8 +420,9 @@
          ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
          ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}
          ${w.late_open ? `<div id="late-box" style="margin-top:14px">${loading()}</div>` : ""}`;
-    const name = RM.weekName(w.title || "");
-    const title = name && name !== `Неделя ${w.number}` ? `Неделя ${w.number} · ${name}` : `Неделя ${w.number}`;
+    // The server sends «Неделя N» as the placeholder of a week that has not opened (views.py).
+    const named = w.title && w.title !== `Неделя ${w.number}`;
+    const title = named ? `Неделя ${w.number} · ${RM.weekName(w.title)}` : `Неделя ${w.number}`;
     openSheet(title, body, () => {
       if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week"));
       if (w.late_open) renderLateBox(w);

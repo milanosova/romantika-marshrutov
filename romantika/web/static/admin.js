@@ -116,7 +116,7 @@
   }
 
   async function remindNow(weekNumber, weekTitle) {
-    const about = weekNumber ? `за неделю ${weekNumber} «${weekTitle}»` : "за текущую неделю";
+    const about = weekNumber ? `за неделю ${weekNumber} «${RM.weekName(weekTitle)}»` : "за текущую неделю";
     if (!(await RM.confirm(`Напомнить всем, кто взялся ${about} и ещё не прислал отчёт?`))) return;
     try { await RM.api("/api/admin/remind", { method: "POST", body: { week_number: weekNumber || null } }); RM.toast("Отправляю — бот напишет тебе, сколько ушло"); }
     catch (e) { RM.toast(e.status === 409 ? "Эта неделя уже прошла — напоминать не о чем" : e.message, 4000); }
