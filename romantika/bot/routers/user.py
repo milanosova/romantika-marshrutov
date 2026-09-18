@@ -253,7 +253,12 @@ async def answer_dialog(
             )
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
-            await safe_send(bot, chat_id, escape(str(exc)), reply_markup=keyboard)
+            await safe_send(
+                bot,
+                chat_id,
+                f"{escape(str(exc))}{ru.FACT_REFUSED_HINT}",
+                reply_markup=keyboards.facts_buttons(is_admin=False, has_facts=False),
+            )
             return
         if is_admin:
             total = len(await facts.list_active(session, season.id))

@@ -336,7 +336,7 @@ async def test_validation_errors_speak_russian(app: App) -> None:
 
     garbage = await app.client.post("/api/words", json={"text": 5}, headers=app.headers(ALICE))
     assert garbage.status_code == 422
-    assert garbage.json()["detail"] == "не поняла, что прислали — попробуй ещё раз"
+    assert garbage.json()["detail"] == "не поняла, что пришло — попробуй ещё раз"
 
 
 # --- admin extras ------------------------------------------------------------------

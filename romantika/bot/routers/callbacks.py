@@ -118,9 +118,9 @@ async def _dispatch(
     if head == "intent" and len(parts) == 3:
         week_number, choice = int(parts[1]), parts[2]
         week = await content.week_by_number(session, season.id, week_number)
-        # A forged button must not pin a draft or a future week with an intent row (DOMAIN §2):
-        # only an announced week that has opened takes «берусь / мимо».
-        if week is None or choice not in ru.INTENT_HINTS or week.is_draft or week.starts_on > today:
+        # A forged button must not pin a draft with an intent row (DOMAIN §2); an announced week
+        # that has not opened yet is refused aloud below, like the other two refusals.
+        if week is None or choice not in ru.INTENT_HINTS or week.is_draft:
             await answer(query)
             return
         try:
@@ -241,7 +241,7 @@ async def _dispatch(
     if head == "addfact":
         await people.set_dialog_state(session, user.id, "fact", now=now)
         await answer(query)
-        await safe_send(bot, chat_id, ru.FACT_PROMPT)
+        await safe_send(bot, chat_id, ru.FACT_PROMPT_ADMIN if is_admin else ru.FACT_PROMPT)
         return
 
     await answer(query)

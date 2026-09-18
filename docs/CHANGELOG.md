@@ -19,9 +19,11 @@ their facts. «Что будет в конце сезона» lists what the PDF
 task there are two answers now — «Берусь» and «В этот раз мимо»; an old «Попробую» button on
 a cached message still answers and counts as «берусь». A bare word typed into the chat
 («Паспорт», «Паспорт!», «Сегодня») is a one-word report, not a button: a button starts with
-its emoji. Three refusals people can see are new: «Эта неделя уже прошла…» and «Штамп за эту
-неделю у тебя уже есть…» on an intent button (in the bot and in the app alike), «такой факт у
-тебя уже записан» on a repeated fact.
+its emoji. Four refusals people can see are new: «Эта неделя уже прошла…», «Штамп за эту
+неделю у тебя уже есть…» and «Эта неделя ещё не открылась…» on an intent button (in the bot
+and in the app alike), «такой факт у тебя уже записан» on a repeated fact (with a hint how to
+try again). Mila's fact form in the bot says her facts are the club's; the help sheet no
+longer breaks a sentence at «две заморозки»; the freezes sheet says «в канале» like the rest.
 
 Under the hood: the intent rules live in `people.choose_intent`, shared by the bot button and
 `POST /api/intent` (a repeated answer is stored but not copied to Mila); every «once per

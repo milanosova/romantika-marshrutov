@@ -117,6 +117,7 @@ async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.text(ALICE, "ацтеки называли себя мешика")
 
     assert "уже записан" in harness.session.last_text(ALICE)
+    assert "Добавить свой факт" in harness.session.last_text(ALICE), "the person is told how to try again"
     assert await count(db_session, models.Fact) == 1
     assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
 
@@ -127,6 +128,7 @@ async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, 
 
 async def test_fact_dialog_from_admin_has_no_author(harness: Harness, db_session: AsyncSession) -> None:
     await harness.callback(ADMIN_ID, "addfact")
+    assert "общий" in harness.session.last_text(ADMIN_ID), "her form does not promise privacy: her facts are the club's"
     await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")
     fact = (await db_session.execute(select(models.Fact))).scalar_one()
     assert fact.author_id is None, "Mila writes facts without a name (DOMAIN §6)"
@@ -247,6 +249,15 @@ async def test_intent_for_an_unknown_week_is_ignored(harness: Harness, db_sessio
     await harness.callback(ALICE, "intent:99:take")
     assert await count(db_session, models.WeekIntent) == 0
     assert any(isinstance(m, AnswerCallbackQuery) for m in harness.session.calls), "the button is still answered"
+
+
+async def test_intent_on_an_announced_week_that_has_not_opened_is_refused_aloud(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """The third refusal has words too: a draft is ignored, an announced future week answers."""
+    await harness.callback(ALICE, "intent:2:take")
+    assert "не открылась" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
 
 
 async def test_level_button_upgrades_minimum_to_maximum(harness: Harness, db_session: AsyncSession) -> None:
