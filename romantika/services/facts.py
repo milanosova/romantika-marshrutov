@@ -26,6 +26,10 @@ class FactDTO:
     created_at: datetime
 
 
+#: A fact fits in one Telegram message, like a report (the app's form has the same cap).
+MAX_LENGTH = 4000
+
+
 async def add(
     session: AsyncSession,
     *,
@@ -39,6 +43,10 @@ async def add(
     body = text.strip()
     if not body:
         raise Refused("факт без текста не запишу")
+    if len(body) > MAX_LENGTH:
+        from romantika.texts import ru  # texts import FactDTO from here: a module-level import would loop
+
+        raise Refused(ru.FACT_TOO_LONG)
     # Concurrent copies of one fact (a double tap, two devices) wait for each other here.
     await locks.serialise(session, f"fact:{season_id}:{author_id}")
     duplicate = await session.execute(
