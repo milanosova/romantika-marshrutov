@@ -174,7 +174,7 @@
   function composerHtml(w, late) {
     const title = late ? (late.again ? "Дописать в журнал" : "Добавить в журнал") : w ? "Сдать отчёт" : "Написать Миле";
     const note = late
-      ? (late.again ? "Штамп за неделю уже стоит, он не изменится. Текст и фото лягут в ту же главу журнала." : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт.")
+      ? lateNote(late)
       : w
       ? "Текст — минимум ✅, фото или видео — максимум ⭐. Дослать можно сколько угодно раз."
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
@@ -185,6 +185,13 @@
       <div class="previews" id="previews" hidden></div>
       <div class="bar" id="bar" hidden><i></i></div>
       <button class="btn block" id="send" style="margin-top:12px">Отправить</button>`;
+  }
+
+  // The stamp decides the wording: a stamped week keeps its stamp, an unstamped one gets none.
+  function lateNote(late) {
+    return late.stamped
+      ? "Штамп за неделю уже стоит, он не изменится. Текст и фото лягут в ту же главу журнала."
+      : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт.";
   }
 
   function bindComposer(w, late) {
@@ -349,34 +356,30 @@
   }
 
   // The chapter of a past week inside its sheet: what is already there, and the door to add more.
-  async function renderLateBox(w) {
+  async function renderLateBox(w, notice) {
     const box = $("late-box");
     if (!box) return;
     let j;
     try { j = await RM.api("/api/journal"); } catch (e) { if (box.isConnected) box.innerHTML = errorBox(e); return; }
     if (!box.isConnected) return;
     const rs = j.reports.filter((r) => r.week_number === w.number);
-    const again = rs.length > 0;
-    box.innerHTML = `${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
-      <button class="btn block" id="late-open" style="margin-top:10px">${again ? "Дописать в журнал" : "Добавить в журнал"}</button>
-      <p class="note" style="margin:8px 0 0">${again ? "Штамп за неделю уже стоит, он не изменится." : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт."}</p>`;
+    const late = { again: rs.length > 0, stamped: !!w.level };
+    box.innerHTML = `${notice ? `<div class="result ok" style="margin-bottom:12px"><div class="rich">${html(notice)}</div></div>` : ""}
+      ${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
+      <button class="btn block" id="late-open" style="margin-top:10px">${late.again ? "Дописать в журнал" : "Добавить в журнал"}</button>
+      <p class="note" id="late-note" style="margin:8px 0 0">${lateNote(late)}</p>`;
     // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
     bindReportActions(box, j, () => { if ($("late-box")) renderLateBox(w); else openWeek(w.number); });
     $("late-open").addEventListener("click", () => {
       const form = document.createElement("div");
       form.className = "composer";
       form.id = "composer";
-      form.innerHTML = composerHtml(w, { again });
+      form.innerHTML = composerHtml(w, late);
+      $("late-note").remove();
       $("late-open").replaceWith(form);
-      bindComposer(w, { again, done: (r) => showLateResult(w, r) });
+      bindComposer(w, { ...late, done: (r) => renderLateBox(w, r.message) });
       $("report-text").focus();
     });
-  }
-
-  function showLateResult(w, r) {
-    const box = $("composer");
-    if (box) box.innerHTML = `<div class="result ok"><div class="rich">${html(r.message)}</div></div>`;
-    renderLateBox(w); // the new entry joins the chapter; the passport above is untouched (no stamp)
   }
 
   // --- Журнал --------------------------------------------------------------------------
