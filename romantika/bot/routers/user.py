@@ -142,7 +142,7 @@ async def handle_text(
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":
-        await common.send_task(bot, chat_id, session, season, today)
+        await common.send_task(bot, chat_id, session, season, today, user_id=user.id)
     elif action == "today":
         await common.send_today(bot, chat_id, session, season, today, settings)
     elif action == "passport":

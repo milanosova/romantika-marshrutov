@@ -182,6 +182,14 @@ async def set_intent(
     await session.flush()
 
 
+async def get_intent(session: AsyncSession, *, user_id: int, week_id: int) -> str | None:
+    """The person's answer on one week, if any («take» / «try» / «skip»)."""
+    query = select(models.WeekIntent.choice).where(
+        models.WeekIntent.user_id == user_id, models.WeekIntent.week_id == week_id
+    )
+    return (await session.execute(query)).scalar_one_or_none()
+
+
 async def intents(session: AsyncSession, *, season_id: int, week_id: int) -> dict[int, models.IntentChoice]:
     """`{user_id: choice}` for one week, used by the summary and the reminders."""
     query = select(models.WeekIntent.user_id, models.WeekIntent.choice).where(

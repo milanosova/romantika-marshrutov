@@ -336,6 +336,7 @@ LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за н�
 LATE_WEEK_FUTURE = "эта неделя ещё не началась"
 LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
 LATE_NO_WEEK = "такой недели нет"
+NO_SUCH_WEEK = "такой недели нет"
 """Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
 
 
@@ -639,6 +640,9 @@ INTENT_HINTS = {
     "skip": "Хорошо, неделя может не задаться.\n\nНапоминаний не пришлю. Реакция под постом — тоже участие.",
 }
 INTENT_NAMES = {"take": "берусь", "try": "берусь", "skip": "мимо"}  # «try» is what old messages send
+INTENT_WEEK_OVER = "Эта неделя уже прошла — дописать за неё можно в приложении, в «Сезоне»."
+INTENT_ALREADY_STAMPED = "Штамп за эту неделю у тебя уже есть — отвечать «берусь» не нужно 🙂"
+INTENT_SAME = "Так и записано."
 
 
 #: How much of a report's text Mila's copy carries (Telegram's cap is 4096 for the whole message).

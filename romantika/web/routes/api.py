@@ -200,9 +200,11 @@ async def set_intent(
     """
     week = await content.week_by_number(session, season.id, body.week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
     if week.starts_on > today:
         raise HTTPException(status.HTTP_409_CONFLICT, "эта неделя ещё не открылась")
+    if week.ends_on < today:
+        raise HTTPException(status.HTTP_409_CONFLICT, ru.INTENT_WEEK_OVER)
     await people.set_intent(
         session,
         season_id=season.id,
@@ -607,7 +609,7 @@ async def fix_level(
     """«Это был максимум/минимум»: upgrade only, and only with a report (DOMAIN §2)."""
     week = await content.week_by_number(session, season.id, week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
     level = StampLevel(body.level)
     result = await reports.fix_level(
         session, season_id=season.id, user_id=principal.user.id, week_number=week_number, level=level, now=now

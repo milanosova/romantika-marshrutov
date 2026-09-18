@@ -14,7 +14,7 @@ from romantika.bot import keyboards
 from romantika.bot.send import safe_send
 from romantika.config import Settings
 from romantika.domain.tzolkin import tzolkin_day
-from romantika.services import content, facts, freezes, journal, passport, people, words
+from romantika.services import content, facts, freezes, journal, passport, people, stamps, words
 from romantika.services.content import SeasonDTO
 from romantika.services.media import MediaStore
 from romantika.services.people import UserDTO
@@ -23,7 +23,9 @@ from romantika.texts import ru
 logger = logging.getLogger(__name__)
 
 
-async def send_task(bot: Bot, chat_id: int, session: AsyncSession, season: SeasonDTO | None, today: date) -> None:
+async def send_task(
+    bot: Bot, chat_id: int, session: AsyncSession, season: SeasonDTO | None, today: date, *, user_id: int | None = None
+) -> None:
     if season is None:
         await safe_send(bot, chat_id, ru.NO_SEASON)
         return
@@ -31,7 +33,10 @@ async def send_task(bot: Bot, chat_id: int, session: AsyncSession, season: Seaso
     if week is None:
         await safe_send(bot, chat_id, ru.NO_WEEK_TASK)
         return
-    await safe_send(bot, chat_id, ru.task_text(week), reply_markup=keyboards.task_buttons(week.number))
+    # With a stamp already in the passport the question «берёшься?» is answered: no buttons.
+    stamped = user_id is not None and await stamps.get_level(session, user_id=user_id, week_id=week.id) is not None
+    markup = None if stamped else keyboards.task_buttons(week.number)
+    await safe_send(bot, chat_id, ru.task_text(week), reply_markup=markup)
 
 
 async def send_today(

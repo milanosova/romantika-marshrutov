@@ -210,6 +210,23 @@ async def test_intent_buttons_store_the_choice_and_tell_mila(
     assert word in harness.session.all_text(ADMIN_ID), "Mila is told about the choice"
 
 
+async def test_intent_on_a_finished_week_and_after_a_stamp_is_refused(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """A button on an old message: the week is over — nothing to take; after a stamp the question is answered."""
+    harness.set_now(moscow(*WEEK2, 12))
+    await harness.callback(ALICE, "intent:1:take")
+    assert "уже прошла" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
+    await harness.text(ALICE, "сделала минимум за вторую")  # a stamp for week 2
+    await harness.callback(ALICE, "intent:2:take")
+    assert "уже есть" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
+    await harness.text(ALICE, "📋 Задание")
+    last = [m for m in harness.session.calls if isinstance(m, SendMessage) and m.chat_id == ALICE][-1]
+    assert last.reply_markup is None, "no «берёшься?» buttons once the week has a stamp"
+
+
 async def test_intent_for_an_unknown_week_is_ignored(harness: Harness, db_session: AsyncSession) -> None:
     await harness.callback(ALICE, "intent:99:take")
     assert await count(db_session, models.WeekIntent) == 0
