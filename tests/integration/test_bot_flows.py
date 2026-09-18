@@ -69,9 +69,13 @@ async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.callback(ALICE, "addword")
     await harness.text(ALICE, "sobremesa — снова")
 
-    assert harness.session.last_text(ALICE) == "слово «sobremesa» у тебя в словарике уже есть"
+    assert harness.session.last_text(ALICE).startswith("слово «sobremesa» у тебя в словарике уже есть")
     assert await count(db_session, models.Word) == 1
-    assert (await dialog_row(db_session, ALICE)).state == "word", "the dialog stays: the person can retry"
+    assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
+
+    await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
+    assert await count(db_session, models.Word) == 1, "a report after a refused word is not a word"
+    assert await count(db_session, models.Report) == 1
 
 
 async def test_letter_dialog_reaches_mila_and_is_linked_for_the_reply(

@@ -46,6 +46,8 @@ def normalize_button(text: str | None) -> str:
 
 
 def button_action(text: str | None) -> str | None:
+    """The word alone counts, with or without its emoji (tests/acceptance/test_stage3_bot.py
+    pins «сегодня» → today): a typed «Паспорт» is the button, not a one-word report."""
     return BUTTON_ACTIONS.get(normalize_button(text))
 
 

@@ -17,6 +17,7 @@ from romantika.bot.send import safe_send
 from romantika.config import Settings
 from romantika.services import content, facts, letters, links, people, words
 from romantika.services.content import SeasonDTO
+from romantika.services.errors import Refused
 from romantika.services.media import MediaStore
 from romantika.services.people import DialogStateDTO, UserDTO
 from romantika.texts import ru
@@ -192,9 +193,14 @@ async def answer_dialog(
             await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboard)
             return
         week = await content.current_week(session, season.id, today=today)
-        result = await words.add(
-            session, season_id=season.id, user_id=user.id, week_id=week.id if week else None, raw=text, now=now
-        )
+        try:
+            result = await words.add(
+                session, season_id=season.id, user_id=user.id, week_id=week.id if week else None, raw=text, now=now
+            )
+        except Refused as exc:
+            # The dialog is already closed (the caller cleared it): the next message is a report again.
+            await safe_send(bot, chat_id, f"{exc}{ru.WORD_REFUSED_HINT}", reply_markup=keyboard)
+            return
         await safe_send(
             bot, chat_id, ru.WORD_SAVED + (ru.WORD_FREEZE_BONUS if result.freeze_granted else ""), reply_markup=keyboard
         )
