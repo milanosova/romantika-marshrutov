@@ -327,9 +327,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   same lock (`services/locks.py: serialise(session, key)`) guards every other «once per
   person» write whose duplicate check is read-then-write: a word (`word:season:user`), a
   fact (`fact:season:author`) and an intent (`intent:user:week`) — a double tap or two
-  devices wait for each other inside Postgres. The first row of a user is not locked (the
-  lock would be held for the whole update, media downloads included): `people.upsert_user`
-  inserts it with `ON CONFLICT DO NOTHING` and reads it back. A
+  devices wait for each other inside Postgres. The first row of a user and their season
+  membership are not locked (the lock would be held for the whole update, media downloads
+  included): `people.upsert_user` and `people.ensure_member` insert with `ON CONFLICT DO
+  NOTHING` and read the row back. A
   service that refuses the input raises `services.errors.Refused` (a `ValueError` with a
   Russian message) and the app answers 422 `{"detail": …}` (`web/app.py`). A body that fails
   schema validation (`RequestValidationError`) answers the same shape — `detail` is always one
