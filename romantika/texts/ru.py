@@ -158,8 +158,8 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         "сразу после отправки или потом в «Рюкзаке», в журнале, пока неделя идёт.",
     ),
     (
-        "Хочу дослать фото или переделать",
-        "Просто пришли ещё раз: повторный отчёт штамп не понижает, а фото поднимет его до "
+        "Хочу прислать ещё фото или переделать",
+        "Просто пришли ещё раз: повторный отчёт штамп не понижает, а фото за текущую неделю поднимет его до "
         "максимума. Другое дело — правка уже присланного отчёта в приложении: если убрать из "
         "него все фото, штамп пересчитается по тому, что осталось.",
         "Просто отправь ещё один отчёт: повторный штамп не понижает, а фото поднимет его до "
@@ -175,6 +175,17 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         None,
     ),
     (
+        "Хочу сделать прошедшую неделю",
+        "Можно, до конца сезона — в приложении: «🎒 Открыть клуб», «Сезон», нажми на неделю, "
+        "там «Добавить в журнал» (или «Дописать», если запись уже есть). Текст и фото лягут в твой "
+        "журнал сезона. Штамп за прошедшую неделю уже не ставится и заморозка не возвращается: "
+        "паспорт — про «вовремя», журнал — про «вообще». Сюда, в чат, такое слать не надо — "
+        "я не пойму, к какой неделе.",
+        "Можно, до конца сезона: вкладка «Сезон», нажми на неделю, там «Добавить в журнал». "
+        "Текст и фото лягут в твой журнал сезона. Штамп за прошедшую неделю уже не "
+        "ставится и заморозка не возвращается: паспорт — про «вовремя», журнал — про «вообще».",
+    ),
+    (
         "Как заработать ещё заморозку",
         "Всего можно накопить пять. Сверх двух базовых:\n"
         "· +1 за своё слово в словарике — сразу, автоматически\n"
@@ -184,7 +195,8 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     ),
     (
         "Старт в середине сезона",
-        "Заходи с любой недели, догонять с начала не нужно. Ничей результат не считается поздним.",
+        "Заходи с любой недели, догонять с начала не нужно. Штампы считаются с твоей первой недели; "
+        "прошедшие можно сделать для себя — они лягут в журнал (см. выше).",
         None,
     ),
     ("Не знаю, что написать", "Минимум — это правда одно слово. «Чимичанга» — уже полноценный отчёт.", None),
@@ -309,8 +321,42 @@ NOT_UNDERSTOOD = (
     "Пришли что-то из этого, и я поставлю штамп."
 )
 OUT_OF_WEEK = "Спасибо! Сейчас неделя сезона не идёт, так что штамп не ставлю — но сообщение сохранила и прочитаю."
+
+# --- late reports: a past week, journal only (DOMAIN §2) ---------------------------------
+LATE_RECEIPT = "📔 {verb} в журнал недели {number} «{title}». {tail}"
+LATE_VERB_FIRST = "Записала"
+LATE_VERB_AGAIN = "Дописала"
+LATE_TAIL_STAMPED = "Штамп за неделю как был — он не меняется."
+LATE_TAIL_NO_STAMP = "Штамп за неё уже не ставится — а в журнале сезона будет."
+LATE_MARK = "дослано позже"
+"""The mark on a late report in the journal, the PDF and Mila's admin app."""
+EDIT_SEASON_OVER = "Сезон закончился — журнал теперь как есть, менять его уже нельзя."
+LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за неё ставит штамп, отправь его как обычно"
+LATE_WEEK_FUTURE = "эта неделя ещё не началась"
+LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
+LATE_NO_WEEK = "такой недели нет"
+"""Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
+
+
+def late_receipt(week: WeekDTO, *, first_of_week: bool, stamped: bool = False) -> str:
+    """The app's answer to a late report. The verb follows the chapter (first entry or not),
+    the tail follows the stamp: «как был» only when the week has one, whatever put it there."""
+    return LATE_RECEIPT.format(
+        verb=LATE_VERB_FIRST if first_of_week else LATE_VERB_AGAIN,
+        number=week.number,
+        title=escape(week.title),
+        tail=LATE_TAIL_STAMPED if stamped else LATE_TAIL_NO_STAMP,
+    )
+
+
+def late_photos_label(n: int) -> str:
+    """Under a stamped chapter's photos in the PDF: how many of the shown photos came late."""
+    return f"{n} фото — {LATE_MARK}"
+
+
 JOURNAL_NOW = "Так он выглядит сейчас. К {end} здесь будет весь сезон."
 NOT_REPORT_DONE = "Поняла, это не отчёт — штамп пересчитала. Сохранила как обычное сообщение, прочитаю."
+NOT_REPORT_DONE_LATE = "Поняла — убрала из журнала. Сохранила как обычное сообщение, прочитаю."
 NOT_REPORT_FOREIGN = "Этот отчёт не твой, ничего не трогаю."
 NOT_REPORT_ALREADY = "Этот отчёт уже отменён — всё в порядке."
 EDIT_WEEK_OVER = "Эта неделя уже закрыта — отчёт остаётся как есть. Дописать можно, пока неделя идёт."
@@ -504,18 +550,20 @@ def facts_text(season: SeasonDTO, facts: list[FactDTO], names: dict[int, str], *
 def journal_text(view: JournalView, level: Level | None) -> str:
     season = view.season
     name = short_name(view.user)
+    done = sum(1 for week in view.weeks if week.stamped)  # stamps only: a late chapter is journal, not rhythm
     lines = [
         f"📔 <b>Журнал сезона · {escape(season.title)}</b>",
         f"{escape(name)} · {season.starts_on:%d.%m} — {season.ends_on:%d.%m.%Y}",
         "",
-        f"Пройдено <b>{len(view.weeks)}</b> {plural(len(view.weeks), 'неделя', 'недели', 'недель')} "
+        f"Пройдено <b>{done}</b> {plural(done, 'неделя', 'недели', 'недель')} "
         f"из {view.weeks_total}. Статус: <b>{JOURNAL_LEVEL_NAMES[level]}</b>.",
     ]
     if view.weeks:
         lines += ["", "───", "<b>Твои недели</b>"]
         for week in view.weeks:
-            mark = "⭐" if week.level is StampLevel.MAX else "✅"
-            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>")
+            mark = "⭐" if week.level is StampLevel.MAX else "✅" if week.stamped else "📔" if week.late_only else "◦"
+            tail = f" · {LATE_MARK}" if week.late_only else ""
+            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")
     else:
@@ -582,14 +630,14 @@ ADMIN_COPY_CHARS = 3500
 
 def admin_report_header(week_number: int, author: str, text: str | None, kind: str) -> str:
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
-    return (
-        f"📨 Отчёт за неделю {week_number} от {escape(author)}{body}"
-        "\n\n<i>Ответь на это сообщение — я передам ответ автору.</i>"
-    )
+    return f"📨 Отчёт за неделю {week_number} от {escape(author)}{body}\n\n<i>Ответь реплаем — передам.</i>"
 
 
-def admin_edit_header(week_number: int, author: str, text: str | None, *, added: int, removed: int) -> str:
-    """Mila's copy of an edited report: what the text is now and what happened to the files."""
+def admin_edit_header(
+    week_number: int, author: str, text: str | None, *, added: int, removed: int, late: bool = False
+) -> str:
+    """Mila's copy of an edited report: what the text is now and what happened to the files.
+    A late entry says so — its week is long over and no stamp moves."""
     changes = []
     if added:
         changes.append(f"+{added} {plural(added, 'файл', 'файла', 'файлов')}")
@@ -597,14 +645,19 @@ def admin_edit_header(week_number: int, author: str, text: str | None, *, added:
         changes.append(f"−{removed} {plural(removed, 'файл', 'файла', 'файлов')}")
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else ""
     tail = f" ({', '.join(changes)})" if changes else ""
-    return (
-        f"✏️ Правка отчёта за неделю {week_number} от {escape(author)}{tail}{body}"
-        "\n\n<i>Ответь на это сообщение — я передам ответ автору.</i>"
+    what = (
+        f"Правка записи за неделю {week_number} ({LATE_MARK}, штамп не трогается)"
+        if late
+        else f"Правка отчёта за неделю {week_number}"
     )
+    return f"✏️ {what} от {escape(author)}{tail}{body}\n\n<i>Ответь реплаем — передам.</i>"
 
 
-def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool) -> str:
-    """The receipt after an edit in the Mini App; names the stamp the week actually has."""
+def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool, late: bool = False) -> str:
+    """The receipt after an edit in the Mini App; names the stamp the week actually has.
+    A late report has none behind it, so the receipt speaks of the journal only."""
+    if late:
+        return f"✏️ Запись в журнале недели «{escape(week.title)}» обновила. Штамп это не трогает."
     if level is StampLevel.MAX:
         text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — штамп со звёздочкой ⭐ на месте."
     elif level is StampLevel.MIN:
@@ -632,6 +685,14 @@ def admin_word_added(author: str, text: str, week_number: int | None = None) -> 
 def admin_fact_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
     return f"💡 Новый факт от {escape(author)}{where}: {escape(text)}"
+
+
+def admin_late_header(week_number: int, author: str, text: str | None, kind: str, *, stamped: bool = False) -> str:
+    """Mila's copy of a report for a week that has ended (DOMAIN §2): the stamp line agrees
+    with the participant's receipt — the week's stamp stays as it is, or there is none."""
+    body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
+    stamp = "Штамп за неделю как был." if stamped else "Штамп не ставится."
+    return f"📨 {escape(author)} дослала за неделю {week_number}{body}\n\n<i>{stamp} Ответь реплаем — передам.</i>"
 
 
 def admin_out_of_week_header(author: str, text: str | None, kind: str) -> str:

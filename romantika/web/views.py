@@ -82,7 +82,11 @@ def weeks_out(view: PassportView, *, today: date, reveal_all: bool = False) -> l
         state = view.breakdown.states.get(week.number, WeekState.LOCKED)
         level = view.stamps.get(week.number)
         reveal = reveal_all or week.starts_on <= today
-        result.append(week_out(week, state, level.value if level else None, reveal=reveal))
+        out = week_out(week, state, level.value if level else None, reveal=reveal)
+        # A past week takes late reports into its journal chapter until the season ends (DOMAIN §2).
+        if week.ends_on < today <= view.season.ends_on:
+            out = out.model_copy(update={"late_open": True})
+        result.append(out)
     return result
 
 
@@ -101,7 +105,12 @@ async def journal_out(
         user=schemas.Me(id=user.id, first_name=user.first_name, username=user.username, is_admin=principal_admin),
         passport=passport_out(view, reasons),
         weeks=weeks_out(view, today=today),
-        reports=[reports_out(r, week_ends={w.number: w.ends_on for w in view.weeks}, today=today) for r in reports],
+        reports=[
+            reports_out(
+                r, week_ends={w.number: w.ends_on for w in view.weeks}, today=today, season_ends_on=season.ends_on
+            )
+            for r in reports
+        ],
         achievements=jview.achievements,
         words=[
             schemas.WordOut(word=w.word, meaning=w.meaning, week_number=week_numbers.get(w.week_id or -1))
@@ -115,8 +124,11 @@ async def journal_out(
     )
 
 
-def reports_out(r: ReportDTO, *, week_ends: dict[int, date], today: date) -> schemas.ReportOut:
-    """One report with its files; `editable` while the week is still open (DOMAIN §2)."""
+def reports_out(
+    r: ReportDTO, *, week_ends: dict[int, date], today: date, season_ends_on: date | None = None
+) -> schemas.ReportOut:
+    """One report with its files; `editable` while the week is still open — a late report
+    until the season ends (DOMAIN §2)."""
     ends_on = week_ends.get(r.week_number) if r.week_number is not None else None
     return schemas.ReportOut(
         id=r.id,
@@ -126,7 +138,8 @@ def reports_out(r: ReportDTO, *, week_ends: dict[int, date], today: date) -> sch
         text=r.text,
         created_at=r.created_at,
         edited_at=r.edited_at,
-        editable=reports.editable_until(ends_on, today),
+        editable=reports.editable_until(ends_on, today, late=r.late, season_ends_on=season_ends_on),
+        late=r.late,
         media=[
             schemas.MediaOut(id=str(m.media_id), url=f"/media/{m.media_id}", mime=m.mime, downloaded=m.downloaded)
             for m in r.media
@@ -160,7 +173,10 @@ async def report_out(session: AsyncSession, report_id: int, *, today: date) -> s
     for dto in await journal.reports_for_user(session, season_id=row.season_id, user_id=row.user_id):
         if dto.id == report_id:
             weeks = await content.weeks(session, row.season_id)
-            return reports_out(dto, week_ends={w.number: w.ends_on for w in weeks}, today=today)
+            season = await content.require_season(session, row.season_id)
+            return reports_out(
+                dto, week_ends={w.number: w.ends_on for w in weeks}, today=today, season_ends_on=season.ends_on
+            )
     return None
 
 

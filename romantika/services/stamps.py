@@ -196,8 +196,12 @@ async def cleared_reports(session: AsyncSession, *, user_id: int, week_id: int) 
 
 
 async def _live_report_ids(session: AsyncSession, *, user_id: int, week_id: int) -> list[int]:
+    """Reports that can speak for the week's stamp — late ones never do (DOMAIN §2)."""
     query = select(models.Report.id).where(
-        models.Report.user_id == user_id, models.Report.week_id == week_id, models.Report.deleted_at.is_(None)
+        models.Report.user_id == user_id,
+        models.Report.week_id == week_id,
+        models.Report.deleted_at.is_(None),
+        models.Report.late.is_(False),
     )
     return [int(rid) for rid in (await session.execute(query)).scalars()]
 

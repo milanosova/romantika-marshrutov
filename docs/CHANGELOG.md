@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.4.0 — unreleased (late reports into the journal)
+
+For participants: a week that has ended takes a report until the season ends — «Добавить в
+журнал» (or «Дописать в журнал» when the week already has one) on the week's sheet in
+«Сезон» and from the week cell in «Рюкзак». The report goes into the journal chapter of
+that week and into the PDF marked «дослано позже»; it earns no stamp, gives no freeze back,
+and never keeps a stamp alive when the on-time report is cancelled. It can be edited and
+taken back until the season ends. The chat still takes reports for the running week only;
+`/help` says where a past week is added.
+
+For Mila: a copy in the chat headed «📨 Имя дослала за неделю N: …» with «Штамп не
+ставится»; reply as usual. The week's summary and «Привал» ignore late reports. The
+participant card in the admin app shows the mark, and report kinds there are in Russian now.
+
+Under the hood: `reports.late` (migration `d5e6f7a8b9c0`, additive; the downgrade refuses
+while late reports exist), `reports.accept_late`, `POST /api/reports` with `week_number`,
+`WeekOut.late_open`, `ReportOut.late`; every stamp computation and the week summary filter
+`late = false`; the journal carries `JournalEntry(text, late)` and late-only chapters
+(`level = None`); `RM.kindName` shared by both apps.
+
 ## v2.3.0 — 2026-09-18 (one door: a button in the chat, three tabs in the app)
 
 For participants: the keyboard under the chat is one button, «🎒 Открыть клуб», and the
