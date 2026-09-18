@@ -562,7 +562,9 @@ def journal_text(view: JournalView, level: Level | None) -> str:
         lines += ["", "───", "<b>Твои недели</b>"]
         for week in view.weeks:
             mark = "⭐" if week.level is StampLevel.MAX else "✅" if week.stamped else "📔" if week.late_only else "◦"
-            tail = f" · {LATE_MARK}" if week.late_only else ""
+            # The quote below is the chapter's last entry: say so when that entry came late.
+            quoted_late = bool(week.entries) and week.entries[-1].late
+            tail = f" · {LATE_MARK}" if week.late_only or quoted_late else ""
             lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")
