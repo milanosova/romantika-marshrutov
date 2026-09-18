@@ -174,7 +174,7 @@ def facts_buttons(*, is_admin: bool, has_facts: bool) -> InlineKeyboardMarkup:
 
 
 def calendar_button(public_base_url: str) -> InlineKeyboardMarkup | None:
-    button = _web_app_button("☀️ Узнать свой день", app_page_url(public_base_url, "/calendar"))
+    button = _web_app_button("☀️ Узнай своё предназначение", app_page_url(public_base_url, "/calendar"))
     return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
 
 

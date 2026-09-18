@@ -126,8 +126,8 @@ async def total(session: AsyncSession, season_id: int, user_id: int) -> int:
 async def pending(session: AsyncSession, *, season_id: int, user_id: int, reason: models.FreezeReason) -> bool:
     """Can this person still earn the freeze given for `reason`?
 
-    The screens promise a bonus («За первый свой факт — ❄️ +1 заморозка»), and the promise has
-    to be true: the freeze is granted once a season, and never above the ceiling (DOMAIN §3).
+    The screens promise the bonus in words, and the promise has to be true: the freeze is
+    granted once a season, and never above the ceiling (DOMAIN §3).
     """
     if reason not in AUTO_REASONS:
         return False

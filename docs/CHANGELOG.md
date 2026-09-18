@@ -4,7 +4,8 @@
 
 For participants: the day of the Maya calendar is four lines now — the label, the day with
 its sign, what it means, and «Узнай своё предназначение →» where the calendar link used to
-sit. The status line says what the deadline is for («дедлайн задания до воскресенья, 18:00»).
+sit — the same words now name the calendar everywhere (the public season page, the button on
+the calendar itself, the bot's button). The status line says what the deadline is for («дедлайн задания до воскресенья, 18:00»).
 The task card carries the week's name as Mila wrote it, with no number in front; every screen
 that prints the number itself («Неделя 3 · …», «3. …») drops the word «Неделя» from the name
 when a latin word follows it, so a week named as the channel names it («Неделя rola [музыка]»)

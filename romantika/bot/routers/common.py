@@ -82,9 +82,7 @@ async def send_dictionary(
         await safe_send(bot, chat_id, ru.NO_SEASON)
         return
     view = await words.season_dictionary(session, season.id, today=today, viewer_id=viewer_id)
-    offer = await freezes.pending(
-        session, season_id=season.id, user_id=viewer_id, reason=models.FreezeReason.WORD
-    )
+    offer = await freezes.pending(session, season_id=season.id, user_id=viewer_id, reason=models.FreezeReason.WORD)
     await safe_send(
         bot,
         chat_id,

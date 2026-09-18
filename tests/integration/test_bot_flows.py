@@ -1240,9 +1240,7 @@ async def test_two_commands_are_advertised_and_old_ones_still_answer(harness: Ha
     assert any("Паспорт" in t for t in harness.session.sent_texts(ALICE)), "/passport keeps answering"
 
 
-async def test_the_screens_stop_promising_a_freeze_at_the_ceiling(
-    harness: Harness, db_session: AsyncSession
-) -> None:
+async def test_the_screens_stop_promising_a_freeze_at_the_ceiling(harness: Harness, db_session: AsyncSession) -> None:
     """A promise has to be true: at the ceiling no freeze is granted, so none is offered
     (DOMAIN §3; `freezes.pending` answers for both screens)."""
     await harness.text(ALICE, "/start")  # the person has to exist before a freeze points at them
