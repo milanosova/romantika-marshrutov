@@ -279,7 +279,7 @@
       <div class="tiles">
         <div class="tile"><div class="big">${p.stamps} <span class="muted">/ ${p.weeks_total}</span></div><div class="label">${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}</div></div>
         <div class="tile"><div class="big">${esc(level)}</div><div class="label">статус</div></div>
-        <div class="tile"><div class="big">${p.freezes_left} <span class="muted">/ ${p.freezes_total}</span></div><div class="label">заморозок · <a href="#" id="freezes-how">как заработать ещё?</a></div></div>
+        <div class="tile"><div class="big">${p.freezes_left} <span class="muted">/ ${p.freezes_total}</span></div><div class="label">${RM.plural(p.freezes_left, "заморозка", "заморозки", "заморозок")} · <a href="#" id="freezes-how">как заработать ещё?</a></div></div>
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>

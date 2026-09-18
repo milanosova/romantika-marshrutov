@@ -35,7 +35,9 @@
       opts.body = JSON.stringify(opts.body);
     }
     opts.credentials = "same-origin";
-    const response = await fetch(path, opts);
+    let response;
+    try { response = await fetch(path, opts); }
+    catch (e) { throw new Error("Сеть не ответила — попробуй ещё раз"); } // the browser's own «Failed to fetch» is English
     return RM._finish(response.status, response.ok, response.statusText, response.status === 204 ? "" : await response.text());
   };
 
