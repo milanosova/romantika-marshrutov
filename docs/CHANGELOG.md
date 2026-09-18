@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.4.0 — unreleased (late reports into the journal)
+## v2.4.0 — 2026-09-18 (late reports into the journal)
 
 For participants: a week that has ended takes a report until the season ends — «Добавить в
 журнал» (or «Дописать в журнал» when the week already has one) on the week's sheet in
@@ -11,7 +11,8 @@ taken back until the season ends. The chat still takes reports for the running w
 `/help` says where a past week is added.
 
 For Mila: a copy in the chat headed «📨 Имя дослала за неделю N: …» with «Штамп не
-ставится»; reply as usual. The week's summary and «Привал» ignore late reports. The
+ставится» (or «Штамп за неделю как был» when the week has one); reply as usual. Every copy
+of a report or an edit now ends with the same line, «Ответь реплаем — передам». The week's summary and «Привал» ignore late reports. The
 participant card in the admin app shows the mark, and report kinds there are in Russian now.
 
 Under the hood: `reports.late` (migration `d5e6f7a8b9c0`, additive; the downgrade refuses
