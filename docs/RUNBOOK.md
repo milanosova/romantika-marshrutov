@@ -110,9 +110,10 @@ Decision 2026-09-04 (owner): the legacy data is not migrated. Since 2026-09-05 p
 on **Mila's own bot `@romantika_marshrutov_bot`** (token in `~/.romantika/prod.env` on the Mac
 and in `/opt/stacks/romantika/.env` on the VPS — nowhere else). The interim
 `@romantika_marshrutov_club_bot` on Dmitry's account is unused and may be deleted in BotFather.
-The stack on the VPS runs with a clean database and the seeded Mexico season. Bot name,
-descriptions, commands and the menu button are set through the Bot API:
-`rc exec -T bot python -m romantika.ops.telegram_setup` (idempotent, run after every bot change).
+The stack on the VPS runs with a clean database and the seeded Mexico season. Bot name and
+descriptions are set through the Bot API: `rc exec -T bot python -m romantika.ops.telegram_setup`
+(idempotent, run after changing them). The command list and the menu button are applied by
+the bot itself at every start (`apply_menu`; log line `menu_applied`), so a deploy is enough.
 
 Switching the token: edit `BOT_TOKEN` / `BOT_USERNAME` in the VPS `.env`, `scripts/deploy.sh`
 (or `rc up -d bot web worker`), then `telegram_setup`. Sessions of the Mini App are signed with
@@ -153,7 +154,8 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
    Check the reconciliation table it prints against the legacy counts.
 5. In BotFather (Mila's account): `/newapp` twice for `@romantika_marshrutov_bot` with the URLs
    `https://romantika.vibe-coding.trade/app/journal` (short name `journal`) and `/calendar`
-   (`calendar`); `/setmenubutton` → journal. `/setcommands` with the list from `GUIDE-RU.md`.
+   (`calendar`). Commands and the menu button are set by the bot at start, not in BotFather
+   (`/setcommands` there would be overwritten at the next bot restart).
 6. Send `/start` to the bot from Mila's account and from a participant's; check `/results`.
 7. Run `scripts/backup.sh` once by hand (`BACKUP_ON_START=1` in `.env` for the first start).
 
@@ -178,7 +180,12 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   previous release would show them to participants. Announce or delete the drafts in the
   admin app («Задания»), then downgrade.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
-  unacknowledged updates for 24 h).
+  unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
+  list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before
+  v2.3.0 does not undo that: run `rc exec -T bot python -m romantika.ops.telegram_setup` from
+  the rolled-back tree afterwards. Reply keyboards are cached on people's phones until their
+  next `/start`; a client too old for `web_app` buttons sends «🎒 Открыть клуб» as text, which
+  a pre-v2.3.0 bot would take for a report inside a week.
 
 ## Read-only queries
 

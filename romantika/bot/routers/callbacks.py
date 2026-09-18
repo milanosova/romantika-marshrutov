@@ -185,7 +185,12 @@ async def _dispatch(
                     letter_id=letter.id,
                     now=now,
                 )
-        await safe_send(bot, chat_id, ru.NOT_REPORT_DONE, reply_markup=keyboards.main_keyboard(is_admin=is_admin))
+        await safe_send(
+            bot,
+            chat_id,
+            ru.NOT_REPORT_DONE,
+            reply_markup=keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url),
+        )
         return
 
     if head == "more" and len(parts) == 2:
@@ -196,7 +201,12 @@ async def _dispatch(
             await people.set_dialog_state(session, user.id, "letter", now=now)
             await safe_send(bot, chat_id, ru.WRITE_PROMPT)
         elif parts[1] == "help":
-            await safe_send(bot, chat_id, ru.HELP, reply_markup=keyboards.main_keyboard(is_admin=is_admin))
+            await safe_send(
+                bot,
+                chat_id,
+                ru.HELP,
+                reply_markup=keyboards.help_buttons(settings.public_base_url),
+            )
         return
 
     if head == "endofseason":

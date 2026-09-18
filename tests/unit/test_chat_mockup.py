@@ -56,6 +56,21 @@ def test_absorbed_dedupes_by_message_and_keeps_late_messages() -> None:
     assert stand.last_inline[0] == (6, "Ок", "ok") and stand.cursor > 11.9
 
 
+def test_absorbed_reads_the_reply_keyboard_the_fake_api_keeps_beside_the_echo() -> None:
+    """Telegram never echoes a reply keyboard, so the fake API stores it in the row itself."""
+    stand = chat_mockup.Stand.__new__(chat_mockup.Stand)
+    stand.transcript, stand.last_inline, stand.seen, stand.cursor = [], [], set(), 0.0
+    row = {
+        "method": "sendMessage",
+        "chat_id": 1,
+        "at": 10.0,
+        "message": {"message_id": 5, "text": "привет"},
+        "reply_keyboard": {"keyboard": [[{"text": "🎒 Открыть клуб", "web_app": {"url": "https://x/app"}}]]},
+    }
+    (entry,) = stand.absorbed([row])
+    assert entry["keyboard"] == [["🎒 Открыть клуб"]]
+
+
 def test_render_places_user_right_and_bot_left_with_buttons() -> None:
     transcript = [
         {"who": "user", "text": "/start"},

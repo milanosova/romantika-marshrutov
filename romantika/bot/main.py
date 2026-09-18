@@ -10,6 +10,7 @@ from romantika.bot.factory import make_bot
 from romantika.config import get_settings
 from romantika.db.session import make_session_factory
 from romantika.logging import setup_logging
+from romantika.ops.telegram_setup import apply_menu
 from romantika.services.media import MediaStore
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,12 @@ async def run() -> None:
     if not settings.admin_ids:
         logger.warning("no_admins_configured")
     await bot.delete_webhook(drop_pending_updates=False)
+    # The command list and the menu button follow the code on every start (DOMAIN §7); a Bot
+    # API hiccup here must not keep the bot from polling.
+    try:
+        logger.info("menu_applied", extra={"menu_button": await apply_menu(bot, settings)})
+    except Exception:
+        logger.exception("menu_apply_failed")
     try:
         await dispatcher.start_polling(bot, allowed_updates=["message", "callback_query"])
     finally:

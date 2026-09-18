@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
+from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -17,6 +18,7 @@ from romantika.bot.send import safe_send
 from romantika.config import Settings
 from romantika.services import content, facts, letters, links, people, words
 from romantika.services.content import SeasonDTO
+from romantika.services.errors import Refused
 from romantika.services.media import MediaStore
 from romantika.services.people import DialogStateDTO, UserDTO
 from romantika.texts import ru
@@ -97,7 +99,7 @@ async def handle_text(
 ) -> None:
     text = (message.text or "").strip()
     chat_id = message.chat.id
-    keyboard = keyboards.main_keyboard(is_admin=is_admin)
+    keyboard = keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url)
     action: str | None
     argument = ""
     if text.startswith("/"):
@@ -126,11 +128,17 @@ async def handle_text(
     if action == "start":
         await safe_send(bot, chat_id, ru.greeting(season) + ru.GREETING_CTA, reply_markup=keyboard)
     elif action == "help":
-        await safe_send(bot, chat_id, ru.HELP, reply_markup=keyboard)
+        await safe_send(bot, chat_id, ru.HELP, reply_markup=keyboards.help_buttons(settings.public_base_url))
         if is_admin:
             await safe_send(bot, chat_id, ru.ADMIN_MEMO)
     elif action == "whoami":
         await safe_send(bot, chat_id, ru.WHOAMI.format(user_id=user.id))
+    elif action == "app":
+        # The door button opens the app by itself over https; a plain label lands here.
+        markup = keyboards.app_button(settings.public_base_url)
+        app_url = keyboards.app_page_url(settings.public_base_url)
+        hint = ru.OPEN_CLUB_HINT if markup else ru.OPEN_CLUB_LINK.format(url=app_url)
+        await safe_send(bot, chat_id, hint, reply_markup=markup)
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":
@@ -178,7 +186,7 @@ async def answer_dialog(
 ) -> None:
     text = (message.text or "").strip()
     chat_id = message.chat.id
-    keyboard = keyboards.main_keyboard(is_admin=is_admin)
+    keyboard = keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url)
     author = user.display_name_with_username
 
     if dialog.state == "word":
@@ -186,9 +194,16 @@ async def answer_dialog(
             await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboard)
             return
         week = await content.current_week(session, season.id, today=today)
-        result = await words.add(
-            session, season_id=season.id, user_id=user.id, week_id=week.id if week else None, raw=text, now=now
-        )
+        try:
+            result = await words.add(
+                session, season_id=season.id, user_id=user.id, week_id=week.id if week else None, raw=text, now=now
+            )
+        except Refused as exc:
+            # The dialog is already closed (the caller cleared it): the next message is a report again.
+            await safe_send(
+                bot, chat_id, f"{escape(str(exc))}{ru.WORD_REFUSED_HINT}", reply_markup=keyboards.word_button()
+            )
+            return
         await safe_send(
             bot, chat_id, ru.WORD_SAVED + (ru.WORD_FREEZE_BONUS if result.freeze_granted else ""), reply_markup=keyboard
         )

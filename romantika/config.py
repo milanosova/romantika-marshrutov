@@ -68,6 +68,12 @@ class Settings(BaseSettings):
             raise ValueError("MEDIA_DIR must be set to the directory holding participant media")
         return value
 
+    @field_validator("public_base_url")
+    @classmethod
+    def _no_trailing_slash(cls, value: str) -> str:
+        """Every link is `{public_base_url}/path`; a trailing slash would make it `//path`."""
+        return value.strip().rstrip("/")
+
     @field_validator("admin_chat_id", "dev_auth_user_id", mode="before")
     @classmethod
     def _empty_to_none(cls, value: object) -> object:

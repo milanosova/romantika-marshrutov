@@ -1,5 +1,34 @@
 # Changelog
 
+## v2.3.0 — 2026-09-18 (one door: a button in the chat, three tabs in the app)
+
+For participants: the keyboard under the chat is one button, «🎒 Открыть клуб», and the
+command menu lists `/start` and `/help` only — the old labels and commands keep answering for
+cached keyboards. The Mini App has three tabs instead of five: **Неделя** (day and word first,
+then the task, intent, every report of the week, the report form), **Рюкзак** (passport with
+freezes as a number and «как заработать ещё?», achievements, the wish, the journal with
+«Собрать» PDF), **Сезон** (released weeks as a chronicle, the word form, week words, facts,
+about, channel). Old tab paths (`/app/journal` …) open the right tab. A letter to Mila inside a
+week goes through `/help` → «✉️ Написать Миле». Nothing in reports, stamps, freezes or
+reminders changes.
+
+For Mila: nothing to do; DOMAIN §7 and GUIDE-RU describe the new layout. The bot's
+command list and menu button are applied by the bot itself at every start (log line
+`menu_applied`), so BotFather needs no visit; the name and descriptions still come from
+`python -m romantika.ops.telegram_setup`.
+
+Also for participants: when a service refuses something in the chat (a word the person
+already has), the bot now says so instead of staying silent — and the word dialog closes, so
+the next message is a report again, not a word in the shared dictionary.
+
+Under the hood: a service's `Refused` reaching the bot is answered by a dispatcher error
+handler (`bot/app.py`); a multipart upload cut by the client answers 400 with one log line
+instead of an ASGI traceback; `keyboards.app_page_url` builds every Mini App link and `PUBLIC_BASE_URL`
+loses a trailing slash in `Settings`; a request body that fails validation answers with one
+Russian sentence (`web/app.py`) instead of pydantic's JSON, since the app shows `detail` as
+is; the fake Bot API keeps a reply keyboard beside the echoed message so the chat mock-up can
+draw it. No migration.
+
 ## v2.2.1 — 2026-09-18 (Mila edits the season's calendar herself; deployed)
 
 For Mila: in the admin's «Задания» a week can be added («＋ Добавить неделю»), a future

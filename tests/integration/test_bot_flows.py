@@ -8,6 +8,7 @@ what was actually sent and what ended up in the database, not merely that nothin
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from aiogram.methods import AnswerCallbackQuery, CopyMessage, SendMessage
@@ -59,6 +60,22 @@ async def test_word_dialog_saves_word_clears_state_and_grants_freeze(
     assert list(freezes) == ["word"]
     assert "Новое слово от" in harness.session.all_text(ADMIN_ID)
     assert await count(db_session, models.Report) == 0, "an answer to the bot is not a report"
+
+
+async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
+    """A service's `Refused` reaches the person as text, never as a silent traceback."""
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — время за столом")
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — снова")
+
+    assert harness.session.last_text(ALICE).startswith("слово «sobremesa» у тебя в словарике уже есть")
+    assert await count(db_session, models.Word) == 1
+    assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
+
+    await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
+    assert await count(db_session, models.Word) == 1, "a report after a refused word is not a word"
+    assert await count(db_session, models.Report) == 1
 
 
 async def test_letter_dialog_reaches_mila_and_is_linked_for_the_reply(
@@ -578,7 +595,7 @@ async def test_whoami_returns_the_id(harness: Harness) -> None:
 )
 async def test_non_admin_commands_are_refused(harness: Harness, db_session: AsyncSession, command: str) -> None:
     await harness.text(ALICE, command)
-    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопки внизу 👇"
+    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопка внизу 👇"
     assert await count(db_session, models.Fact) == 0
     assert await count(db_session, models.Achievement) == 0
     assert await count(db_session, models.Report) == 0
@@ -593,12 +610,40 @@ async def test_non_admin_callbacks_are_refused(harness: Harness, db_session: Asy
     assert await count(db_session, models.Setting) == 0
 
 
-async def test_participant_keyboard_has_no_admin_button(harness: Harness) -> None:
+async def test_participant_keyboard_is_one_door(harness: Harness) -> None:
+    """DOMAIN §7 (14.09.2026): one button under the chat, no admin button for a participant."""
     await harness.text(ALICE, "/start")
     markup = harness.session.messages(ALICE)[-1].reply_markup
     labels = [b.text for row in markup.keyboard for b in row]
+    assert labels == ["🎒 Открыть клуб"], labels
     assert "⚙️ Мила" not in labels
-    assert "📋 Задание" in labels
+
+
+async def test_door_label_answers_with_a_button_over_https(harness: Harness) -> None:
+    """A cached plain label (or a tap on the text) gets the app as an inline button."""
+    await harness.text(ALICE, "🎒 Открыть клуб")
+    message = harness.session.messages(ALICE)[-1]
+    assert "👇" in message.text, message.text
+    button = message.reply_markup.inline_keyboard[0][0]
+    assert button.web_app is not None and button.web_app.url == "https://romantika.example.test/app"
+
+
+async def test_door_label_without_https_answers_with_the_address(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Over http Telegram allows no web_app button, so the door press must still lead somewhere."""
+    harness = await build_harness(db_session, tmp_path, monkeypatch, public_base_url="http://127.0.0.1:8010/")
+    await harness.text(ALICE, "🎒 Открыть клуб")
+    message = harness.session.messages(ALICE)[-1]
+    assert "http://127.0.0.1:8010/app" in message.text, message.text
+    assert "👇" not in message.text, "no button below — the text must not promise one"
+    assert message.reply_markup is None
+
+
+async def test_old_button_labels_still_answer(harness: Harness) -> None:
+    """The keyboard is cached on the client until /start: «📋 Задание» must keep working."""
+    await harness.text(ALICE, "📋 Задание")
+    assert any("Неделя" in t for t in harness.session.sent_texts(ALICE)), "the old label still opens the task"
 
 
 async def test_admin_keyboard_has_the_panel_button(harness: Harness) -> None:
@@ -1068,6 +1113,26 @@ async def test_free_text_achievement_and_html_are_escaped(harness: Harness, db_s
 
 async def test_a_participant_pressing_the_panel_button_gets_nothing(harness: Harness, db_session: AsyncSession) -> None:
     await harness.text(ALICE, "⚙️ Мила")
-    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопки внизу 👇"
+    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопка внизу 👇"
     assert harness.session.last_markup(ALICE) is None
     assert await count(db_session, models.Report) == 0
+
+
+async def test_help_offers_a_letter_to_mila_and_the_door(harness: Harness, db_session: AsyncSession) -> None:
+    """Inside a week a plain message is a report (DOMAIN §2), so the letter keeps its own
+    button — under /help, the one place people look for «how do I reach her»."""
+    await harness.text(ALICE, "/help")
+    labels = [label for label, _ in harness.session.buttons(ALICE)]
+    assert "✉️ Написать Миле" in labels, labels
+    await harness.callback(ALICE, "more:write")
+    await harness.text(ALICE, "Мила, у меня заморозка за встречу")
+    assert "Передала" in harness.session.last_text(ALICE)
+    assert await count(db_session, models.Report) == 0, "a letter is not a report"
+
+
+async def test_two_commands_are_advertised_and_old_ones_still_answer(harness: Harness) -> None:
+    from romantika.ops.telegram_setup import COMMANDS
+
+    assert [c for c, _ in COMMANDS] == ["start", "help"]
+    await harness.text(ALICE, "/passport")
+    assert any("Паспорт" in t for t in harness.session.sent_texts(ALICE)), "/passport keeps answering"
