@@ -18,6 +18,7 @@ from romantika.db import models
 from romantika.domain.types import StampLevel
 from romantika.services import achievements, content, facts, letters, links, people, reports
 from romantika.services.content import SeasonDTO
+from romantika.services.errors import Refused
 from romantika.services.gateways import TelegramGateway
 from romantika.services.media import MediaStore
 from romantika.services.people import UserDTO
@@ -117,15 +118,28 @@ async def _dispatch(
     if head == "intent" and len(parts) == 3:
         week_number, choice = int(parts[1]), parts[2]
         week = await content.week_by_number(session, season.id, week_number)
-        # A forged button must not pin a draft or a future week with an intent row (DOMAIN §2):
-        # only an announced week that has opened takes «берусь / попробую / мимо».
-        if week is None or choice not in ru.INTENT_HINTS or week.is_draft or week.starts_on > today:
+        # A forged button must not pin a draft with an intent row (DOMAIN §2); an announced week
+        # that has not opened yet is refused aloud below, like the other two refusals.
+        if week is None or choice not in ru.INTENT_HINTS or week.is_draft:
             await answer(query)
             return
-        await people.set_intent(
-            session, season_id=season.id, user_id=user.id, week_id=week.id, choice=models.IntentChoice(choice), now=now
-        )
+        try:
+            outcome = await people.choose_intent(
+                session,
+                season_id=season.id,
+                user_id=user.id,
+                week=week,
+                choice=models.IntentChoice(choice),
+                today=today,
+                now=now,
+            )
+        except Refused as exc:  # a button on an old message, or the stamp is already there
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
+            await answer(query, str(exc), alert=True)
+            return
         await answer(query, ru.INTENT_HINTS[choice], alert=True)
+        if not outcome.changed:
+            return  # the same answer again: Mila was told the first time
         await common.notify_admin(
             bot,
             admin_chat,
@@ -228,7 +242,7 @@ async def _dispatch(
     if head == "addfact":
         await people.set_dialog_state(session, user.id, "fact", now=now)
         await answer(query)
-        await safe_send(bot, chat_id, ru.FACT_PROMPT)
+        await safe_send(bot, chat_id, ru.FACT_PROMPT_ADMIN if is_admin else ru.FACT_PROMPT)
         return
 
     await answer(query)
@@ -332,11 +346,7 @@ async def handle_admin(
             "Попадёт в его журнал в конце сезона.",
         )
     elif action == "edit":
-        weeks = [
-            week
-            for week in await content.weeks(session, season.id, include_drafts=True)
-            if week.is_draft or week.ends_on >= today
-        ]
+        weeks = await content.weeks(session, season.id, include_drafts=True)  # finished ones too (DOMAIN §1)
         await safe_send(
             bot,
             chat_id,

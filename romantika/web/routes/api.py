@@ -16,7 +16,6 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
-from sqlalchemy import text as sql_text
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.formparsers import MultiPartException
@@ -24,8 +23,9 @@ from starlette.requests import ClientDisconnect
 
 from romantika.db import models
 from romantika.domain.types import ReportKind, StampLevel
-from romantika.services import content, facts, jobs, letters, notify, people, reports, stamps, words
+from romantika.services import content, facts, jobs, letters, locks, notify, people, reports, stamps, words
 from romantika.services import media as media_service
+from romantika.services.errors import Refused
 from romantika.services.people import TelegramUser
 from romantika.services.reports import IncomingFile, IncomingMessage
 from romantika.texts import ru
@@ -121,7 +121,7 @@ def _attempt_key(fields: dict[str, str], name: str) -> str | None:
 async def _serialise(session: SessionDep, key: str) -> None:
     """Two retries of one attempt wait for each other on a transaction lock, so the second one
     finds the first one's row instead of doing the work twice."""
-    await session.execute(sql_text("SELECT pg_advisory_xact_lock(hashtext(:key))"), {"key": key})
+    await locks.serialise(session, key)
 
 
 @router.get("/me", response_model=schemas.Me)
@@ -193,24 +193,28 @@ async def set_intent(
     now: NowDep,
     today: TodayDep,
 ) -> schemas.IntentOut:
-    """«Берусь · Попробую · В этот раз мимо» — the same row Mila's summary and the reminders read.
+    """«Берусь · В этот раз мимо» — the same row Mila's summary and the reminders read.
 
-    Only for a week that has started: a future week is not shown to participants (DOMAIN §1),
-    so an intent on it would be a guess about a task nobody has seen.
+    The rules (a running week only, not after the stamp, a repeat does not ping Mila) live in
+    `people.choose_intent`, shared with the bot button; a refusal is a 409 with its sentence.
     """
     week = await content.week_by_number(session, season.id, body.week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
-    if week.starts_on > today:
-        raise HTTPException(status.HTTP_409_CONFLICT, "эта неделя ещё не открылась")
-    await people.set_intent(
-        session,
-        season_id=season.id,
-        user_id=principal.user.id,
-        week_id=week.id,
-        choice=models.IntentChoice(body.choice),
-        now=now,
-    )
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
+    try:
+        outcome = await people.choose_intent(
+            session,
+            season_id=season.id,
+            user_id=principal.user.id,
+            week=week,
+            choice=models.IntentChoice(body.choice),
+            today=today,
+            now=now,
+        )
+    except Refused as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    if not outcome.changed:  # the same answer again: Mila was told the first time
+        return schemas.IntentOut(choice=body.choice, hint=ru.INTENT_HINTS[body.choice])
     await _notify_admin(
         session,
         settings,
@@ -607,7 +611,7 @@ async def fix_level(
     """«Это был максимум/минимум»: upgrade only, and only with a report (DOMAIN §2)."""
     week = await content.week_by_number(session, season.id, week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
     level = StampLevel(body.level)
     result = await reports.fix_level(
         session, season_id=season.id, user_id=principal.user.id, week_number=week_number, level=level, now=now
@@ -659,7 +663,7 @@ async def send_letter(
 async def dictionary(
     principal: PrincipalDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> schemas.DictionaryOut:
-    view = await words.season_dictionary(session, season.id, today=today)
+    view = await words.season_dictionary(session, season.id, today=today, viewer_id=principal.user.id)
     names = await people.display_names(session, [item.user_id for item in view.user_words], short=True)
     return schemas.DictionaryOut(
         about=season.title,
@@ -719,7 +723,8 @@ async def add_word(
 
 @router.get("/facts", response_model=schemas.FactsOut)
 async def list_facts(principal: PrincipalDep, session: SessionDep, season: SeasonDep) -> schemas.FactsOut:
-    listed = await facts.list_active(session, season.id)
+    """Mila's facts and the viewer's own (DOMAIN §6); the admin sees everyone's."""
+    listed = await facts.list_active(session, season.id, viewer_id=None if principal.is_admin else principal.user.id)
     names = await people.display_names(session, [f.author_id for f in listed if f.author_id is not None], short=True)
     return schemas.FactsOut(
         about=season.title_accusative or season.title,

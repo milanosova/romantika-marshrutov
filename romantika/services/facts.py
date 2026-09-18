@@ -9,11 +9,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
-from romantika.services import content
+from romantika.services import content, locks
 from romantika.services.errors import Refused
 
 
@@ -24,6 +24,10 @@ class FactDTO:
     author_id: int | None
     week_id: int | None
     created_at: datetime
+
+
+#: A fact fits in one Telegram message, like a report (the app's form has the same cap).
+MAX_LENGTH = 4000
 
 
 async def add(
@@ -39,19 +43,43 @@ async def add(
     body = text.strip()
     if not body:
         raise Refused("факт без текста не запишу")
+    if len(body) > MAX_LENGTH:
+        from romantika.texts import ru  # texts import FactDTO from here: a module-level import would loop
+
+        raise Refused(ru.FACT_TOO_LONG)
+    # Concurrent copies of one fact (a double tap, two devices) wait for each other here.
+    await locks.serialise(session, f"fact:{season_id}:{author_id}")
+    duplicate = await session.execute(
+        select(models.Fact.id).where(
+            models.Fact.season_id == season_id,
+            models.Fact.author_id.is_(author_id) if author_id is None else models.Fact.author_id == author_id,
+            models.Fact.deleted_at.is_(None),
+            func.lower(models.Fact.text) == body.lower(),
+        )
+    )
+    if duplicate.first() is not None:
+        from romantika.texts import ru  # texts import FactDTO from here: a module-level import would loop
+
+        raise Refused(ru.FACT_DUPLICATE)
     row = models.Fact(season_id=season_id, week_id=week_id, text=body, author_id=author_id, created_at=now)
     session.add(row)
     await session.flush()
     return row.id
 
 
-async def list_active(session: AsyncSession, season_id: int) -> list[FactDTO]:
-    """Facts of the season that were not removed, oldest first."""
+async def list_active(session: AsyncSession, season_id: int, *, viewer_id: int | None = None) -> list[FactDTO]:
+    """Facts of the season that were not removed, oldest first.
+
+    With a `viewer_id`: Mila's facts (no author) plus the viewer's own — a participant's facts
+    are personal (DOMAIN §6, 15.09.2026). Without one, everything: the admin's view.
+    """
     query = (
         select(models.Fact)
         .where(models.Fact.season_id == season_id, models.Fact.deleted_at.is_(None))
         .order_by(models.Fact.created_at, models.Fact.id)
     )
+    if viewer_id is not None:
+        query = query.where(or_(models.Fact.author_id.is_(None), models.Fact.author_id == viewer_id))
     return [
         FactDTO(
             id=row.id,

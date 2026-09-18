@@ -211,7 +211,7 @@ def test_split_text_respects_limit_and_keeps_content() -> None:
     [
         ("📋 Задание", "task"),
         ("📋️ Задание", "task"),
-        ("сегодня", "today"),
+        ("сегодня", None),  # a bare word is a one-word report, not a button (the owner's decision, 18.09.2026)
         ("🌤 Сегодня", "today"),
         ("📘 Паспорт", "passport"),
         ("🛡 Мой паспорт", "passport"),
@@ -248,7 +248,9 @@ async def test_task_shows_current_week_with_intent_buttons(harness: Harness) -> 
     markup = last.reply_markup
     assert markup is not None
     labels = [b.text for row in markup.inline_keyboard for b in row]  # type: ignore[union-attr]
-    assert any("Берусь" in x for x in labels) and any("Попробую" in x for x in labels) and any("мимо" in x for x in labels)
+    # Two answers since 18.09.2026 (the owner's decision, DOMAIN §7): «Берусь» and «В этот раз мимо».
+    assert any("Берусь" in x for x in labels) and any("мимо" in x for x in labels)
+    assert not any("Попробую" in x for x in labels)
 
 
 async def test_text_report_gets_min_stamp_and_admin_copy(harness: Harness, db_session: AsyncSession) -> None:

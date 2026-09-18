@@ -154,6 +154,26 @@ async def test_intent_is_stored_and_mila_is_told(app: App) -> None:
     ).status_code == 422
 
 
+async def test_intent_repeats_and_stamps_follow_the_bot_rules(app: App) -> None:
+    """One rule for both doors (`people.choose_intent`): a repeat of the same answer is not
+    copied to Mila again, and a week with a stamp takes no answer at all."""
+    headers = app.headers(ALICE)
+    for _ in range(3):
+        assert (
+            await app.client.post("/api/intent", json={"week_number": 1, "choice": "take"}, headers=headers)
+        ).status_code == 200
+    assert len(await app.jobs("telegram_notify")) == 1, "Mila was told the first time only"
+    r = await app.client.post("/api/intent", json={"week_number": 1, "choice": "skip"}, headers=headers)
+    assert r.status_code == 200
+    assert len(await app.jobs("telegram_notify")) == 2, "a different answer is news"
+
+    assert (await app.client.post("/api/reports", data={"text": "чимичанга"}, headers=headers)).status_code == 201
+    r = await app.client.post("/api/intent", json={"week_number": 1, "choice": "take"}, headers=headers)
+    assert r.status_code == 409 and "уже есть" in r.json()["detail"]
+    home = (await app.client.get("/api/home", headers=headers)).json()
+    assert home["week"]["intent"] == "skip", "the answer before the stamp stays as it was"
+
+
 async def test_mila_own_actions_are_not_copied_to_herself(app: App) -> None:
     r = await app.client.post(
         "/api/intent", json={"week_number": 1, "choice": "take"}, headers=app.headers(ADMIN_ID, "Мила")
@@ -270,10 +290,12 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     assert r.status_code == 201 and r.json()["word"] == "sobremesa" and r.json()["freeze_granted"] is True
     home = (await app.client.get("/api/home", headers=app.headers(ALICE))).json()
     assert home["passport"]["freezes_total"] == 3 and home["passport"]["freeze_reasons"] == ["word"]
+    # A participant's words are personal (DOMAIN §6): Bob does not see Alice's, Alice sees her own.
     d = (await app.client.get("/api/dictionary", headers=app.headers(BOB, "Боб"))).json()
     assert d["week_words"][0]["week_number"] == 1 and len(d["week_words"]) == 1, "only released weeks"
-    assert d["user_words"][0]["word"] == "sobremesa" and d["user_words"][0]["mine"] is False
-    assert d["user_words"][0]["author"] == "Алиса"
+    assert d["user_words"] == []
+    mine = (await app.client.get("/api/dictionary", headers=app.headers(ALICE))).json()
+    assert mine["user_words"][0]["word"] == "sobremesa" and mine["user_words"][0]["mine"] is True
 
     assert (
         await app.client.post("/api/facts", json={"text": "Ацтеки называли себя мешика"}, headers=app.headers(ALICE))
@@ -284,6 +306,13 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     facts = (await app.client.get("/api/facts", headers=app.headers(ALICE))).json()
     assert [f["mine"] for f in facts["facts"]] == [True, False]
     assert facts["facts"][0]["author"] == "Алиса" and facts["facts"][1]["author"] is None
+    # Bob sees Mila's fact and not Alice's — facts of participants are personal too.
+    bobs = (await app.client.get("/api/facts", headers=app.headers(BOB, "Боб"))).json()
+    assert [f["author"] for f in bobs["facts"]] == [None]
+    twice = await app.client.post(
+        "/api/facts", json={"text": "Ацтеки называли себя мешика"}, headers=app.headers(ALICE)
+    )
+    assert twice.status_code == 422 and "уже записан" in twice.json()["detail"], "the same fact twice is refused"
 
     r = await app.client.post(
         "/api/letters", json={"text": "Мила, я оставила комментарий!"}, headers=app.headers(ALICE)
@@ -307,7 +336,7 @@ async def test_validation_errors_speak_russian(app: App) -> None:
 
     garbage = await app.client.post("/api/words", json={"text": 5}, headers=app.headers(ALICE))
     assert garbage.status_code == 422
-    assert garbage.json()["detail"] == "не поняла, что прислали — попробуй ещё раз"
+    assert garbage.json()["detail"] == "не поняла, что пришло — попробуй ещё раз"
 
 
 # --- admin extras ------------------------------------------------------------------

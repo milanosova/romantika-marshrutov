@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import date
 
 from aiogram.types import (
@@ -46,9 +47,13 @@ def normalize_button(text: str | None) -> str:
 
 
 def button_action(text: str | None) -> str | None:
-    """The word alone counts, with or without its emoji (tests/acceptance/test_stage3_bot.py
-    pins «сегодня» → today): a typed «Паспорт» is the button, not a one-word report."""
-    return BUTTON_ACTIONS.get(normalize_button(text))
+    """A button press starts with its emoji (whatever selector the client adds); a word
+    someone typed — «Паспорт», «Паспорт!», «Паспорт 🇲🇽» as a one-word report — starts with a
+    letter and is not a button (DOMAIN §7, 18.09.2026)."""
+    raw = (text or "").strip()
+    if not raw or raw[0].isalpha() or raw[0].isdigit() or unicodedata.category(raw[0]).startswith("P"):
+        return None  # «Паспорт», "Паспорт", 1. Задание — typed, not pressed
+    return BUTTON_ACTIONS.get(normalize_button(raw))
 
 
 def main_keyboard(*, is_admin: bool, app_url: str | None = None) -> ReplyKeyboardMarkup:
@@ -93,11 +98,12 @@ def more_menu(public_base_url: str) -> InlineKeyboardMarkup:
 
 
 def task_buttons(week_number: int) -> InlineKeyboardMarkup:
+    """Two answers (Mila, 18.09.2026): «Берусь» or «В этот раз мимо». The old «Попробую» button
+    on cached messages still answers and counts as «берусь»."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Берусь", callback_data=f"intent:{week_number}:take"),
-                InlineKeyboardButton(text="Попробую", callback_data=f"intent:{week_number}:try"),
                 InlineKeyboardButton(text="В этот раз мимо", callback_data=f"intent:{week_number}:skip"),
             ]
         ]
@@ -250,7 +256,7 @@ def achievement_choices(user_id: int, catalogue: list[AchievementTypeDTO]) -> In
 def week_choices(weeks: list[WeekDTO], *, today: date) -> InlineKeyboardMarkup:
     rows = []
     for week in weeks:
-        prefix = "✏️ " if week.is_draft else "▶ " if week.starts_on <= today else "🔒 "
+        prefix = "✏️ " if week.is_draft else "✓ " if week.ends_on < today else "▶ " if week.starts_on <= today else "🔒 "
         title = week.title or ru.WEEK_UNTITLED
         label = f"{prefix}{week.number} · {title}"[:60]
         rows.append([InlineKeyboardButton(text=label, callback_data=f"adm:week:{week.number}")])

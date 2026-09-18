@@ -66,7 +66,6 @@ def test_split_text_prefers_paragraph_then_line_then_space() -> None:
     [
         ("📋 Задание", "task"),
         ("📋️ Задание", "task"),  # the desktop client adds U+FE0F
-        ("ЗАДАНИЕ", "task"),
         ("🌤 Сегодня", "today"),
         ("📘 Паспорт", "passport"),
         ("🛡 Мой паспорт", "passport"),
@@ -78,7 +77,20 @@ def test_split_text_prefers_paragraph_then_line_then_space() -> None:
         ("⚙️ Мила", "admin"),
         ("📔 Мой журнал", "journal"),
         ("🎒 Открыть клуб", "app"),
-        ("Открыть клуб", "app"),
+        ("Открыть клуб", None),  # a bare word is a report, a button always carries its emoji
+        ("Паспорт", None),
+        ("Паспорт!", None),  # a typed word with punctuation or a flag is still a report:
+        ("паспорт.", None),  # the emoji of a button stands first
+        ("Паспорт 🇲🇽", None),
+        ("Сегодня!", None),
+        ("Задание 1", None),
+        ("  📘 Паспорт", "passport"),  # leading spaces do not hide the emoji
+        ("«Паспорт»", None),  # quotes, a dot or a number in front: typed, not pressed
+        ('"Паспорт"', None),
+        ("...паспорт", None),
+        ("1. Задание", None),
+        ("⋯ Ещё", "more"),  # the one button whose sign is a math symbol, not an emoji
+        ("ЗАДАНИЕ", None),
         ("тако удались, фото ниже", None),
         ("", None),
         (None, None),
@@ -149,7 +161,7 @@ def test_report_buttons_offer_the_upgrade_and_the_cancellation() -> None:
 
 
 def test_task_buttons_carry_the_week_number() -> None:
-    assert data_of(keyboards.task_buttons(7)) == ["intent:7:take", "intent:7:try", "intent:7:skip"]
+    assert data_of(keyboards.task_buttons(7)) == ["intent:7:take", "intent:7:skip"]  # two answers (Mila, 18.09)
 
 
 def test_fact_choices_are_capped_and_keep_back() -> None:

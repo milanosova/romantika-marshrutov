@@ -69,7 +69,7 @@ async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.callback(ALICE, "addword")
     await harness.text(ALICE, "sobremesa — снова")
 
-    assert harness.session.last_text(ALICE).startswith("слово «sobremesa» у тебя в словарике уже есть")
+    assert harness.session.last_text(ALICE).startswith("Слово «sobremesa» у тебя в словарике уже есть")
     assert await count(db_session, models.Word) == 1
     assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
 
@@ -109,8 +109,33 @@ async def test_fact_dialog_from_participant_keeps_the_author(harness: Harness, d
     assert "Новый факт от" in harness.session.all_text(ADMIN_ID)
 
 
+async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
+    """The duplicate refusal closes the dialog: the next message is a report, not a second fact."""
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Ацтеки называли себя мешика")
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "ацтеки называли себя мешика")
+
+    assert harness.session.last_text(ALICE).startswith("Такой факт у тебя уже записан"), "a sentence of its own"
+    assert "Добавить свой факт" in harness.session.last_text(ALICE), "the person is told how to try again"
+    assert await count(db_session, models.Fact) == 1
+    assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
+
+    await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
+    assert await count(db_session, models.Fact) == 1, "a report after a refused fact is not a fact"
+    assert await count(db_session, models.Report) == 1
+
+
+async def test_a_fact_longer_than_a_message_is_refused(harness: Harness, db_session: AsyncSession) -> None:
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "ф" * 4001)
+    assert "4000" in harness.session.last_text(ALICE)
+    assert await count(db_session, models.Fact) == 0
+
+
 async def test_fact_dialog_from_admin_has_no_author(harness: Harness, db_session: AsyncSession) -> None:
     await harness.callback(ADMIN_ID, "addfact")
+    assert "общий" in harness.session.last_text(ADMIN_ID), "her form does not promise privacy: her facts are the club's"
     await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")
     fact = (await db_session.execute(select(models.Fact))).scalar_one()
     assert fact.author_id is None, "Mila writes facts without a name (DOMAIN §6)"
@@ -197,7 +222,8 @@ async def test_dialog_state_expires_after_six_hours(harness: Harness, db_session
 # =====================================================================================
 
 
-@pytest.mark.parametrize(("choice", "word"), [("take", "берусь"), ("try", "попробую"), ("skip", "мимо")])
+# «try» is what buttons on old messages still send (before 19.09 there were three): it reads as «берусь».
+@pytest.mark.parametrize(("choice", "word"), [("take", "берусь"), ("try", "берусь"), ("skip", "мимо")])
 async def test_intent_buttons_store_the_choice_and_tell_mila(
     harness: Harness, db_session: AsyncSession, choice: str, word: str
 ) -> None:
@@ -209,10 +235,36 @@ async def test_intent_buttons_store_the_choice_and_tell_mila(
     assert word in harness.session.all_text(ADMIN_ID), "Mila is told about the choice"
 
 
+async def test_intent_on_a_finished_week_and_after_a_stamp_is_refused(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """A button on an old message: the week is over — nothing to take; after a stamp the question is answered."""
+    harness.set_now(moscow(*WEEK2, 12))
+    await harness.callback(ALICE, "intent:1:take")
+    assert "уже прошла" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
+    await harness.text(ALICE, "сделала минимум за вторую")  # a stamp for week 2
+    await harness.callback(ALICE, "intent:2:take")
+    assert "уже есть" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
+    await harness.text(ALICE, "📋 Задание")
+    last = [m for m in harness.session.calls if isinstance(m, SendMessage) and m.chat_id == ALICE][-1]
+    assert last.reply_markup is None, "no «берёшься?» buttons once the week has a stamp"
+
+
 async def test_intent_for_an_unknown_week_is_ignored(harness: Harness, db_session: AsyncSession) -> None:
     await harness.callback(ALICE, "intent:99:take")
     assert await count(db_session, models.WeekIntent) == 0
     assert any(isinstance(m, AnswerCallbackQuery) for m in harness.session.calls), "the button is still answered"
+
+
+async def test_intent_on_an_announced_week_that_has_not_opened_is_refused_aloud(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """The third refusal has words too: a draft is ignored, an announced future week answers."""
+    await harness.callback(ALICE, "intent:2:take")
+    assert "не открылась" in harness.session.alerts()[-1]
+    assert await count(db_session, models.WeekIntent) == 0
 
 
 async def test_level_button_upgrades_minimum_to_maximum(harness: Harness, db_session: AsyncSession) -> None:
@@ -474,12 +526,15 @@ async def test_panel_delfact_lists_and_removes(harness: Harness, db_session: Asy
     assert "Фактов пока нет" in harness.session.last_text(ADMIN_ID)
 
 
-async def test_admin_edit_hides_weeks_that_are_already_over(harness: Harness) -> None:
+async def test_admin_edit_offers_finished_weeks_too(harness: Harness) -> None:
+    """Texts of a finished week are editable (Mila, 18.09.2026, DOMAIN §1); the picker marks it ✓."""
     harness.set_now(moscow(*WEEK2, 12))
     await harness.callback(ADMIN_ID, "adm:edit")
-    offered = [d for _, d in harness.session.buttons(ADMIN_ID) if d and d.startswith("adm:week:")]
-    assert "adm:week:1" not in offered, "past weeks are not edited (DOMAIN §1)"
-    assert "adm:week:2" in offered and "adm:week:12" in offered
+    buttons = [(t, d) for t, d in harness.session.buttons(ADMIN_ID) if d and d.startswith("adm:week:")]
+    offered = [d for _, d in buttons]
+    assert "adm:week:1" in offered and "adm:week:2" in offered and "adm:week:12" in offered
+    assert next(t for t, d in buttons if d == "adm:week:1").startswith("✓ ")
+    assert next(t for t, d in buttons if d == "adm:week:2").startswith("▶ ")
 
 
 # =====================================================================================
@@ -644,6 +699,13 @@ async def test_old_button_labels_still_answer(harness: Harness) -> None:
     """The keyboard is cached on the client until /start: «📋 Задание» must keep working."""
     await harness.text(ALICE, "📋 Задание")
     assert any("Неделя" in t for t in harness.session.sent_texts(ALICE)), "the old label still opens the task"
+
+
+async def test_a_bare_label_word_is_a_report_not_a_button(harness: Harness, db_session: AsyncSession) -> None:
+    """With no buttons on the keyboard a typed «Паспорт» is a one-word report (DOMAIN §2, §7)."""
+    await harness.text(ALICE, "Паспорт")
+    assert await count(db_session, models.Report) == 1
+    assert "Записала" in harness.session.last_text(ALICE)
 
 
 async def test_admin_keyboard_has_the_panel_button(harness: Harness) -> None:
@@ -911,19 +973,19 @@ async def test_the_panel_ends_an_unfinished_edit(harness: Harness, db_session: A
     assert week.title == "Красками", "an abandoned edit must not rewrite the week later"
 
 
-async def test_editing_a_week_that_ended_while_the_dialog_was_open_is_answered_not_crashed(
+async def test_editing_a_week_that_ended_while_the_dialog_was_open_saves(
     db_session: AsyncSession, tmp_path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Texts of a finished week are editable (Mila, 18.09.2026, DOMAIN §1)."""
     harness = await build_harness(db_session, tmp_path, monkeypatch, now=moscow(2026, 9, 6, 22))
     await harness.callback(ADMIN_ID, "adm:field:1:title")
     harness.advance(timedelta(hours=3))  # past midnight: week 1 is over, the dialog is still alive
 
     await harness.text(ADMIN_ID, "Новое название")
-    assert "задним числом" in harness.session.last_text(ADMIN_ID)
     season = await content.active_season(db_session, today=date(2026, 9, 7))
     week = await content.week_by_number(db_session, season.id, 1)
-    assert week.title == "За столом", "a finished week is not rewritten (DOMAIN §1)"
-    assert await count(db_session, models.AuditLog) == 1, "only the season activation is in the log"
+    assert week.title == "Новое название", "a finished week's text is rewritten on request"
+    assert await count(db_session, models.AuditLog) == 2, "the season activation and the edit are in the log"
 
 
 async def test_the_journal_counts_weeks_in_russian(harness: Harness) -> None:

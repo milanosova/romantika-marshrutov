@@ -156,11 +156,11 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
         media=media,
         achievements=await achievements.labels(session, season_id=season_id, user_id=user_id),
         words=await words.for_user(session, season_id=season_id, user_id=user_id),
-        facts=await facts.list_active(session, season_id),
+        facts=await facts.list_active(session, season_id, viewer_id=user_id),
         wish=await wishes.get_wish(session, season_id, user_id),
         weeks_total=len(weeks),
         week_numbers=[week.number for week in ordered],
-        season_words=(await words.season_dictionary(session, season_id, today=today)).week_words,
+        season_words=(await words.season_dictionary(session, season_id, today=today, viewer_id=user_id)).week_words,
     )
 
 

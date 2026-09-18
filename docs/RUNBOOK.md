@@ -186,6 +186,11 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   WHERE late` (read-only, see below) is not zero, **fix forward** — do not roll back
   v2.4.0. With zero late reports the code may be rolled back without touching the
   migration: the column keeps `server_default false` and v2.3.0 runs on the new schema.
+  **v2.5.0 has no migration, and that is the trap:** it made participants' own words and
+  facts personal (seen by the author and Mila only) and the form promises it. Rolling the
+  code back to v2.4.0 shows every word and fact of every participant to everyone again —
+  the old ones included — and a look cannot be undone. Ask Mila before rolling back below
+  v2.5.0; prefer a forward fix. The data itself is untouched either way.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
   list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before
@@ -209,6 +214,7 @@ select count(*) from reports where created_at > now() - interval '7 days' and de
 select count(*) from letters where replied_at is null;                                           -- unanswered letters
 select count(*) from jobs where status = 'failed' and finished_at > now() - interval '24 hours'; -- failed worker jobs
 select count(*) from reports where late and deleted_at is null;                                  -- late reports (blocks a rollback below v2.4.0)
+select count(*) from facts where author_id in (<ADMIN_IDS>) and deleted_at is null;                -- Mila's facts that carry her id (v2.5.0 shows them to her only; re-add them in the admin app). Put the ids from ADMIN_IDS in the .env: users.is_admin is not set in production
 ```
 
 Run by hand: `scripts/rc.sh exec -T db psql -U romantika -d romantika -Atc "<one of the above>"`.

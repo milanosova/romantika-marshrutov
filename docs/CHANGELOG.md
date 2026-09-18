@@ -1,5 +1,38 @@
 # Changelog
 
+## v2.5.0 — 2026-09-18 (Mila's edits of 18.09: the week tab, freezes, personal words and facts)
+
+For participants: the «Неделя» tab opens with the club name small, the season name large in
+the accent colour, then the date and the week line; the day card is one line about the Maya
+day (no memory word, no disclaimer); the report forms say «Загрузить фото или видео». The
+«Заморозки» sheet is a plain sentence and a list, with the letter form as its own block; the
+legend under the week grid is a column; the chronicle in «Сезон» shows each week's own mark
+(⭐ ✅ ❄️ ◦) instead of ✓. «О клубе» no longer breaks its sentences at bold words. **Own words
+and facts are personal**: «Мои слова» and «Мои факты» with their forms live in «Рюкзак» and
+are seen by the author only (and by Mila in the person's card); «Сезон» keeps the week words
+and Mila's facts; the bot's `/words` and `/facts` show the same; the journal and the PDF
+carry the person's own. The freeze for the first word stays.
+
+For Mila: the texts of any week — a finished one included — are editable in the admin app
+and in «⚙️ Мила» (only the calendar of a started week stays frozen); the person's card shows
+their facts. «Что будет в конце сезона» lists what the PDF holds in plain words. Under the
+task there are two answers now — «Берусь» and «В этот раз мимо»; an old «Попробую» button on
+a cached message still answers and counts as «берусь». A bare word typed into the chat
+(«Паспорт», «Паспорт!», «Сегодня») is a one-word report, not a button: a button starts with
+its emoji. Four refusals people can see are new: «Эта неделя уже прошла…», «Штамп за эту
+неделю у тебя уже есть…» and «Эта неделя ещё не открылась…» on an intent button (in the bot
+and in the app alike), «Такой факт у тебя уже записан» on a repeated fact (with a hint how to
+try again); a fact is capped at 4000 characters in the bot as in the app. Mila's fact form in the bot says her facts are the club's; the help sheet no
+longer breaks a sentence at «две заморозки»; the freezes sheet says «в канале» like the rest.
+
+Under the hood: the intent rules live in `people.choose_intent`, shared by the bot button and
+`POST /api/intent` (a repeated answer is stored but not copied to Mila); every «once per
+person» write whose duplicate check is read-then-write — a word, a fact, an intent — takes a
+transaction-scoped advisory lock (`services/locks.py`), and the first row of a user is an
+idempotent insert, so a double tap or two devices no longer make copies or a 500; the texts of a week are bounded like their
+columns (255 / 4000 characters, no NUL) and answer 422 in Russian; the stand's demo facts of
+Mila carry no author, as production does.
+
 ## v2.4.0 — 2026-09-18 (late reports into the journal)
 
 For participants: a week that has ended takes a report until the season ends — «Добавить в

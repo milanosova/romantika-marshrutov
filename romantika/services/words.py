@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
-from romantika.services import content, freezes, people
+from romantika.services import content, freezes, locks, people
 from romantika.services.errors import Refused
 
 #: The first dash surrounded by spaces, or the first colon, separates word and meaning.
@@ -88,6 +88,8 @@ async def add(
     if not word:
         raise Refused("нужно само слово, а не только его значение")
     await people.ensure_member(session, season_id, user_id, now=now)
+    # Two copies of one word sent at the same moment wait for each other here (bugs/2026-09-18).
+    await locks.serialise(session, f"word:{season_id}:{user_id}")
     if await _has_word(session, season_id=season_id, user_id=user_id, word=word[:WORD_LENGTH]):
         raise Refused(f"слово «{word[:WORD_LENGTH]}» у тебя в словарике уже есть")
 
@@ -116,16 +118,24 @@ async def add(
     return WordResult(word_id=row.id, word=row.word, meaning=row.meaning, freeze_granted=freeze_granted)
 
 
-async def season_dictionary(session: AsyncSession, season_id: int, *, today: date) -> DictionaryView:
-    """Words of the weeks that have already started, plus every word participants added."""
+async def season_dictionary(
+    session: AsyncSession, season_id: int, *, today: date, viewer_id: int | None = None
+) -> DictionaryView:
+    """Words of the weeks that have already started, plus participants' words.
+
+    A participant's words are personal (DOMAIN §6, 15.09.2026): with a `viewer_id` only that
+    person's words come back — what the bot and the app show. Without one, every word of the
+    season: the admin's view and the acceptance contract of the service.
+    """
     weeks = [
         WeekWord(number=week.number, title=week.title, word=week.word, word_ru=week.word_ru, meaning=week.word_meaning)
         for week in await content.weeks(session, season_id)
         if week.word and week.starts_on <= today
     ]
-    query = (
-        select(models.Word).where(models.Word.season_id == season_id).order_by(models.Word.created_at, models.Word.id)
-    )
+    query = select(models.Word).where(models.Word.season_id == season_id)
+    if viewer_id is not None:
+        query = query.where(models.Word.user_id == viewer_id)
+    query = query.order_by(models.Word.created_at, models.Word.id)
     user_words = [
         UserWord(
             id=row.id,

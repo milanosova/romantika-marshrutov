@@ -142,15 +142,15 @@ async def handle_text(
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":
-        await common.send_task(bot, chat_id, session, season, today)
+        await common.send_task(bot, chat_id, session, season, today, user_id=user.id)
     elif action == "today":
         await common.send_today(bot, chat_id, session, season, today, settings)
     elif action == "passport":
         await common.send_passport(bot, chat_id, session, season, user.id, today, settings)
     elif action == "words":
-        await common.send_dictionary(bot, chat_id, session, season, today)
+        await common.send_dictionary(bot, chat_id, session, season, today, viewer_id=user.id)
     elif action == "facts":
-        await common.send_facts(bot, chat_id, session, season, is_admin=is_admin)
+        await common.send_facts(bot, chat_id, session, season, is_admin=is_admin, viewer_id=user.id)
     elif action == "journal":
         target = user.id
         if is_admin and argument:
@@ -200,8 +200,12 @@ async def answer_dialog(
             )
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
             await safe_send(
-                bot, chat_id, f"{escape(str(exc))}{ru.WORD_REFUSED_HINT}", reply_markup=keyboards.word_button()
+                bot,
+                chat_id,
+                f"{escape(ru.sentence(str(exc)))}{ru.WORD_REFUSED_HINT}",
+                reply_markup=keyboards.word_button(),
             )
             return
         await safe_send(
@@ -242,14 +246,25 @@ async def answer_dialog(
             await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboard)
             return
         week = await content.current_week(session, season.id, today=today)
-        await facts.add(
-            session,
-            season_id=season.id,
-            week_id=week.id if week else None,
-            text=text,
-            author_id=None if is_admin else user.id,
-            now=now,
-        )
+        try:
+            await facts.add(
+                session,
+                season_id=season.id,
+                week_id=week.id if week else None,
+                text=text,
+                author_id=None if is_admin else user.id,
+                now=now,
+            )
+        except Refused as exc:
+            # The dialog is already closed (the caller cleared it): the next message is a report again.
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
+            await safe_send(
+                bot,
+                chat_id,
+                f"{escape(ru.sentence(str(exc)))}{ru.FACT_REFUSED_HINT}",
+                reply_markup=keyboards.facts_buttons(is_admin=is_admin, has_facts=is_admin),
+            )
+            return
         if is_admin:
             total = len(await facts.list_active(session, season.id))
             await safe_send(
@@ -277,9 +292,8 @@ async def answer_dialog(
                 session, actor_id=user.id, week_id=week.id, changes={field: text}, today=today
             )
         except content.ContentError:
-            # The panel never offers a finished week, but the dialog outlives midnight: without
-            # this the whole update transaction would roll back and Mila would get no answer.
-            await safe_send(bot, chat_id, ru.WEEK_ALREADY_OVER)
+            # The week vanished under the dialog (deleted meanwhile): answer instead of rolling back silently.
+            await safe_send(bot, chat_id, ru.WEEK_NOT_FOUND)
             return
         except ValueError:
             # An announced week keeps its title and minimum (DOMAIN §1).

@@ -113,7 +113,7 @@
   };
   RM.levelLabel = function (level) { return RM.levelName[level || ""] || RM.levelName[""]; };
   RM.spinner = function () { return '<div class="loading"><div class="spinner"></div></div>'; };
-  RM.intentName = { take: "Берусь", try: "Попробую", skip: "В этот раз мимо" };
+  RM.intentName = { take: "Берусь", try: "Берусь", skip: "В этот раз мимо" }; // «try» is legacy: shown as «Берусь»
 
   RM.toast = function (text, ms) {
     const el = document.getElementById("toast");

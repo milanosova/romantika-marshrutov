@@ -197,14 +197,14 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 | Module | Functions (all `async`, first arg `session`) |
 |---|---|
 | `people` | `upsert_user(session, tg: TelegramUser, *, now) -> UserDTO` (keeps first `joined_at`); `ensure_member(session, season_id, user_id, *, now) -> datetime` (returns existing `joined_at`); `set_dialog_state(session, user_id, state, payload=None, *, now)`, `get_dialog_state(session, user_id, *, now) -> DialogStateDTO | None` (TTL 6 h), `clear_dialog_state(session, user_id)`; `set_intent(session, *, season_id, user_id, week_id, choice: IntentChoice, now)` |
-| `content` | `active_season(session, *, today) -> SeasonDTO | None`; `activate_season(session, season_id, *, actor_id)`; `weeks(session, season_id, *, include_drafts=False) -> list[WeekDTO]` (calendar order; announced weeks only unless `include_drafts`); `WeekDTO.is_draft` (`announced_at is None`); `ready_to_announce(week) -> bool` (title and task_min non-blank); `current_week(session, season_id, *, today) -> WeekDTO | None` (announced only); `week_by_number(session, season_id, number)` (drafts included); `update_week(session, *, actor_id, week_id, changes: dict[str, str], today=None) -> WeekDTO` (only title/intro/task_min/task_max/word/word_ru/word_meaning; refuses a week that is over; refuses to empty title/task_min of an announced week; audit row); `create_week(session, *, actor_id, season_id, number, starts_on, ends_on, today, texts=None, announce: datetime | None = None) -> WeekDTO` (future, inside the season; a draft unless `announce`; overlap / taken number → `ContentError`; audit `create`); `announce_week(session, *, actor_id, week_id, now, season_id=None) -> WeekDTO` (one way; needs title and task_min; not after the week is over; audit `announce`); `move_week(session, *, actor_id, week_id, today, season_id=None, number=None, starts_on=None, ends_on=None) -> WeekDTO` (not-started weeks only; audit `move` with the changed fields); `delete_week(session, *, actor_id, week_id, today, season_id=None)` (not-started, untouched weeks only; audit `delete`); `get_setting/set_setting(session, key, value)` |
+| `content` | `active_season(session, *, today) -> SeasonDTO | None`; `activate_season(session, season_id, *, actor_id)`; `weeks(session, season_id, *, include_drafts=False) -> list[WeekDTO]` (calendar order; announced weeks only unless `include_drafts`); `WeekDTO.is_draft` (`announced_at is None`); `ready_to_announce(week) -> bool` (title and task_min non-blank); `current_week(session, season_id, *, today) -> WeekDTO | None` (announced only); `week_by_number(session, season_id, number)` (drafts included); `update_week(session, *, actor_id, week_id, changes: dict[str, str], today=None) -> WeekDTO` (only title/intro/task_min/task_max/word/word_ru/word_meaning; any week, a finished one included — DOMAIN §1, 18.09.2026; refuses to empty title/task_min of an announced week; audit row); `create_week(session, *, actor_id, season_id, number, starts_on, ends_on, today, texts=None, announce: datetime | None = None) -> WeekDTO` (future, inside the season; a draft unless `announce`; overlap / taken number → `ContentError`; audit `create`); `announce_week(session, *, actor_id, week_id, now, season_id=None) -> WeekDTO` (one way; needs title and task_min; not after the week is over; audit `announce`); `move_week(session, *, actor_id, week_id, today, season_id=None, number=None, starts_on=None, ends_on=None) -> WeekDTO` (not-started weeks only; audit `move` with the changed fields); `delete_week(session, *, actor_id, week_id, today, season_id=None)` (not-started, untouched weeks only; audit `delete`); `get_setting/set_setting(session, key, value)` |
 | `reports` | `IncomingFile`, `IncomingMessage` dataclasses; `accept(session, *, season_id, user_id, message, now) -> AcceptResult(report_id, week_number, out_of_week, level, stamp_level, freeze_granted, media_ids)`; `fix_level(session, *, season_id, user_id, week_number, level, now) -> FixResult(ok, stamp_level, reason)`; `cancel(session, *, user_id, report_id, now) -> CancelResult(ok, stamp_level)` |
 | `stamps` | `admin_set(session, *, actor_id, season_id, user_id, week_number, level: StampLevel | None, now) -> StampLevel | None` (audit row) |
 | `freezes` | `grant(session, *, season_id, user_id, reason: FreezeReason, granted_by, now, note=None) -> bool`; `bonus_count(session, season_id, user_id) -> int` |
 | `media` | `MediaStore(root: Path)`: `.root`, `download(session, media_id, telegram, *, now) -> MediaDTO(path, sha256, size)`; path `<season_slug>/<user_id>/<uuid>.<ext>`, `.part` + atomic rename, idempotent |
 | `achievements` | `award(session, *, season_id, user_id, code_or_text, awarded_by, now) -> AwardResult(created, code, label)`; `labels(session, *, season_id, user_id) -> list[str]` |
-| `words` | `add(session, *, season_id, user_id, week_id, raw, now) -> WordResult(word, meaning, freeze_granted)`; `season_dictionary(session, season_id, *, today) -> DictionaryView(week_words, user_words)` |
-| `facts` | `add(session, *, season_id, week_id, text, author_id, now) -> int`; `list_active(session, season_id) -> list[FactDTO]`; `remove(session, *, fact_id, actor_id, now) -> bool` |
+| `words` | `add(session, *, season_id, user_id, week_id, raw, now) -> WordResult(word, meaning, freeze_granted)`; `season_dictionary(session, season_id, *, today, viewer_id=None) -> DictionaryView(week_words, user_words)` (with `viewer_id` only that person's words — what participants ever see, DOMAIN §6; without it every word of the season, the admin's view) |
+| `facts` | `add(session, *, season_id, week_id, text, author_id, now) -> int`; `list_active(session, season_id, *, viewer_id=None) -> list[FactDTO]` (with `viewer_id`: Mila's facts plus the viewer's own — what participants see; without it everything, the admin's view); `remove(session, *, fact_id, actor_id, now) -> bool` |
 | `wishes` | `set_wish(session, *, season_id, user_id, text, now)`; `get_wish(session, season_id, user_id) -> str | None` |
 | `passport` | `build(session, *, season_id, user_id, today) -> PassportView(breakdown, stamps_max, level, achievements, ...)` |
 | `journal` | `build(session, *, season_id, user_id, today) -> JournalView(user, season, weeks: [JournalWeek(number, title, level, quote)], media: [JournalMedia(media_id, path)], achievements, words, facts, wish)` |
@@ -261,7 +261,8 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   text passes through it (`safe_send`).
 - `romantika.bot.keyboards.normalize_button(text) -> str` (drops emoji/variation selectors,
   collapses spaces, lower-cases) and `button_action(text) -> str | None` with actions
-  `app, task, today, passport, words, facts, more, help, write, admin`.
+  `app, task, today, passport, words, facts, more, help, write, admin`; a message that starts
+  with a letter is never a button (a typed word is a report, DOMAIN §7).
 - Callback data: `intent:<week_number>:<take|try|skip>`, `level:<week_number>:<min|max>`,
   `notreport:<report_id>`, `more:<journal|write|help>`, `addword`, `addfact`, `endofseason`,
   admin `adm:<action>...` (free format, documented in keyboards.py).
@@ -306,9 +307,11 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   the report's week is open — DOMAIN §2; recomputes the stamp, hides removed files, copies the
   new version to Mila, receipts the author; 403 foreign, 409 cancelled or week over, 413 over
   10 files, 422 empty; an `edit_key` makes a retried PATCH idempotent), `POST
-  /api/reports/{id}/cancel`, `POST /api/weeks/{n}/level`, `POST /api/intent` (409 for a week
-  that has not started), `POST /api/letters`, `POST /api/words` (422 for a word the person
-  already has), `POST /api/facts`.
+  /api/reports/{id}/cancel`, `POST /api/weeks/{n}/level`, `POST /api/intent` (rules in
+  `people.choose_intent`, shared with the bot button: 409 for a week that has not started or
+  has ended and after the stamp; a repeated answer is stored but not copied to Mila), `POST
+  /api/letters`, `POST /api/words` (422 for a word the person already has), `POST /api/facts`
+  (422 for a fact the person already has).
 - Multipart limits (`routes/api.py`): the request is refused with 413 from `Content-Length`
   before parsing when it exceeds 200 MB; `request.form(max_files=11, max_fields=64)`; one file
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are
@@ -320,7 +323,14 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   is there to read it) and one `upload_client_disconnected` log line, never an ASGI error.
   One person's attempts are serialised with
   `pg_advisory_xact_lock` on `user:client_id` (POST) and `user:edit:report:edit_key` (PATCH),
-  so a retry in flight finds the first attempt's row instead of doing the work twice. A
+  so a retry in flight finds the first attempt's row instead of doing the work twice. The
+  same lock (`services/locks.py: serialise(session, key)`) guards every other «once per
+  person» write whose duplicate check is read-then-write: a word (`word:season:user`), a
+  fact (`fact:season:author`) and an intent (`intent:user:week`) — a double tap or two
+  devices wait for each other inside Postgres. The first row of a user and their season
+  membership are not locked (the lock would be held for the whole update, media downloads
+  included): `people.upsert_user` and `people.ensure_member` insert with `ON CONFLICT DO
+  NOTHING` and read the row back. A
   service that refuses the input raises `services.errors.Refused` (a `ValueError` with a
   Russian message) and the app answers 422 `{"detail": …}` (`web/app.py`). A body that fails
   schema validation (`RequestValidationError`) answers the same shape — `detail` is always one
