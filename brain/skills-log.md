@@ -116,3 +116,14 @@ git; демо-отчёты получали время «сегодня вече
 (две кнопки вместо трёх) и параметр `("сегодня", None)` в `test_button_action_ignores_emoji`
 (голое слово — отчёт). Это единственное отступление от правила 5 — по слову владельца,
 запись здесь для Димы.
+
+## 2026-09-18 — `scripts/dev-stack.sh reset` без Docker на PATH пишет «stand data dropped», а базу не трогает
+
+При `/relize` v2.5.0 запустила `scripts/dev-stack.sh reset` из оболочки без
+`/Applications/Docker.app/Contents/Resources/bin` на PATH: скрипт напечатал «stand data
+dropped (.dev/media, stand database)» и только потом «Docker не запущен». Следующий `up` (уже с
+Docker) поднял стенд на старой базе с данными критиков — заметила по скриншоту «Сезона»
+(чужие факты) и по `select count(*) from facts` (не 3). Трёх критиков пришлось остановить и
+запустить заново. Что сделать: в `reset` проверять Docker до сообщения об удалении (или
+печатать «dropped» после фактического `docker volume rm`). Правило для себя: `export PATH=…docker…`
+перед любым `dev-stack.sh`.
