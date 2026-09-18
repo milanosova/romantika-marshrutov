@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +22,7 @@ from romantika.web.deps import AppState
 from romantika.web.routes import admin_api, api, media, public
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
+logger = logging.getLogger(__name__)
 
 
 async def _refused(_: Request, exc: Exception) -> JSONResponse:
@@ -28,10 +30,17 @@ async def _refused(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse({"detail": str(exc)}, status_code=422)
 
 
-async def _invalid(_: Request, exc: Exception) -> JSONResponse:
+async def _invalid(request: Request, exc: Exception) -> JSONResponse:
     """A body failed validation: one Russian sentence instead of pydantic's JSON, since the
-    Mini App shows `detail` to the person as is."""
+    Mini App shows `detail` to the person as is. The fields and error types go to the log."""
     errors = exc.errors() if isinstance(exc, RequestValidationError) else []
+    logger.warning(
+        "request_invalid",
+        extra={
+            "path": request.url.path,
+            "errors": [{"loc": list(e.get("loc", ())), "type": e.get("type")} for e in errors],
+        },
+    )
     first = errors[0] if errors else {}
     kind = str(first.get("type", ""))
     if kind == "string_too_long":

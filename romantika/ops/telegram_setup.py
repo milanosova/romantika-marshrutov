@@ -12,7 +12,6 @@ manual step; the name and the descriptions stay here — Telegram rate-limits th
 from __future__ import annotations
 
 import asyncio
-import logging
 
 from aiogram import Bot
 from aiogram.types import BotCommand, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
@@ -21,8 +20,6 @@ from romantika.bot.factory import make_bot
 from romantika.bot.keyboards import app_page_url
 from romantika.config import Settings, get_settings
 from romantika.texts import ru
-
-logger = logging.getLogger(__name__)
 
 NAME = "Романтика маршрутов"
 SHORT_DESCRIPTION = "Бот клуба «Романтика маршрутов»: задания недели, паспорт со штампами, журнал сезона."

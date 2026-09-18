@@ -308,8 +308,11 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   `pg_advisory_xact_lock` on `user:client_id` (POST) and `user:edit:report:edit_key` (PATCH),
   so a retry in flight finds the first attempt's row instead of doing the work twice. A
   service that refuses the input raises `services.errors.Refused` (a `ValueError` with a
-  Russian message) and the app answers 422 `{"detail": …}` (`web/app.py`); any other error
-  stays a 500.
+  Russian message) and the app answers 422 `{"detail": …}` (`web/app.py`). A body that fails
+  schema validation (`RequestValidationError`) answers the same shape — `detail` is always one
+  Russian sentence (`ru.API_TOO_LONG` with the limit, our own `value_error` messages as they
+  are, `ru.API_BAD_INPUT` otherwise) because the Mini App shows it as is; the fields and
+  error types go to the log as `request_invalid`. Any other error stays a 500.
 - `GET /media/{id}` sends only images, video and audio inline (`INLINE_TYPES`); anything else
   goes out as `application/octet-stream` with `Content-Disposition: attachment`, always with
   `X-Content-Type-Options: nosniff`. Hidden media are 404 for the owner but still open for Mila.

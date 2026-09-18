@@ -12,7 +12,16 @@ about, channel). Old tab paths (`/app/journal` …) open the right tab. A letter
 week goes through `/help` → «✉️ Написать Миле». Nothing in reports, stamps, freezes or
 reminders changes.
 
-For Mila: nothing to do; DOMAIN §7 and GUIDE-RU describe the new layout.
+For Mila: nothing to do; DOMAIN §7 and GUIDE-RU describe the new layout. The bot's
+command list and menu button are applied by the bot itself at every start (log line
+`menu_applied`), so BotFather needs no visit; the name and descriptions still come from
+`python -m romantika.ops.telegram_setup`.
+
+Under the hood: `keyboards.app_page_url` builds every Mini App link and `PUBLIC_BASE_URL`
+loses a trailing slash in `Settings`; a request body that fails validation answers with one
+Russian sentence (`web/app.py`) instead of pydantic's JSON, since the app shows `detail` as
+is; the fake Bot API keeps a reply keyboard beside the echoed message so the chat mock-up can
+draw it. No migration.
 
 ## v2.2.1 — 2026-09-18 (Mila edits the season's calendar herself; deployed)
 

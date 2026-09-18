@@ -62,6 +62,22 @@ async def test_word_dialog_saves_word_clears_state_and_grants_freeze(
     assert await count(db_session, models.Report) == 0, "an answer to the bot is not a report"
 
 
+async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
+    """A service's `Refused` reaches the person as text, never as a silent traceback."""
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — время за столом")
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — снова")
+
+    assert harness.session.last_text(ALICE).startswith("слово «sobremesa» у тебя в словарике уже есть")
+    assert await count(db_session, models.Word) == 1
+    assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
+
+    await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
+    assert await count(db_session, models.Word) == 1, "a report after a refused word is not a word"
+    assert await count(db_session, models.Report) == 1
+
+
 async def test_letter_dialog_reaches_mila_and_is_linked_for_the_reply(
     harness: Harness, db_session: AsyncSession
 ) -> None:
@@ -579,7 +595,7 @@ async def test_whoami_returns_the_id(harness: Harness) -> None:
 )
 async def test_non_admin_commands_are_refused(harness: Harness, db_session: AsyncSession, command: str) -> None:
     await harness.text(ALICE, command)
-    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопки внизу 👇"
+    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопка внизу 👇"
     assert await count(db_session, models.Fact) == 0
     assert await count(db_session, models.Achievement) == 0
     assert await count(db_session, models.Report) == 0
@@ -1097,7 +1113,7 @@ async def test_free_text_achievement_and_html_are_escaped(harness: Harness, db_s
 
 async def test_a_participant_pressing_the_panel_button_gets_nothing(harness: Harness, db_session: AsyncSession) -> None:
     await harness.text(ALICE, "⚙️ Мила")
-    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопки внизу 👇"
+    assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопка внизу 👇"
     assert harness.session.last_markup(ALICE) is None
     assert await count(db_session, models.Report) == 0
 

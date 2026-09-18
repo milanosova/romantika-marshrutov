@@ -123,6 +123,9 @@ def greeting(season: SeasonDTO | None, *, app: bool = False) -> str:
 OPEN_CLUB = "🎒 Открыть клуб"
 """The one button under the chat: it opens the Mini App (DOMAIN §7)."""
 
+WRITE_MILA = "✉️ Написать Миле"
+"""The inline button under /help and in the legacy «Ещё» menu."""
+
 GREETING_CTA = (
     "\n\nВсё остальное — за кнопкой ниже 👇 Там три вкладки: «Неделя» с заданием, "
     "«Рюкзак» с паспортом и журналом, «Сезон» со словарём."
@@ -138,6 +141,8 @@ OPEN_CLUB_LINK = "Паспорт, журнал, словарь и задание
 API_TOO_LONG = "текст длиннее {limit} знаков"
 API_BAD_INPUT = "не поняла, что прислали — попробуй ещё раз"
 """What the Mini App shows when a request body fails validation (web/app.py)."""
+API_UPLOAD_CUT = "соединение оборвалось — пришли ещё раз"
+"""The phone lost the network mid-upload (routes/api.py)."""
 
 
 #: (heading, answer in the bot, answer in the Mini App or None when it is the same).
@@ -270,7 +275,7 @@ ADMIN_MEMO = (
 
 WHOAMI = "Твой id: <code>{user_id}</code>\nПоложи его в <code>ADMIN_IDS</code>, чтобы получить админские команды."
 UNKNOWN_COMMAND = "Такой команды нет. Жми кнопку внизу 👇"
-NOT_ADMIN = "Это команда Милы. Тебе — кнопки внизу 👇"
+NOT_ADMIN = "Это команда Милы. Тебе — кнопка внизу 👇"
 NO_WEEK_TASK = "Сейчас неделя сезона не идёт. Ближайшее задание — в понедельник."
 NO_SEASON = "Сезон ещё не начался. Как только рандомайзер выберет страну — здесь появится задание."
 MORE_MENU = "Что открыть:"
@@ -287,6 +292,8 @@ WORD_PROMPT = (
 WORD_SAVED = (
     "Записала в общий словарик 📖\n\nК концу сезона соберём из них словарь — твоё слово будет там с твоим именем."
 )
+WORD_REFUSED_HINT = ". Если хочешь записать другое — нажми «➕ Добавить своё слово» ещё раз."
+"""Follows a refusal from `words.add` in the bot: the dialog is closed, a plain message is a report again."""
 WORD_FREEZE_BONUS = (
     "\n\n❄️ И тебе +1 заморозка — это право пропустить неделю так, чтобы цепочка не порвалась. "
     "Все заморозки — в «Рюкзаке»."
