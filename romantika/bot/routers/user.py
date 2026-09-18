@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
+from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -199,7 +200,9 @@ async def answer_dialog(
             )
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
-            await safe_send(bot, chat_id, f"{exc}{ru.WORD_REFUSED_HINT}", reply_markup=keyboard)
+            await safe_send(
+                bot, chat_id, f"{escape(str(exc))}{ru.WORD_REFUSED_HINT}", reply_markup=keyboards.word_button()
+            )
             return
         await safe_send(
             bot, chat_id, ru.WORD_SAVED + (ru.WORD_FREEZE_BONUS if result.freeze_granted else ""), reply_markup=keyboard

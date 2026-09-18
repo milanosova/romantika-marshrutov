@@ -17,7 +17,13 @@ command list and menu button are applied by the bot itself at every start (log l
 `menu_applied`), so BotFather needs no visit; the name and descriptions still come from
 `python -m romantika.ops.telegram_setup`.
 
-Under the hood: `keyboards.app_page_url` builds every Mini App link and `PUBLIC_BASE_URL`
+Also for participants: when a service refuses something in the chat (a word the person
+already has), the bot now says so instead of staying silent — and the word dialog closes, so
+the next message is a report again, not a word in the shared dictionary.
+
+Under the hood: a service's `Refused` reaching the bot is answered by a dispatcher error
+handler (`bot/app.py`); a multipart upload cut by the client answers 400 with one log line
+instead of an ASGI traceback; `keyboards.app_page_url` builds every Mini App link and `PUBLIC_BASE_URL`
 loses a trailing slash in `Settings`; a request body that fails validation answers with one
 Russian sentence (`web/app.py`) instead of pydantic's JSON, since the app shows `detail` as
 is; the fake Bot API keeps a reply keyboard beside the echoed message so the chat mock-up can

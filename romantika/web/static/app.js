@@ -59,7 +59,7 @@
 
   function render() {
     closeSheet();
-    ({ week: renderWeek, bag: renderBag, season: renderSeason })[state.tab]();
+    return ({ week: renderWeek, bag: renderBag, season: renderSeason })[state.tab]();
   }
 
   // --- Неделя --------------------------------------------------------------------------
@@ -360,7 +360,7 @@
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
     box.innerHTML = out;
     // The passport tiles and the week grid above the journal change with the stamp: redraw the tab.
-    bindReportActions(box, j, async () => { await refreshHome(); render(); });
+    bindReportActions(box, j, async () => { const y = window.scrollY; await refreshHome(); await render(); window.scrollTo(0, y); });
     if ($("pdf")) $("pdf").addEventListener("click", requestPdf);
   }
 

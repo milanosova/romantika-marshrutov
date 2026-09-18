@@ -221,6 +221,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   keyboards live until the next `/start`. Button detection by normalized word
   (emoji-insensitive) as in legacy. `/help` carries «✉️ Написать Миле» (`help_buttons`):
   inside a week a plain message is a report, so the letter needs its own entry.
+- A service's `Refused` raised inside a handler is answered to the person as text by the
+  dispatcher's error handler (`bot/app.py::_refused`, HTML-escaped); the update's transaction
+  has rolled back by then, so a dialog state survives. The word dialog catches it itself and
+  keeps the dialog closed (`routers/user.py`) — the next message must be a report again.
 - Inline `web_app` buttons open the Mini Apps: the app (`{PUBLIC_BASE_URL}/app`, the bag tab
   `/app/bag` under the legacy passport and journal answers), calendar (`/calendar`), admin
   (`/app/admin`). `keyboards.app_page_url` builds every one of them.
@@ -304,7 +308,9 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are
   attachments; a zero-size file is refused (422) rather than dropped; a NUL byte in any text
   is 422; `client_id` / `edit_key` longer than 64 characters are 422, never cut; files stored
-  before a failure are removed again. One person's attempts are serialised with
+  before a failure are removed again; a client that disconnects mid-body gets 400 (nobody
+  is there to read it) and one `upload_client_disconnected` log line, never an ASGI error.
+  One person's attempts are serialised with
   `pg_advisory_xact_lock` on `user:client_id` (POST) and `user:edit:report:edit_key` (PATCH),
   so a retry in flight finds the first attempt's row instead of doing the work twice. A
   service that refuses the input raises `services.errors.Refused` (a `ValueError` with a

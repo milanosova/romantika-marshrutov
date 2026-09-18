@@ -292,7 +292,7 @@ WORD_PROMPT = (
 WORD_SAVED = (
     "Записала в общий словарик 📖\n\nК концу сезона соберём из них словарь — твоё слово будет там с твоим именем."
 )
-WORD_REFUSED_HINT = ". Если хочешь записать другое — нажми «➕ Добавить своё слово» ещё раз."
+WORD_REFUSED_HINT = ". Если хочешь записать другое — нажми «➕ Добавить своё слово» ниже."
 """Follows a refusal from `words.add` in the bot: the dialog is closed, a plain message is a report again."""
 WORD_FREEZE_BONUS = (
     "\n\n❄️ И тебе +1 заморозка — это право пропустить неделю так, чтобы цепочка не порвалась. "

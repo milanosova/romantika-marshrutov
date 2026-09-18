@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import datetime
+from html import escape
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import ExceptionTypeFilter
@@ -29,10 +30,12 @@ async def _refused(event: ErrorEvent, bot: Bot) -> bool:
     """
     update = event.update
     message = update.message or (update.callback_query.message if update.callback_query else None)
-    chat_id = message.chat.id if message is not None and hasattr(message, "chat") else None
+    chat_id = message.chat.id if message is not None else None
     logger.info("refused", extra={"chat_id": chat_id, "reason": str(event.exception)})
+    if update.callback_query is not None:
+        await update.callback_query.answer()
     if chat_id is not None:
-        await safe_send(bot, chat_id, str(event.exception))
+        await safe_send(bot, chat_id, escape(str(event.exception)))  # the reason quotes the person's text
     return True
 
 
