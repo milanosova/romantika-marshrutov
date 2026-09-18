@@ -165,10 +165,11 @@ class Stand:
                             for line in markup["inline_keyboard"]
                             for button in line
                         ] + self.last_inline
-                if markup.get("keyboard"):
+                keyboard = row.get("reply_keyboard") or {}
+                if keyboard.get("keyboard"):
                     entry["keyboard"] = [
                         [button["text"] if isinstance(button, dict) else button for button in line]
-                        for line in markup["keyboard"]
+                        for line in keyboard["keyboard"]
                     ]
             entries.append(entry)
             if not dry:

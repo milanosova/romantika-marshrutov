@@ -77,6 +77,8 @@ def test_split_text_prefers_paragraph_then_line_then_space() -> None:
         ("✉️ Написать Миле", "write"),
         ("⚙️ Мила", "admin"),
         ("📔 Мой журнал", "journal"),
+        ("🎒 Открыть клуб", "app"),
+        ("Открыть клуб", "app"),
         ("тако удались, фото ниже", None),
         ("", None),
         (None, None),
@@ -207,3 +209,19 @@ def test_facts_buttons_show_the_bin_only_to_mila_and_only_with_facts() -> None:
     assert data_of(keyboards.facts_buttons(is_admin=False, has_facts=True)) == ["addfact"]
     assert data_of(keyboards.facts_buttons(is_admin=True, has_facts=False)) == ["addfact"]
     assert data_of(keyboards.facts_buttons(is_admin=True, has_facts=True)) == ["addfact", "adm:delfact"]
+
+
+def test_main_keyboard_is_one_web_app_door() -> None:
+    """DOMAIN §7: one button; over https it opens the app itself, otherwise it is a label."""
+    from romantika.bot.keyboards import main_keyboard
+
+    https = main_keyboard(is_admin=False, app_url="https://romantika.example.test")
+    assert [[b.text for b in row] for row in https.keyboard] == [["🎒 Открыть клуб"]]
+    assert https.keyboard[0][0].web_app is not None
+    assert https.keyboard[0][0].web_app.url == "https://romantika.example.test/app"
+
+    plain = main_keyboard(is_admin=False, app_url="http://127.0.0.1:8010")  # Telegram refuses non-https web apps
+    assert plain.keyboard[0][0].web_app is None
+
+    admin = main_keyboard(is_admin=True, app_url="https://romantika.example.test")
+    assert [[b.text for b in row] for row in admin.keyboard] == [["🎒 Открыть клуб"], ["⚙️ Мила"]]

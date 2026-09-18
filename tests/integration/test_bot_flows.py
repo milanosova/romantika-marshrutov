@@ -593,12 +593,19 @@ async def test_non_admin_callbacks_are_refused(harness: Harness, db_session: Asy
     assert await count(db_session, models.Setting) == 0
 
 
-async def test_participant_keyboard_has_no_admin_button(harness: Harness) -> None:
+async def test_participant_keyboard_is_one_door(harness: Harness) -> None:
+    """DOMAIN §7 (14.09.2026): one button under the chat, no admin button for a participant."""
     await harness.text(ALICE, "/start")
     markup = harness.session.messages(ALICE)[-1].reply_markup
     labels = [b.text for row in markup.keyboard for b in row]
+    assert labels == ["🎒 Открыть клуб"], labels
     assert "⚙️ Мила" not in labels
-    assert "📋 Задание" in labels
+
+
+async def test_old_button_labels_still_answer(harness: Harness) -> None:
+    """The keyboard is cached on the client until /start: «📋 Задание» must keep working."""
+    await harness.text(ALICE, "📋 Задание")
+    assert any("Неделя" in t for t in harness.session.sent_texts(ALICE)), "the old label still opens the task"
 
 
 async def test_admin_keyboard_has_the_panel_button(harness: Harness) -> None:
@@ -1071,3 +1078,23 @@ async def test_a_participant_pressing_the_panel_button_gets_nothing(harness: Har
     assert harness.session.last_text(ALICE) == "Это команда Милы. Тебе — кнопки внизу 👇"
     assert harness.session.last_markup(ALICE) is None
     assert await count(db_session, models.Report) == 0
+
+
+async def test_help_offers_a_letter_to_mila_and_the_door(harness: Harness, db_session: AsyncSession) -> None:
+    """Inside a week a plain message is a report (DOMAIN §2), so the letter keeps its own
+    button — under /help, the one place people look for «how do I reach her»."""
+    await harness.text(ALICE, "/help")
+    labels = [label for label, _ in harness.session.buttons(ALICE)]
+    assert "✉️ Написать Миле" in labels, labels
+    await harness.callback(ALICE, "more:write")
+    await harness.text(ALICE, "Мила, у меня заморозка за встречу")
+    assert "Передала" in harness.session.last_text(ALICE)
+    assert await count(db_session, models.Report) == 0, "a letter is not a report"
+
+
+async def test_two_commands_are_advertised_and_old_ones_still_answer(harness: Harness) -> None:
+    from romantika.ops.telegram_setup import COMMANDS
+
+    assert [c for c, _ in COMMANDS] == ["start", "help"]
+    await harness.text(ALICE, "/passport")
+    assert any("Паспорт" in t for t in harness.session.sent_texts(ALICE)), "/passport keeps answering"

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.bot import keyboards
 from romantika.bot.send import safe_send
+from romantika.config import Settings
 from romantika.domain.types import ReportKind
 from romantika.services import content, jobs, letters, links, reports
 from romantika.services.content import SeasonDTO
@@ -165,6 +166,7 @@ async def handle_report(
     message: Message,
     bot: Bot,
     session: AsyncSession,
+    settings: Settings,
     user: UserDTO,
     season: SeasonDTO | None,
     is_admin: bool,
@@ -176,11 +178,21 @@ async def handle_report(
 ) -> None:
     chat_id = message.chat.id
     if season is None:
-        await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboards.main_keyboard(is_admin=is_admin))
+        await safe_send(
+            bot,
+            chat_id,
+            ru.NO_SEASON,
+            reply_markup=keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url),
+        )
         return
     incoming = incoming_from(message)
     if incoming is None:
-        await safe_send(bot, chat_id, ru.NOT_UNDERSTOOD, reply_markup=keyboards.main_keyboard(is_admin=is_admin))
+        await safe_send(
+            bot,
+            chat_id,
+            ru.NOT_UNDERSTOOD,
+            reply_markup=keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url),
+        )
         return
 
     result = await reports.accept(session, season_id=season.id, user_id=user.id, message=incoming, now=now)
@@ -188,7 +200,12 @@ async def handle_report(
     author = user.display_name_with_username
 
     if result.out_of_week or result.week_number is None:
-        await safe_send(bot, chat_id, ru.OUT_OF_WEEK, reply_markup=keyboards.main_keyboard(is_admin=is_admin))
+        await safe_send(
+            bot,
+            chat_id,
+            ru.OUT_OF_WEEK,
+            reply_markup=keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url),
+        )
         letter = await letters.create(
             session,
             season_id=season.id,

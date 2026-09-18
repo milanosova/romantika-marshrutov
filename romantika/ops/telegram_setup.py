@@ -21,14 +21,10 @@ DESCRIPTION = (
     "Каждый понедельник здесь появляется задание: минимум на пять минут и максимум на вечер. "
     "Пришли текст или фото — и в паспорте сезона будет штамп."
 )
+# Two commands in the menu (DOMAIN §7, 14.09.2026): everything else lives in the app behind
+# the one keyboard button. The old commands keep answering, they are just not advertised.
 COMMANDS = [
     ("start", "Начать"),
-    ("task", "Задание недели"),
-    ("today", "Сегодня: день и слово"),
-    ("passport", "Мой паспорт"),
-    ("words", "Словарь сезона"),
-    ("facts", "Что мы узнали"),
-    ("journal", "Мой журнал"),
     ("help", "Если что-то пошло не так"),
 ]
 
@@ -42,7 +38,7 @@ async def run() -> None:
         await bot.set_my_description(DESCRIPTION)
         await bot.set_my_commands([BotCommand(command=command, description=text) for command, text in COMMANDS])
         await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="Открыть", web_app=WebAppInfo(url=f"{settings.public_base_url}/app"))
+            menu_button=MenuButtonWebApp(text="Открыть клуб", web_app=WebAppInfo(url=f"{settings.public_base_url}/app"))
         )
         me = await bot.get_me()
         print(f"configured @{me.username} ({me.first_name}); menu button → {settings.public_base_url}/app")

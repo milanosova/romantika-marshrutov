@@ -97,7 +97,7 @@ async def handle_text(
 ) -> None:
     text = (message.text or "").strip()
     chat_id = message.chat.id
-    keyboard = keyboards.main_keyboard(is_admin=is_admin)
+    keyboard = keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url)
     action: str | None
     argument = ""
     if text.startswith("/"):
@@ -126,11 +126,14 @@ async def handle_text(
     if action == "start":
         await safe_send(bot, chat_id, ru.greeting(season) + ru.GREETING_CTA, reply_markup=keyboard)
     elif action == "help":
-        await safe_send(bot, chat_id, ru.HELP, reply_markup=keyboard)
+        await safe_send(bot, chat_id, ru.HELP, reply_markup=keyboards.help_buttons(settings.public_base_url))
         if is_admin:
             await safe_send(bot, chat_id, ru.ADMIN_MEMO)
     elif action == "whoami":
         await safe_send(bot, chat_id, ru.WHOAMI.format(user_id=user.id))
+    elif action == "app":
+        # The door button opens the app by itself over https; a plain label lands here.
+        await safe_send(bot, chat_id, ru.OPEN_CLUB_HINT, reply_markup=keyboards.app_button(settings.public_base_url))
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":
@@ -178,7 +181,7 @@ async def answer_dialog(
 ) -> None:
     text = (message.text or "").strip()
     chat_id = message.chat.id
-    keyboard = keyboards.main_keyboard(is_admin=is_admin)
+    keyboard = keyboards.main_keyboard(is_admin=is_admin, app_url=settings.public_base_url)
     author = user.display_name_with_username
 
     if dialog.state == "word":

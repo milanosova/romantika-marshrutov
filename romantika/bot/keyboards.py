@@ -33,6 +33,7 @@ BUTTON_ACTIONS: dict[str, str] = {
     "написать миле": "write",
     "мила": "admin",
     "мой журнал": "journal",
+    "открыть клуб": "app",
 }
 
 PEOPLE_PAGE = 20
@@ -48,12 +49,19 @@ def button_action(text: str | None) -> str | None:
     return BUTTON_ACTIONS.get(normalize_button(text))
 
 
-def main_keyboard(*, is_admin: bool) -> ReplyKeyboardMarkup:
-    rows = [
-        [KeyboardButton(text="📋 Задание"), KeyboardButton(text="🌤 Сегодня")],
-        [KeyboardButton(text="📘 Паспорт"), KeyboardButton(text="📖 Словарь")],
-        [KeyboardButton(text="💡 Что узнали"), KeyboardButton(text="⋯ Ещё")],
-    ]
+def main_keyboard(*, is_admin: bool, app_url: str | None = None) -> ReplyKeyboardMarkup:
+    """One door (DOMAIN §7, 14.09.2026): the chat brings things, the app keeps them.
+
+    The button opens the Mini App straight from the keyboard when the app URL is known
+    (`https://` only — Telegram refuses anything else); without it the button is a plain
+    label the bot answers with a link. Old labels stay recognised (`BUTTON_ACTIONS`).
+    """
+    door = (
+        KeyboardButton(text=ru.OPEN_CLUB, web_app=WebAppInfo(url=f"{app_url.rstrip('/')}/app"))
+        if app_url and app_url.startswith("https://")
+        else KeyboardButton(text=ru.OPEN_CLUB)
+    )
+    rows = [[door]]
     if is_admin:
         rows.append([KeyboardButton(text="⚙️ Мила")])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
@@ -108,6 +116,22 @@ def report_buttons(week_number: int, level: StampLevel, report_id: int) -> Inlin
 def passport_buttons(public_base_url: str) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(text="📔 Что будет в конце сезона", callback_data="endofseason")]]
     if button := _web_app_button("📱 Паспорт в приложении", f"{public_base_url}/app/passport"):
+        rows.append([button])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def app_button(public_base_url: str) -> InlineKeyboardMarkup | None:
+    button = _web_app_button(ru.OPEN_CLUB, f"{public_base_url}/app")
+    return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
+
+
+def help_buttons(public_base_url: str) -> InlineKeyboardMarkup:
+    """Under the FAQ: the way to write Mila (inside a week a plain message is a report,
+    DOMAIN §2, so the letter needs its own door) and the app."""
+    rows: list[list[InlineKeyboardButton]] = [
+        [InlineKeyboardButton(text="✉️ Написать Миле", callback_data="more:write")]
+    ]
+    if button := _web_app_button(ru.OPEN_CLUB, f"{public_base_url}/app"):
         rows.append([button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

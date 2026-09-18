@@ -96,7 +96,18 @@ async def app(db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.Monk
 
 
 async def test_app_shell_serves_vendored_bridge_and_tab(app: App) -> None:
-    for path, tab in (("/app", "today"), ("/app/journal", "journal"), ("/app/nonsense", "today")):
+    # Three tabs; the old five names alias to them (links in old messages keep opening the right tab).
+    for path, tab in (
+        ("/app", "week"),
+        ("/app/bag", "bag"),
+        ("/app/season", "season"),
+        ("/app/journal", "bag"),
+        ("/app/passport", "bag"),
+        ("/app/words", "season"),
+        ("/app/more", "season"),
+        ("/app/today", "week"),
+        ("/app/nonsense", "week"),
+    ):
         r = await app.client.get(path)
         assert r.status_code == 200, path
         assert "/static/vendor/telegram-web-app.js" in r.text, "the bridge is served from here, not telegram.org"

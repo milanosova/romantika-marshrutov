@@ -503,10 +503,10 @@ async def test_the_people_list_says_reports_exist_when_the_stamp_was_removed(app
 
 async def test_the_app_texts_speak_of_the_app(app: App) -> None:
     home = (await app.client.get("/api/home", headers=app.headers(ALICE))).json()
-    assert "во вкладке «Сегодня»" in home["texts"]["greeting"]
+    assert "во вкладке «Неделя»" in home["texts"]["greeting"]
     assert "пришли сюда" not in home["texts"]["greeting"]
     assert "Записалось не то, что нужно" in home["texts"]["help"]
-    assert "в «Журнале»" in home["texts"]["help"]
+    assert "в «Рюкзаке»" in home["texts"]["help"]
 
 
 async def test_a_meaning_without_a_word_is_refused(app: App) -> None:
