@@ -116,16 +116,24 @@ async def add(
     return WordResult(word_id=row.id, word=row.word, meaning=row.meaning, freeze_granted=freeze_granted)
 
 
-async def season_dictionary(session: AsyncSession, season_id: int, *, today: date) -> DictionaryView:
-    """Words of the weeks that have already started, plus every word participants added."""
+async def season_dictionary(
+    session: AsyncSession, season_id: int, *, today: date, viewer_id: int | None = None
+) -> DictionaryView:
+    """Words of the weeks that have already started, plus participants' words.
+
+    A participant's words are personal (DOMAIN §6, 15.09.2026): with a `viewer_id` only that
+    person's words come back — what the bot and the app show. Without one, every word of the
+    season: the admin's view and the acceptance contract of the service.
+    """
     weeks = [
         WeekWord(number=week.number, title=week.title, word=week.word, word_ru=week.word_ru, meaning=week.word_meaning)
         for week in await content.weeks(session, season_id)
         if week.word and week.starts_on <= today
     ]
-    query = (
-        select(models.Word).where(models.Word.season_id == season_id).order_by(models.Word.created_at, models.Word.id)
-    )
+    query = select(models.Word).where(models.Word.season_id == season_id)
+    if viewer_id is not None:
+        query = query.where(models.Word.user_id == viewer_id)
+    query = query.order_by(models.Word.created_at, models.Word.id)
     user_words = [
         UserWord(
             id=row.id,

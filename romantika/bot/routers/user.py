@@ -142,15 +142,15 @@ async def handle_text(
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":
-        await common.send_task(bot, chat_id, session, season, today)
+        await common.send_task(bot, chat_id, session, season, today, user_id=user.id)
     elif action == "today":
         await common.send_today(bot, chat_id, session, season, today, settings)
     elif action == "passport":
         await common.send_passport(bot, chat_id, session, season, user.id, today, settings)
     elif action == "words":
-        await common.send_dictionary(bot, chat_id, session, season, today)
+        await common.send_dictionary(bot, chat_id, session, season, today, viewer_id=user.id)
     elif action == "facts":
-        await common.send_facts(bot, chat_id, session, season, is_admin=is_admin)
+        await common.send_facts(bot, chat_id, session, season, is_admin=is_admin, viewer_id=user.id)
     elif action == "journal":
         target = user.id
         if is_admin and argument:
@@ -277,9 +277,8 @@ async def answer_dialog(
                 session, actor_id=user.id, week_id=week.id, changes={field: text}, today=today
             )
         except content.ContentError:
-            # The panel never offers a finished week, but the dialog outlives midnight: without
-            # this the whole update transaction would roll back and Mila would get no answer.
-            await safe_send(bot, chat_id, ru.WEEK_ALREADY_OVER)
+            # The week vanished under the dialog (deleted meanwhile): answer instead of rolling back silently.
+            await safe_send(bot, chat_id, ru.WEEK_NOT_FOUND)
             return
         except ValueError:
             # An announced week keeps its title and minimum (DOMAIN §1).

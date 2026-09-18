@@ -99,7 +99,7 @@
     $("week-body").innerHTML = `
       <div class="tiles" style="margin-top:12px">
         <div class="tile"><div class="big">${s.submitted.length} <span class="muted">/ ${s.members_total}</span></div><div class="label">сдали из тех, кто в боте</div></div>
-        <div class="tile"><div class="big">${s.took.length}</div><div class="label">нажали «берусь» или «попробую»</div></div>
+        <div class="tile"><div class="big">${s.took.length}</div><div class="label">нажали «берусь»</div></div>
         <div class="tile"><div class="big">${s.core_current} <span class="muted">/ ${s.core_best}</span></div><div class="label">в ядре сейчас / были за сезон · две недели подряд</div></div>
         <div class="tile"><div class="big">${s.reports_total}</div><div class="label">${RM.plural(s.reports_total, "отчёт", "отчёта", "отчётов")} за неделю</div></div>
       </div>
@@ -135,9 +135,9 @@
     const weekMark = (p) => {
       if (!cur) return "";
       const stamp = p.week_level === "max" ? "⭐" : p.week_level === "min" ? "✅" : "";
-      const intent = p.week_intent === "take" ? "берусь" : p.week_intent === "try" ? "попробую" : p.week_intent === "skip" ? "мимо" : "";
+      const intent = p.week_intent === "take" || p.week_intent === "try" ? "берусь" : p.week_intent === "skip" ? "мимо" : "";
       const reports = p.week_reports ? `${p.week_reports} ${RM.plural(p.week_reports, "отчёт", "отчёта", "отчётов")}, штамп снят` : "";
-      return `<div class="sub">неделя ${cur.number}: ${stamp ? stamp + " есть штамп" : reports ? reports : intent ? intent + " · пока без отчёта" : "без ответа"}</div>`;
+      return `<div class="sub">неделя ${cur.number}: ${stamp ? stamp + " есть штамп" : reports ? reports : intent === "мимо" ? "мимо — отчёта не ждём" : intent ? intent + " · пока без отчёта" : "без ответа"}</div>`;
     };
     const draw = () => {
       const q = $("people-q").value.trim().toLowerCase();
@@ -182,7 +182,8 @@
       <div class="card"><h3 style="margin-top:0">Написать в бота</h3><p class="note">Придёт в чат с ботом с пометкой «Сообщение от Милы». Ответить реплаем на отчёт в своём чате — то же самое.</p><textarea id="msg"></textarea><button class="btn small" id="msg-btn" style="margin-top:8px">Отправить</button></div>
       <h3>Отчёты (${d.reports.length})</h3>
       ${d.reports.map((r) => `<article class="report"><div class="meta">${r.week_number ? "Неделя " + r.week_number : "вне недели"} · ${RM.fmtDateTime(r.created_at)} · ${r.late ? "📔 дослано позже" : r.level === "max" ? "⭐ максимум" : "✅ минимум"} · ${esc(RM.kindName(r.kind))}${r.edited_at ? ` · <span class="edited">изменено ${RM.fmtDateTime(r.edited_at)}</span>` : ""}</div>${r.text ? `<div class="text">${esc(r.text)}</div>` : ""}${r.media.length ? `<div class="gallery">${r.media.map((m) => m.mime && m.mime.startsWith("image/") && m.downloaded ? `<a href="${m.url}" target="_blank"><img src="${m.url}" alt="" loading="lazy"></a>` : (m.downloaded ? `<a class="btn ghost small" href="${m.url}" target="_blank">файл</a>` : `<span class="muted small">файл ещё не скачан</span>`)).join("")}</div>` : ""}</article>`).join("") || '<p class="muted">Отчётов нет.</p>'}
-      ${d.words.length ? `<h3>Слова</h3><div class="chips">${d.words.map((w) => `<span class="chip">${esc(w.word)}${w.meaning ? " — " + esc(w.meaning) : ""}</span>`).join("")}</div>` : ""}`;
+      ${d.words.length ? `<h3>Слова</h3><div class="chips">${d.words.map((w) => `<span class="chip">${esc(w.word)}${w.meaning ? " — " + esc(w.meaning) : ""}</span>`).join("")}</div>` : ""}
+      ${(d.facts || []).length ? `<h3>Факты</h3><ol style="padding-left:20px;margin:0">${d.facts.map((t) => `<li>${esc(t)}</li>`).join("")}</ol><p class="note">Личные: видит только автор и ты.</p>` : ""}`;
     const body = $("sheet-body");
     body.querySelectorAll(".stampbar button").forEach((b) => b.addEventListener("click", () => {
       const week = d.weeks.find((w) => String(w.number) === b.dataset.week);
@@ -248,7 +249,7 @@
   // --- Задания: тексты недель ---------------------------------------------------------
 
   function renderContent() {
-    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; прошедшие недели не редактируются — люди их уже прожили.</p></header>
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; тексты любой недели — и прошедшей тоже — правятся; у прошедшей и идущей недели заморожены только даты.</p></header>
       <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
       <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
       <p class="note">Новая неделя — только в будущее, внутри сезона и в свободные даты. Она появляется черновиком: участники её не видят, и она не считается пропуском. Когда впишешь название и минимум — нажми «Объявить».</p>`;
@@ -317,11 +318,12 @@
     const w = state.weeks.find((x) => x.id === id);
     const past = w.state === "stamped";
     const future = w.state === "locked"; // the calendar moves only before the week starts (DOMAIN §1)
-    openSheet(`Неделя ${w.number}`, `<p class="muted small">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${past ? " · прошла, только чтение" : future ? "" : " · идёт, даты заморожены"}</p>
+    // Texts are editable at any time, a finished week included (Mila, 18.09.2026); only the calendar freezes.
+    openSheet(`Неделя ${w.number}`, `<p class="muted small">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${past ? " · прошла, даты заморожены, тексты правятся" : future ? "" : " · идёт, даты заморожены"}</p>
       ${isDraft(w) && !past ? `<div class="card" style="margin:0 0 12px"><p style="margin:0 0 8px"><b>Черновик.</b> Участники её не видят и не теряют заморозку.${w.stale_draft ? " <b>Её даты уже идут</b> — для людей сейчас между неделями. Переставь её вперёд и объяви, или удали." : ""}</p>${readyToAnnounce(w) ? `<button class="btn small" id="week-announce" type="button">Объявить неделю</button><p class="note">После этого её увидят все, и назад в черновик она не вернётся.</p>` : `<p class="note" style="margin:0">Чтобы объявить, нужны название и минимум — впиши их и сохрани.</p>`}</div>` : ""}
       ${future ? `<form class="stack" id="week-cal"><div class="row"><label style="flex:0 0 72px">Номер<input name="number" type="number" min="1" value="${w.number}"></label><label style="flex:1">Начало<input name="starts_on" type="date" value="${w.starts_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label><label style="flex:1">Конец<input name="ends_on" type="date" value="${w.ends_on}" ${state.season ? `min="${state.season.starts_on}" max="${state.season.ends_on}"` : ""}></label></div><button class="btn soft small" type="submit">Переставить</button></form>` : ""}
-      <form class="stack" id="week-form">${FIELDS.map(([f, label, kind]) => `<label>${label}${kind === "textarea" ? `<textarea name="${f}" ${past ? "readonly" : ""}>${esc(w[f])}</textarea>` : `<input name="${f}" value="${esc(w[f])}" ${past ? "readonly" : ""}>`}</label>`).join("")}
-      ${past ? "" : `<button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.</p>`}</form>
+      <form class="stack" id="week-form">${FIELDS.map(([f, label, kind]) => `<label>${label}${kind === "textarea" ? `<textarea name="${f}">${esc(w[f])}</textarea>` : `<input name="${f}" value="${esc(w[f])}">`}</label>`).join("")}
+      <button class="btn block" type="submit">Сохранить</button><p class="note">Каждое сохранение записывается в «Изменения»: что было и что стало.${past ? " Люди увидят новый текст в листе прошедшей недели и в журнале сезона." : ""}</p></form>
       ${future ? `<button class="btn soft small danger" id="week-del" style="margin-top:16px">Удалить неделю</button><p class="note">Удалить можно только неделю, к которой ещё ничего не привязано — ни штампов, ни отчётов, ни слов, ни фактов.</p>` : ""}`, () => {
       $("week-form").addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -372,7 +374,7 @@
   // --- Факты ---------------------------------------------------------------------------
 
   async function renderFacts() {
-    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Что мы узнали</p><h1>Факты</h1></header><div class="card"><div class="row"><input id="fact-text" placeholder="Новый факт про страну" style="flex:1"><button class="btn small" id="fact-add">Записать</button></div><p class="note">Факты участников подписаны их именем, твои — «Мила». Всё это попадёт в журналы сезона.</p></div><div id="facts-list">${loading()}</div>`;
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Что мы узнали</p><h1>Факты</h1></header><div class="card"><div class="row"><input id="fact-text" placeholder="Новый факт про страну" style="flex:1"><button class="btn small" id="fact-add">Записать</button></div><p class="note">Твои факты — общие: их видят все и они попадут в журналы всех. Факты участников — личные: видит автор, ты в его карточке и его журнал.</p></div><div id="facts-list">${loading()}</div>`;
     let facts;
     try { facts = await RM.api("/api/admin/facts"); } catch (e) { $("facts-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
     $("facts-list").innerHTML = facts.length ? `<ul class="list">${facts.map((f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`).join("")}</ul>` : `<p class="muted">Фактов пока нет.</p>`;
@@ -385,14 +387,14 @@
   async function renderMore() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · админка</p><h1>Ещё</h1></header>
       <div class="card"><div class="row between"><h2 style="margin:0">Автонапоминания</h2><label class="toggle"><input type="checkbox" id="rem-toggle"> <span id="rem-state">…</span></label></div>
-        <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» или «Попробую» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
+        <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
         <button class="btn soft small" id="remind-now">⏰ Напомнить сейчас</button></div>
       <a class="card tight linkcard" href="#" id="open-facts"><div class="row between"><div style="flex:1;min-width:0"><b>💡 Факты про страну</b><div class="muted small">Что мы узнали за сезон — общий список для журналов.</div></div><span class="muted chevron">›</span></div></a>
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
         <b>Отчёты</b> Человек присылает боту текст или фото — или отправляет их из приложения. Текст = минимум ✅, фото или видео = максимум ⭐. Копия приходит тебе в чат с шапкой «📨 Отчёт за неделю N от…»; ответь на неё реплаем — бот передаст автору.
         <b>Штампы</b> Ставятся сами по первому отчёту недели и никогда не понижаются (кроме «это не отчёт»). Ручной штамп ставишь во вкладке «Люди»; он важнее автоматического.
         <b>Заморозки</b> Две базовые, до пяти. Пропущенная неделя тратит одну сама. За слово в словарике и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
-        <b>Задания</b> Тексты недели правятся во вкладке «Задания» и появляются в боте сразу. Прошедшие недели закрыты.
+        <b>Задания</b> Тексты любой недели — и прошедшей тоже — правятся во вкладке «Задания» и появляются в боте сразу. У прошедшей и идущей недели заморожены только даты.
         <b>Сводка</b> Вкладка «Неделя»: кто взялся, кто сдал, ядро (две недели подряд) и черновик «Привала».
         <b>Письма</b> Вкладка «Письма»: всё, что пришло не отчётом. Ответ отсюда или реплаем в чате — одно и то же, письмо помечается отвеченным.
         <b>Правки</b> Пока неделя идёт, человек может поправить свой отчёт в приложении: текст и файлы. Тебе приходит копия с шапкой «✏️ Правка отчёта», штамп пересчитывается по правилам отчётов.

@@ -200,9 +200,11 @@ async def set_intent(
     """
     week = await content.week_by_number(session, season.id, body.week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
     if week.starts_on > today:
         raise HTTPException(status.HTTP_409_CONFLICT, "эта неделя ещё не открылась")
+    if week.ends_on < today:
+        raise HTTPException(status.HTTP_409_CONFLICT, ru.INTENT_WEEK_OVER)
     await people.set_intent(
         session,
         season_id=season.id,
@@ -607,7 +609,7 @@ async def fix_level(
     """«Это был максимум/минимум»: upgrade only, and only with a report (DOMAIN §2)."""
     week = await content.week_by_number(session, season.id, week_number)
     if week is None or week.is_draft:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "no such week")
+        raise HTTPException(status.HTTP_404_NOT_FOUND, ru.NO_SUCH_WEEK)
     level = StampLevel(body.level)
     result = await reports.fix_level(
         session, season_id=season.id, user_id=principal.user.id, week_number=week_number, level=level, now=now
@@ -659,7 +661,7 @@ async def send_letter(
 async def dictionary(
     principal: PrincipalDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> schemas.DictionaryOut:
-    view = await words.season_dictionary(session, season.id, today=today)
+    view = await words.season_dictionary(session, season.id, today=today, viewer_id=principal.user.id)
     names = await people.display_names(session, [item.user_id for item in view.user_words], short=True)
     return schemas.DictionaryOut(
         about=season.title,
@@ -719,7 +721,8 @@ async def add_word(
 
 @router.get("/facts", response_model=schemas.FactsOut)
 async def list_facts(principal: PrincipalDep, session: SessionDep, season: SeasonDep) -> schemas.FactsOut:
-    listed = await facts.list_active(session, season.id)
+    """Mila's facts and the viewer's own (DOMAIN §6); the admin sees everyone's."""
+    listed = await facts.list_active(session, season.id, viewer_id=None if principal.is_admin else principal.user.id)
     names = await people.display_names(session, [f.author_id for f in listed if f.author_id is not None], short=True)
     return schemas.FactsOut(
         about=season.title_accusative or season.title,

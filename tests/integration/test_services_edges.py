@@ -450,17 +450,17 @@ async def test_a_truncated_download_is_not_recorded(db_session: AsyncSession, se
     assert not list(tmp_path.rglob("*.jpg"))
 
 
-async def test_update_week_refuses_a_week_that_is_over(db_session: AsyncSession, season: int) -> None:
-    """«Прошедшие недели задним числом не меняем» (DOMAIN §1)."""
+async def test_update_week_edits_the_texts_of_a_finished_week(db_session: AsyncSession, season: int) -> None:
+    """Texts are editable at any time (Mila, 18.09.2026, DOMAIN §1): a mistake found later is fixable."""
     week = await _week(db_session, season, 1)
-    with pytest.raises(content.ContentError, match="not edited afterwards"):
-        await content.update_week(
-            db_session,
-            actor_id=ADMIN_ID,
-            week_id=week.id,
-            changes={"task_min": "задним числом"},
-            today=date(2026, 9, 7),
-        )
+    updated = await content.update_week(
+        db_session,
+        actor_id=ADMIN_ID,
+        week_id=week.id,
+        changes={"task_max": "рисунок свой"},
+        today=date(2026, 9, 7),  # the week ended on 6.09
+    )
+    assert updated.task_max == "рисунок свой"
     updated = await content.update_week(
         db_session, actor_id=ADMIN_ID, week_id=week.id, changes={"task_min": "пока идёт"}, today=date(2026, 9, 6)
     )

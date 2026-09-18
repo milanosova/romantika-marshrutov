@@ -210,6 +210,8 @@ class ParticipantDetail(BaseModel):
     wish: str | None
     reports: list[ReportOut]
     words: list[WordOut]
+    facts: list[str] = []
+    """The person's own facts — personal for participants, visible to Mila here (DOMAIN §6)."""
 
 
 class StampSet(BaseModel):
