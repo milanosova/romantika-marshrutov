@@ -8,14 +8,19 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, PlainSerializer
 
 
+def _no_nul(value: str) -> str:
+    """Postgres refuses a NUL byte inside text; say so in Russian instead of a 500."""
+    if "\x00" in value:
+        raise ValueError("в тексте недопустимые символы")
+    return value
+
+
 def _non_blank(value: str) -> str:
     """Whitespace is not a text: a letter, a wish or a word made of spaces is refused (422)."""
     stripped = value.strip()
     if not stripped:
         raise ValueError("пустой текст")
-    if "\x00" in stripped:
-        raise ValueError("в тексте недопустимые символы")
-    return stripped
+    return _no_nul(stripped)
 
 
 def _utc_iso(value: datetime) -> str:
@@ -23,13 +28,6 @@ def _utc_iso(value: datetime) -> str:
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
     return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-
-
-def _no_nul(value: str) -> str:
-    """Postgres refuses a NUL byte inside text; say so in Russian instead of a 500."""
-    if "\x00" in value:
-        raise ValueError("в тексте недопустимые символы")
-    return value
 
 
 NonBlank = Annotated[str, AfterValidator(_non_blank)]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from datetime import date
 
 from aiogram.types import (
@@ -50,8 +51,8 @@ def button_action(text: str | None) -> str | None:
     someone typed — «Паспорт», «Паспорт!», «Паспорт 🇲🇽» as a one-word report — starts with a
     letter and is not a button (DOMAIN §7, 18.09.2026)."""
     raw = (text or "").strip()
-    if not raw or raw[0].isalpha():
-        return None
+    if not raw or raw[0].isalpha() or raw[0].isdigit() or unicodedata.category(raw[0]).startswith("P"):
+        return None  # «Паспорт», "Паспорт", 1. Задание — typed, not pressed
     return BUTTON_ACTIONS.get(normalize_button(raw))
 
 

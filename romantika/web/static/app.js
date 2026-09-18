@@ -10,7 +10,7 @@
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
   const TAB_ALIASES = { today: "week", passport: "bag", journal: "bag", words: "season", more: "season" };
-  const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, dictionary: null, facts: null, files: [], clientId: null };
+  const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, files: [], clientId: null };
 
   boot();
 

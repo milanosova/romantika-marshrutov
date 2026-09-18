@@ -200,6 +200,7 @@ async def answer_dialog(
             )
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
             await safe_send(
                 bot, chat_id, f"{escape(str(exc))}{ru.WORD_REFUSED_HINT}", reply_markup=keyboards.word_button()
             )
@@ -253,11 +254,12 @@ async def answer_dialog(
             )
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
             await safe_send(
                 bot,
                 chat_id,
                 f"{escape(str(exc))}{ru.FACT_REFUSED_HINT}",
-                reply_markup=keyboards.facts_buttons(is_admin=False, has_facts=False),
+                reply_markup=keyboards.facts_buttons(is_admin=is_admin, has_facts=is_admin),
             )
             return
         if is_admin:
