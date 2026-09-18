@@ -77,6 +77,41 @@ def short_name(user: UserDTO | None, fallback: int | None = None) -> str:
     return display_name(user, fallback).split(" (@")[0]
 
 
+#: «ж ч ш щ г к х» + «а» take «и», everything else takes «ы» (Маша → Маши, Лена → Лены).
+_HUSHING = "жчшщгкх"
+
+
+def name_genitive(author: str) -> str:
+    """«Юля (@julia)» → «Юли (@julia)»: Mila's copies read «от Юли», not «от Юля».
+
+    Only the endings that are safe are declined — a name in -а/-я/-й, the shape almost every
+    name in the club has. Anything else (a consonant, a latin name, an emoji) comes back as
+    it is: a wrong case reads worse than a nominative one.
+    """
+    head, sep, tail = author.partition(" (@")
+    first, space, rest = head.partition(" ")
+    if len(first) < 3 or not first[:-1].isalpha():
+        return author
+    last, before = first[-1].lower(), first[-2].lower()
+    if last == "я":
+        declined = first[:-2] + "ии" if before == "и" else first[:-1] + "и"
+    elif last == "а":
+        declined = first[:-1] + ("и" if before in _HUSHING else "ы")
+    elif last == "й":
+        declined = first[:-1] + "я"
+    else:
+        return author
+    return f"{declined}{space}{_surname_genitive(rest)}{sep}{tail}"
+
+
+def _surname_genitive(surname: str) -> str:
+    """«Петрова» → «Петровой»; a word shaped like anything else is left alone."""
+    lowered = surname.lower()
+    if len(surname) > 4 and any(lowered.endswith(ending) for ending in ("ова", "ева", "ёва", "ина", "ына")):
+        return surname[:-1] + "ой"
+    return surname
+
+
 def date_genitive(day: date) -> str:
     return f"{day.day} {MONTHS_GENITIVE[day.month - 1]}"
 
@@ -204,7 +239,7 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     ),
     (
         "Как заработать ещё заморозку",
-        "Всего можно накопить пять. Сверх двух базовых:\n"
+        "Всего можно накопить шесть. Сверх двух базовых:\n"
         "· +1 за своё слово в словарике — сразу, автоматически\n"
         "· +1 за свой первый факт про страну — тоже автоматически\n"
         "· +1 за первый выполненный максимум — тоже автоматически\n"
@@ -692,7 +727,9 @@ ADMIN_COPY_CHARS = 3500
 
 def admin_report_header(week_number: int, author: str, text: str | None, kind: str) -> str:
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
-    return f"📨 Отчёт за неделю {week_number} от {escape(author)}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return (
+        f"📨 Отчёт за неделю {week_number} от {escape(name_genitive(author))}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    )
 
 
 def admin_edit_header(
@@ -712,7 +749,7 @@ def admin_edit_header(
         if late
         else f"Правка отчёта за неделю {week_number}"
     )
-    return f"✏️ {what} от {escape(author)}{tail}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return f"✏️ {what} от {escape(name_genitive(author))}{tail}{body}\n\n<i>Ответь реплаем — передам.</i>"
 
 
 def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool, late: bool = False) -> str:
@@ -734,19 +771,19 @@ def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool,
 def admin_letter_header(author: str, text: str | None, *, corrected: bool = False) -> str:
     suffix = " (сначала пришло как отчёт)" if corrected else ""
     return (
-        f"✉️ <b>Сообщение от {escape(author)}</b>{suffix}\n\n{escape(text or '(без текста)')}"
+        f"✉️ <b>Сообщение от {escape(name_genitive(author))}</b>{suffix}\n\n{escape(text or '(без текста)')}"
         "\n\n<i>Ответь реплаем — передам.</i>"
     )
 
 
 def admin_word_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
-    return f"📖 Новое слово от {escape(author)}{where}: {escape(text)}"
+    return f"📖 Новое слово от {escape(name_genitive(author))}{where}: {escape(text)}"
 
 
 def admin_fact_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
-    return f"💡 Новый факт от {escape(author)}{where}: {escape(text)}"
+    return f"💡 Новый факт от {escape(name_genitive(author))}{where}: {escape(text)}"
 
 
 def admin_late_header(week_number: int, author: str, text: str | None, kind: str, *, stamped: bool = False) -> str:
@@ -759,7 +796,10 @@ def admin_late_header(week_number: int, author: str, text: str | None, kind: str
 
 def admin_out_of_week_header(author: str, text: str | None, kind: str) -> str:
     body = escape(text) if text else f"({kind})"
-    return f"✉️ <b>Сообщение от {escape(author)}</b> (неделя не идёт)\n\n{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return (
+        f"✉️ <b>Сообщение от {escape(name_genitive(author))}</b> (неделя не идёт)\n\n"
+        f"{body}\n\n<i>Ответь реплаем — передам.</i>"
+    )
 
 
 def reply_to_author(text: str, *, about: str = "report") -> str:

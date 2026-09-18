@@ -70,3 +70,23 @@ def test_only_a_foreign_word_is_trimmed_after_the_word_week() -> None:
     assert ru.week_name("Неделя памяти") == "Неделя памяти"
     assert ru.week_name("Неделя тишины") == "Неделя тишины"
     assert ru.week_name("Неделя 7") == "Неделя 7"
+
+
+# --- names in Mila's copies ------------------------------------------------------------------
+
+
+def test_names_are_declined_where_the_copy_says_from() -> None:
+    """«📨 Отчёт … от Юли», not «от Юля» (Mila, 19.09). Only safe endings are declined —
+    a nominative reads better than a wrong case."""
+    assert ru.name_genitive("Юля") == "Юли"
+    assert ru.name_genitive("Лена") == "Лены"
+    assert ru.name_genitive("Ольга") == "Ольги"
+    assert ru.name_genitive("Маша") == "Маши"
+    assert ru.name_genitive("Мария") == "Марии"
+    assert ru.name_genitive("Андрей") == "Андрея"
+    assert ru.name_genitive("Мила (@mila)") == "Милы (@mila)", "the username is not part of the name"
+    assert ru.name_genitive("Алиса Петрова") == "Алисы Петровой"
+    assert ru.name_genitive("Иван") == "Иван", "a consonant is left alone: the vowel may be fleeting"
+    assert ru.name_genitive("Anna") == "Anna"
+    assert ru.name_genitive("🌸") == "🌸"
+    assert ru.name_genitive("") == ""

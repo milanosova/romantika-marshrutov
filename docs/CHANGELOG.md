@@ -17,10 +17,17 @@ while `freezes.pending` says it can still be earned — never to Mila, whose fac
 club's, and never above the ceiling. The end-of-season list no longer
 guesses the reader's gender and no longer names the month.
 
+**A season now holds six freezes instead of five** (two base, four earned): with three
+automatic reasons the old ceiling left no room for the ones Mila gives by hand. Copies to
+Mila decline the name — «📨 Отчёт … от Юли», not «от Юля» — for the endings that are safe
+(-а, -я, -й, and a surname in -ова/-ина); anything else stays as it is.
+
 For Mila: name the weeks as the channel does — the guide says what the screens then show.
 Under the hood: `ru.week_name` / `RM.weekName` (one helper, used by the bot, the app, the
 admin app and the PDF), `facts.add_own` with the `fact` freeze reason (migration
 `e7f8a9b0c1d2`: the CHECK constraint and the «once per season» partial unique index),
+`f8a9b0c1d2e3` (the ceiling, rewriting `seasons.max_freezes` — a fresh backup first),
+`ru.name_genitive`,
 `POST /api/facts` answers `FactAdded` with `freeze_granted`.
 
 ## v2.5.0 — 2026-09-18 (Mila's edits of 18.09: the week tab, freezes, personal words and facts)

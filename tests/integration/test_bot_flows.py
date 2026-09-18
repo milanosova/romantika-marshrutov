@@ -538,15 +538,15 @@ async def test_panel_freeze_reasons(harness: Harness, db_session: AsyncSession, 
     assert "заморозка" in harness.session.all_text(ALICE).lower()
 
 
-async def test_panel_freeze_stops_at_the_ceiling_of_five(harness: Harness, db_session: AsyncSession) -> None:
+async def test_panel_freeze_stops_at_the_ceiling(harness: Harness, db_session: AsyncSession) -> None:
     await harness.text(ALICE, "привет")
-    for reason in ("comment", "meetup", "friend"):
+    for reason in ("comment", "meetup", "friend", "manual"):
         await harness.callback(ADMIN_ID, f"adm:frz:{ALICE}:{reason}")
     harness.session.reset()
 
     await harness.callback(ADMIN_ID, f"adm:frz:{ALICE}:comment")
-    assert await count(db_session, models.Freeze) == 3, "2 base + 3 earned is the ceiling (DOMAIN §3)"
-    assert "потолок — 5" in harness.session.last_text(ADMIN_ID)
+    assert await count(db_session, models.Freeze) == 4, "2 base + 4 earned is the ceiling (DOMAIN §3)"
+    assert "потолок — 6" in harness.session.last_text(ADMIN_ID)
 
 
 async def test_panel_delfact_lists_and_removes(harness: Harness, db_session: AsyncSession) -> None:
@@ -1246,7 +1246,7 @@ async def test_the_screens_stop_promising_a_freeze_at_the_ceiling(harness: Harne
     await harness.text(ALICE, "/start")  # the person has to exist before a freeze points at them
     season = (await db_session.execute(select(models.Season))).scalars().first()
     assert season is not None
-    for reason in ("comment", "meetup", "friend"):
+    for reason in ("comment", "meetup", "friend", "manual"):
         db_session.add(models.Freeze(season_id=season.id, user_id=ALICE, reason=reason))
     await db_session.flush()
 

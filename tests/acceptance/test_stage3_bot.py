@@ -258,7 +258,7 @@ async def test_text_report_gets_min_stamp_and_admin_copy(harness: Harness, db_se
     texts = harness.session.sent_texts(ALICE)
     assert texts and "минимум" in texts[-1].lower()
     admin_texts = harness.session.sent_texts(ADMIN_ID)
-    assert admin_texts and "Алиса" in admin_texts[-1] and "неделю 1" in admin_texts[-1].lower()
+    assert admin_texts and "Алисы" in admin_texts[-1] and "неделю 1" in admin_texts[-1].lower()
     stamps = (await db_session.execute(select(models.Stamp).where(models.Stamp.user_id == ALICE))).scalars().all()
     assert len(stamps) == 1 and stamps[0].level == "min"
 

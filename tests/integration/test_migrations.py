@@ -143,3 +143,30 @@ async def test_fact_freeze_downgrade_refuses_while_such_freezes_exist(engine: As
     async with engine.begin() as connection:
         await connection.execute(sa.text("DELETE FROM users WHERE id = 9002"))
         await connection.execute(sa.text("DELETE FROM seasons WHERE id = 9002"))
+
+
+async def test_freezes_ceiling_moves_to_six_and_back(engine: AsyncEngine, database_url: str) -> None:
+    """`f8a9b0c1d2e3`: three automatic freezes left no room for the ones Mila gives by hand,
+    so the ceiling is six (DOMAIN §3, 19.09.2026). A ceiling she set herself is not touched."""
+    async with engine.begin() as connection:
+        await connection.execute(
+            sa.text(
+                "INSERT INTO seasons (id, slug, title, title_accusative, hashtag, starts_on, ends_on, status, "
+                "max_freezes) VALUES "
+                "(9003, 'ceiling', 'Проба', 'Пробу', '#проба', '2026-01-05', '2026-03-29', 'draft', 6), "
+                "(9004, 'custom', 'Своё', 'Своё', '#своё', '2026-01-05', '2026-03-29', 'draft', 9)"
+            )
+        )
+    async with engine.connect() as connection:
+        after_upgrade = dict((await connection.execute(sa.text("SELECT id, max_freezes FROM seasons"))).all())
+    assert after_upgrade[9003] == 6 and after_upgrade[9004] == 9
+
+    await asyncio.to_thread(run_alembic, database_url, "e7f8a9b0c1d2", downgrade=True)
+    async with engine.connect() as connection:
+        after_downgrade = dict((await connection.execute(sa.text("SELECT id, max_freezes FROM seasons"))).all())
+    assert after_downgrade[9003] == 5, "the default ceiling goes back"
+    assert after_downgrade[9004] == 9, "a ceiling set by hand is left alone"
+
+    await asyncio.to_thread(run_alembic, database_url, "head")
+    async with engine.begin() as connection:
+        await connection.execute(sa.text("DELETE FROM seasons WHERE id IN (9003, 9004)"))

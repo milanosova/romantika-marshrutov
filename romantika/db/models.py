@@ -153,7 +153,7 @@ class Season(Base, TimestampMixin):
     daily_title: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     daily_note: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     base_freezes: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("2"))
-    max_freezes: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("5"))
+    max_freezes: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("6"))
     level_tourist: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     level_traveler: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("4"))
     level_resident: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("9"))
