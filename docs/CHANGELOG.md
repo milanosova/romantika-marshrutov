@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.5.0 — unreleased (Mila's edits of 18.09: the week tab, freezes, personal words and facts)
+## v2.5.0 — 2026-09-18 (Mila's edits of 18.09: the week tab, freezes, personal words and facts)
 
 For participants: the «Неделя» tab opens with the club name small, the season name large in
 the accent colour, then the date and the week line; the day card is one line about the Maya
