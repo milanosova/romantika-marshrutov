@@ -102,6 +102,7 @@ async def test_second_late_report_adds_to_the_chapter_and_the_summary_ignores_bo
     )
     assert "Записала в журнал" in first.json()["message"]
     assert "Дописала в журнал" in second.json()["message"], "the second one joins the chapter"
+    assert "уже не ставится" in second.json()["message"], "no stamp to keep: the receipt must not claim one"
 
     week2 = await content.week_by_number(app.session, app.season_id, 2)
     assert week2 is not None
@@ -146,6 +147,7 @@ async def test_a_late_report_never_holds_the_stamp_of_an_on_time_one(
     late = await make_app(db_session, tmp_path, monkeypatch, WEEK3)
     r = await late.client.post("/api/reports", data={"text": "потом", "week_number": "1"}, headers=late.headers(ALICE))
     assert r.status_code == 201 and "Дописала" in r.json()["message"] and r.json()["stamp_level"] == "min"
+    assert "как был" in r.json()["message"], "the stamped week's receipt says the stamp stays"
     assert await late.stamp(ALICE, 1) == "min", "the stamp the week already had stays"
 
     cancel = await late.client.post(f"/api/reports/{on_time['report_id']}/cancel", headers=late.headers(ALICE))

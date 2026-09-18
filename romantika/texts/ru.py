@@ -158,7 +158,7 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         "сразу после отправки или потом в «Рюкзаке», в журнале, пока неделя идёт.",
     ),
     (
-        "Хочу дослать фото или переделать",
+        "Хочу прислать ещё фото или переделать",
         "Просто пришли ещё раз: повторный отчёт штамп не понижает, а фото поднимет его до "
         "максимума. Другое дело — правка уже присланного отчёта в приложении: если убрать из "
         "него все фото, штамп пересчитается по тому, что осталось.",
@@ -177,11 +177,11 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     (
         "Хочу сделать прошедшую неделю",
         "Можно, до конца сезона — в приложении: «🎒 Открыть клуб», «Сезон», нажми на неделю, "
-        "там «Добавить в журнал». Текст и фото лягут в твой журнал и в книгу сезона. Штамп за "
+        "там «Добавить в журнал». Текст и фото лягут в твой журнал сезона. Штамп за "
         "прошедшую неделю уже не ставится и заморозка не возвращается: паспорт — про «вовремя», "
         "журнал — про «вообще». Сюда, в чат, такое слать не надо — я не пойму, к какой неделе.",
         "Можно, до конца сезона: вкладка «Сезон», нажми на неделю, там «Добавить в журнал». "
-        "Текст и фото лягут в твой журнал и в книгу сезона. Штамп за прошедшую неделю уже не "
+        "Текст и фото лягут в твой журнал сезона. Штамп за прошедшую неделю уже не "
         "ставится и заморозка не возвращается: паспорт — про «вовремя», журнал — про «вообще».",
     ),
     (
@@ -194,7 +194,8 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     ),
     (
         "Старт в середине сезона",
-        "Заходи с любой недели, догонять с начала не нужно. Ничей результат не считается поздним.",
+        "Заходи с любой недели, догонять с начала не нужно. Штампы считаются с твоей первой недели; "
+        "прошедшие можно сделать для себя — они лягут в журнал (см. выше).",
         None,
     ),
     ("Не знаю, что написать", "Минимум — это правда одно слово. «Чимичанга» — уже полноценный отчёт.", None),
@@ -321,8 +322,11 @@ NOT_UNDERSTOOD = (
 OUT_OF_WEEK = "Спасибо! Сейчас неделя сезона не идёт, так что штамп не ставлю — но сообщение сохранила и прочитаю."
 
 # --- late reports: a past week, journal only (DOMAIN §2) ---------------------------------
-LATE_SAVED = "📔 Записала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в книгу сезона попадёт."
+LATE_SAVED = "📔 Записала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в журнале сезона будет."
 LATE_ADDED = "📔 Дописала в журнал недели {number} «{title}». Штамп за неделю как был — он не меняется."
+LATE_ADDED_NO_STAMP = (
+    "📔 Дописала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в журнале сезона будет."
+)
 LATE_MARK = "дослано позже"
 """The mark on a late report in the journal, the PDF and Mila's admin app."""
 EDIT_SEASON_OVER = "Сезон закончился — журнал теперь как есть, менять его уже нельзя."
@@ -333,9 +337,10 @@ LATE_NO_WEEK = "такой недели нет"
 """Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
 
 
-def late_receipt(week: WeekDTO, *, first_of_week: bool) -> str:
-    """The app's answer to a late report; the title is escaped like every week title here."""
-    template = LATE_SAVED if first_of_week else LATE_ADDED
+def late_receipt(week: WeekDTO, *, first_of_week: bool, stamped: bool = False) -> str:
+    """The app's answer to a late report; the title is escaped like every week title here.
+    «Штамп как был» is said only when the week has one — otherwise there is none to keep."""
+    template = LATE_SAVED if first_of_week else LATE_ADDED if stamped else LATE_ADDED_NO_STAMP
     return template.format(number=week.number, title=escape(week.title))
 
 
@@ -680,7 +685,7 @@ def admin_late_header(week_number: int, author: str, text: str | None, kind: str
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
     return (
         f"📨 {escape(author)} дослала за неделю {week_number}{body}"
-        "\n\n<i>Штамп не ставится. Ответь на это сообщение — я передам ответ автору.</i>"
+        "\n\n<i>Штамп не ставится. Ответь реплаем — передам.</i>"
     )
 
 

@@ -84,7 +84,7 @@
           ${w.task_max ? `<div><div class="k">Максимум ⭐ · на вечер</div><div class="v">${esc(w.task_max)}</div></div>` : ""}
         </div>
         ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
-        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."} Дослать можно ниже.</p>` : `<h3>Берёшься?</h3>
+        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."} Прислать ещё можно ниже.</p>` : `<h3>Берёшься?</h3>
         <div class="segment" id="intent">${["take", "try", "skip"].map((c) => `<button data-choice="${c}" class="${w.intent === c ? "active" : ""}">${RM.intentName[c]}</button>`).join("")}</div>
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь» или «Попробую»."}</p>`}
       </div>`;
@@ -176,11 +176,11 @@
     const note = late
       ? lateNote(late)
       : w
-      ? "Текст — минимум ✅, фото или видео — максимум ⭐. Дослать можно сколько угодно раз."
+      ? "Текст — минимум ✅, фото или видео — максимум ⭐. Присылать можно сколько угодно раз."
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
     return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
-      <textarea id="report-text" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
+      <textarea id="report-text" maxlength="4000" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
       <div class="attach"><label class="btn soft small" for="report-files">📷 Фото или видео</label><input id="report-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="files-count"></span></div>
       <div class="previews" id="previews" hidden></div>
       <div class="bar" id="bar" hidden><i></i></div>
@@ -191,7 +191,7 @@
   function lateNote(late) {
     return late.stamped
       ? "Штамп за неделю уже стоит, он не изменится. Текст и фото лягут в ту же главу журнала."
-      : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт.";
+      : "Неделя прошла — штамп за неё уже не ставится, а в журнале сезона будет.";
   }
 
   function bindComposer(w, late) {
@@ -445,7 +445,7 @@
     const week = (state.home.weeks || []).find((w) => w.number === r.week_number);
     const added = [], removed = new Set();
     const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
-      <textarea id="edit-text" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
+      <textarea id="edit-text" maxlength="4000" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
       ${r.media.length ? `<p class="note" style="margin:10px 0 4px">Файлы в отчёте — нажми, чтобы убрать</p><div class="previews" id="edit-existing">${r.media.map((m) => `<button class="pv keep" data-id="${m.id}" title="${esc(m.mime || "")}">${m.mime && m.mime.startsWith("image/") && m.downloaded ? `<img src="${m.url}" alt="">` : `<span>${kindName(m.mime && m.mime.startsWith("video/") ? "video" : "document")}</span>`}<span class="x" aria-hidden="true">✕</span></button>`).join("")}</div>` : ""}
       <div class="attach" style="margin-top:10px"><label class="btn soft small" for="edit-files">📷 Добавить фото или видео</label><input id="edit-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="edit-count"></span></div>
       <div class="previews" id="edit-previews" hidden></div>
