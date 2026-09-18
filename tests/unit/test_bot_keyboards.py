@@ -85,6 +85,11 @@ def test_split_text_prefers_paragraph_then_line_then_space() -> None:
         ("Сегодня!", None),
         ("Задание 1", None),
         ("  📘 Паспорт", "passport"),  # leading spaces do not hide the emoji
+        ("«Паспорт»", None),  # quotes, a dot or a number in front: typed, not pressed
+        ('"Паспорт"', None),
+        ("...паспорт", None),
+        ("1. Задание", None),
+        ("⋯ Ещё", "more"),  # the one button whose sign is a math symbol, not an emoji
         ("ЗАДАНИЕ", None),
         ("тако удались, фото ниже", None),
         ("", None),

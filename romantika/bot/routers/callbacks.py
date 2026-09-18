@@ -134,6 +134,7 @@ async def _dispatch(
                 now=now,
             )
         except Refused as exc:  # a button on an old message, or the stamp is already there
+            logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
             await answer(query, str(exc), alert=True)
             return
         await answer(query, ru.INTENT_HINTS[choice], alert=True)

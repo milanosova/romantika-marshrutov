@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
@@ -86,13 +87,18 @@ def to_dto(row: models.User) -> UserDTO:
 
 async def upsert_user(session: AsyncSession, tg: TelegramUser, *, now: datetime) -> UserDTO:
     """Create the person on the first contact, refresh the name later; `joined_at` is kept."""
-    # The first two requests of a newcomer arrive together (two tabs, the app's parallel
-    # fetches): the second waits here and finds the row instead of hitting the primary key.
-    await locks.serialise(session, f"user:{tg.id}")
     row = await session.get(models.User, tg.id)
     if row is None:
-        row = models.User(id=tg.id, joined_at=now)
-        session.add(row)
+        # The first two requests of a newcomer arrive together (two tabs, the app's parallel
+        # fetches): an idempotent insert lets the second one find the first one's row instead
+        # of hitting the primary key. No advisory lock here — it would be held for the whole
+        # update, media downloads included, and queue every request of the person behind it.
+        await session.execute(
+            pg_insert(models.User).values(id=tg.id, joined_at=now).on_conflict_do_nothing(index_elements=["id"])
+        )
+        row = await session.get(models.User, tg.id, populate_existing=True)
+        if row is None:  # pragma: no cover - the insert or the concurrent one has committed by now
+            raise RuntimeError(f"user {tg.id} vanished after an idempotent insert")
     row.username = tg.username
     row.first_name = tg.first_name
     row.last_name = tg.last_name

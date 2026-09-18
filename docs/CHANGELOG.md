@@ -27,9 +27,9 @@ longer breaks a sentence at «две заморозки»; the freezes sheet say
 
 Under the hood: the intent rules live in `people.choose_intent`, shared by the bot button and
 `POST /api/intent` (a repeated answer is stored but not copied to Mila); every «once per
-person» write whose duplicate check is read-then-write — a word, a fact, an intent, the first
-row of a user — takes a transaction-scoped advisory lock (`services/locks.py`), so a double tap
-or two devices no longer make copies or a 500; the texts of a week are bounded like their
+person» write whose duplicate check is read-then-write — a word, a fact, an intent — takes a
+transaction-scoped advisory lock (`services/locks.py`), and the first row of a user is an
+idempotent insert, so a double tap or two devices no longer make copies or a 500; the texts of a week are bounded like their
 columns (255 / 4000 characters, no NUL) and answer 422 in Russian; the stand's demo facts of
 Mila carry no author, as production does.
 
