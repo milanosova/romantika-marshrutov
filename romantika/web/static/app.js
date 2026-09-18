@@ -377,7 +377,7 @@
       form.innerHTML = composerHtml(w, late);
       $("late-note").remove();
       $("late-open").replaceWith(form);
-      bindComposer(w, { ...late, done: (r) => renderLateBox(w, r.message) });
+      bindComposer(w, { ...late, done: async (r) => { renderLateBox(w, r.message); await refreshHome(); if ($("journal-box")) renderJournalInto($("journal-box")); } });
       $("report-text").focus();
     });
   }
@@ -480,7 +480,6 @@
       });
     });
   }
-
 
   async function requestPdf() {
     const button = $("pdf"), status = $("pdf-status");

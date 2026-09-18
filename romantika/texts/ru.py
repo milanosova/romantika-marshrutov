@@ -323,8 +323,24 @@ OUT_OF_WEEK = "Спасибо! Сейчас неделя сезона не ид�
 # --- late reports: a past week, journal only (DOMAIN §2) ---------------------------------
 LATE_SAVED = "📔 Записала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в книгу сезона попадёт."
 LATE_ADDED = "📔 Дописала в журнал недели {number} «{title}». Штамп за неделю как был — он не меняется."
+
+
+def late_receipt(week: WeekDTO, *, first_of_week: bool) -> str:
+    """The app's answer to a late report; the title is escaped like every week title here."""
+    template = LATE_SAVED if first_of_week else LATE_ADDED
+    return template.format(number=week.number, title=escape(week.title))
+
+
+EDIT_SEASON_OVER = "Сезон закончился — журнал теперь как есть, менять его уже нельзя."
 LATE_MARK = "дослано позже"
 """The mark on a late report in the journal, the PDF and Mila's admin app."""
+
+
+def late_photos_label(n: int) -> str:
+    """Under a stamped chapter's photos in the PDF: how many of them came late."""
+    return f"{n} фото — {LATE_MARK}"
+
+
 LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за неё ставит штамп, отправь его как обычно"
 LATE_WEEK_FUTURE = "эта неделя ещё не началась"
 LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
@@ -526,18 +542,20 @@ def facts_text(season: SeasonDTO, facts: list[FactDTO], names: dict[int, str], *
 def journal_text(view: JournalView, level: Level | None) -> str:
     season = view.season
     name = short_name(view.user)
+    done = sum(1 for week in view.weeks if week.stamped)  # stamps only: a late chapter is journal, not rhythm
     lines = [
         f"📔 <b>Журнал сезона · {escape(season.title)}</b>",
         f"{escape(name)} · {season.starts_on:%d.%m} — {season.ends_on:%d.%m.%Y}",
         "",
-        f"Пройдено <b>{len(view.weeks)}</b> {plural(len(view.weeks), 'неделя', 'недели', 'недель')} "
+        f"Пройдено <b>{done}</b> {plural(done, 'неделя', 'недели', 'недель')} "
         f"из {view.weeks_total}. Статус: <b>{JOURNAL_LEVEL_NAMES[level]}</b>.",
     ]
     if view.weeks:
         lines += ["", "───", "<b>Твои недели</b>"]
         for week in view.weeks:
-            mark = "⭐" if week.level is StampLevel.MAX else "✅"
-            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>")
+            mark = "⭐" if week.level is StampLevel.MAX else "✅" if week.stamped else "📔"
+            tail = f" · {LATE_MARK}" if not week.stamped else ""
+            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")
     else:

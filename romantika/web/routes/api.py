@@ -285,8 +285,7 @@ async def submit_report(
     if result.late and result.week_number is not None:
         week = await content.week_by_number(session, season.id, result.week_number)
         assert week is not None
-        template = ru.LATE_SAVED if result.first_of_week else ru.LATE_ADDED
-        message = template.format(number=week.number, title=week.title)
+        message = ru.late_receipt(week, first_of_week=result.first_of_week)
         header = ru.admin_late_header(week.number, author, incoming.text, kind.value)
         week_id = week.id
         letter_id: int | None = None
@@ -342,7 +341,7 @@ def _late_week_number(fields: dict[str, str]) -> int | None:
     raw = fields.get("week_number", "").strip()
     if not raw:
         return None
-    if not raw.isdigit():
+    if not (raw.isascii() and raw.isdigit()):  # `isdigit` alone accepts superscripts int() refuses
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, ru.LATE_NO_WEEK)
     return int(raw)
 
@@ -411,7 +410,7 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
             level=row.level,
             stamp_level=stamp.value if stamp else None,
             freeze_granted=False,
-            message=ru.LATE_SAVED.format(number=week.number, title=week.title),
+            message=ru.late_receipt(week_dto, first_of_week=True),
             late=True,
         )
     return schemas.ReportResult(
@@ -497,6 +496,8 @@ async def edit_report(
             raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
         if result.reason == reports.EMPTY:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "пустой отчёт: нужен текст или файл")
+        if result.reason == reports.SEASON_OVER:
+            raise HTTPException(status.HTTP_409_CONFLICT, ru.EDIT_SEASON_OVER)
         raise HTTPException(status.HTTP_409_CONFLICT, ru.EDIT_WEEK_OVER)
     await _store_uploads(session, media_store, result.media_ids, uploads, now)
 

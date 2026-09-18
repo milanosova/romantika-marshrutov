@@ -99,10 +99,10 @@ async def test_late_downgrade_refuses_while_late_reports_exist(engine: AsyncEngi
             )
         )
     with pytest.raises(Exception, match="late report"):
-        await asyncio.to_thread(run_alembic, database_url, "-1", downgrade=True)
+        await asyncio.to_thread(run_alembic, database_url, "c4e8f1a2b9d3", downgrade=True)
     async with engine.begin() as connection:
         await connection.execute(sa.text("UPDATE reports SET late = false WHERE user_id = 9002"))
-    await asyncio.to_thread(run_alembic, database_url, "-1", downgrade=True)
+    await asyncio.to_thread(run_alembic, database_url, "c4e8f1a2b9d3", downgrade=True)
     await asyncio.to_thread(run_alembic, database_url, "head")
     async with engine.connect() as connection:
         late = await connection.scalar(sa.text("SELECT late FROM reports WHERE user_id = 9002"))

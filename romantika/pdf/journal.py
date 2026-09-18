@@ -19,7 +19,6 @@ from markupsafe import Markup
 from romantika.domain.types import Level, StampLevel
 from romantika.services.journal import JournalView, JournalWeek
 from romantika.texts import ru
-from romantika.texts.ru import plural
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 LEVEL_NAMES = {Level.RESIDENT: "Резидент", Level.TRAVELER: "Путешественник", Level.TOURIST: "Турист"}
@@ -72,18 +71,25 @@ class WeekCard:
     photos: list[str]
     files_more: int
     """Files the section does not show: non-images and photos past the cap."""
+    stamped: bool = True
+    """A stamp stands for the week (the badge); False for a chapter that is journal only."""
     late_only: bool = False
-    """No stamp behind the chapter: everything in it was added after the week ended."""
-    late_mark: str = ru.LATE_MARK
+    """Everything in the chapter was added after the week ended."""
+    late_photos: int = 0
+    """Photos that came with late reports, in a chapter that also has on-time content."""
 
     @property
     def texts(self) -> list[str]:
         return [entry.text for entry in self.entries]
 
     @property
+    def late_photos_label(self) -> str:
+        return ru.late_photos_label(self.late_photos)
+
+    @property
     def files_more_label(self) -> str:
         n = self.files_more
-        return f"Ещё {n} {plural(n, 'файл остался', 'файла остались', 'файлов остались')}"
+        return f"Ещё {n} {ru.plural(n, 'файл остался', 'файла остались', 'файлов остались')}"
 
 
 def _photos_of(week: JournalWeek, media_root: Path | None, budget: int) -> tuple[list[str], int]:
@@ -139,11 +145,13 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
                 entries=[CardEntry(text=clip(entry.text), late=entry.late) for entry in week.entries],
                 photos=photos,
                 files_more=skipped,
+                stamped=week.stamped,
                 late_only=week.late_only,
+                late_photos=0 if week.late_only else week.late_media,
             )
         )
-    # The passport grid and the cover count stamps only: a late-only chapter is journal, not rhythm.
-    stamped: dict[int, JournalWeek] = {week.number: week for week in view.weeks if not week.late_only}
+    # The passport grid and the cover count stamps only: a journal-only chapter is not rhythm.
+    stamped: dict[int, JournalWeek] = {week.number: week for week in view.weeks if week.stamped}
     grid = []
     # The season's real numbers, not 1..N: a deleted or inserted week must not shift the cells.
     for number in view.week_numbers or range(1, view.weeks_total + 1):
@@ -175,10 +183,11 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
         ends=date_words(view.season.ends_on, year=True),
         stars=stars,
         weeks_done=weeks_done,
-        stars_label=plural(stars, "со звёздочкой", "со звёздочкой", "со звёздочкой"),
-        weeks_label=plural(weeks_done, "неделя со штампом", "недели со штампом", "недель со штампом"),
+        late_mark=ru.LATE_MARK,
+        stars_label=ru.plural(stars, "со звёздочкой", "со звёздочкой", "со звёздочкой"),
+        weeks_label=ru.plural(weeks_done, "неделя со штампом", "недели со штампом", "недель со штампом"),
         photos_total=photos_total,
-        photos_label=plural(photos_total, "фотография", "фотографии", "фотографий"),
+        photos_label=ru.plural(photos_total, "фотография", "фотографии", "фотографий"),
     )
 
 

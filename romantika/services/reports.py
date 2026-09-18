@@ -214,7 +214,7 @@ async def accept_late(
     await people.ensure_member(session, season_id, user_id, now=now)
     today = to_moscow(now).date()
     week = await content.week_by_number(session, season_id, week_number)
-    if week is None:
+    if week is None or week.is_draft:  # a draft is invisible to participants (DOMAIN §1)
         raise Refused(ru.LATE_NO_WEEK)
     if today < week.starts_on:
         raise Refused(ru.LATE_WEEK_FUTURE)
@@ -410,6 +410,7 @@ async def _recompute_stamp(
 NOT_YOURS = "not_yours"
 CANCELLED = "cancelled"
 WEEK_OVER = "week_over"
+SEASON_OVER = "season_over"
 EMPTY = "empty"
 
 
@@ -469,7 +470,7 @@ async def edit(
     if week is None or not editable_until(
         week.ends_on, to_moscow(now).date(), late=report.late, season_ends_on=season.ends_on
     ):
-        return EditResult(ok=False, reason=WEEK_OVER)
+        return EditResult(ok=False, reason=SEASON_OVER if report.late else WEEK_OVER)
 
     body = (text or "").strip() or None
     text_changed = body != (report.text or None)
@@ -583,15 +584,13 @@ async def find_by_client_id(session: AsyncSession, *, user_id: int, client_id: s
     return (await session.execute(query)).scalar_one_or_none()
 
 
-async def count_for_week(session: AsyncSession, *, user_id: int, week_id: int, include_late: bool = True) -> int:
-    """Live (not cancelled) reports of one participant for one week, late ones included by default."""
+async def count_for_week(session: AsyncSession, *, user_id: int, week_id: int) -> int:
+    """Live (not cancelled) reports of one participant for one week (the running week has no late ones)."""
     query = select(func.count(models.Report.id)).where(
         models.Report.user_id == user_id,
         models.Report.week_id == week_id,
         models.Report.deleted_at.is_(None),
     )
-    if not include_late:
-        query = query.where(models.Report.late.is_(False))
     return int((await session.execute(query)).scalar_one())
 
 

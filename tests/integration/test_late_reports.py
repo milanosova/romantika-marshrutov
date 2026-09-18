@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -187,3 +187,83 @@ async def test_journal_and_pdf_carry_the_late_mark(app: App) -> None:
     assert '<div class="n">1 <small>/ 12</small></div><div class="l">неделя со штампом</div>' in html, (
         "the cover counts stamps, not chapters"
     )
+
+
+async def test_a_draft_week_and_odd_digits_are_refused(app: App) -> None:
+    """A draft is invisible to participants (DOMAIN §1); a superscript digit is not a number."""
+    # A past draft in the gap before week 1 (weeks may not overlap).
+    app.session.add(
+        models.Week(
+            season_id=app.season_id,
+            number=13,
+            title="Черновик Милы",
+            starts_on=date(2026, 8, 24),
+            ends_on=date(2026, 8, 30),
+            announced_at=None,
+        )
+    )
+    await app.session.flush()
+    draft = await app.client.post("/api/reports", data={"text": "x", "week_number": "13"}, headers=app.headers(ALICE))
+    assert draft.status_code == 422 and "такой недели нет" in draft.json()["detail"]
+    assert "Черновик" not in draft.text
+    odd = await app.client.post("/api/reports", data={"text": "x", "week_number": "²"}, headers=app.headers(ALICE))
+    assert odd.status_code == 422, odd.text
+
+
+async def test_the_bot_journal_counts_stamps_only_and_marks_the_late_chapter(app: App) -> None:
+    from romantika.texts import ru
+
+    await app.client.post("/api/reports", data={"text": "вовремя, неделя 3"}, headers=app.headers(ALICE))
+    await app.client.post("/api/reports", data={"text": "дослано", "week_number": "1"}, headers=app.headers(ALICE))
+    view = await journal.build(app.session, season_id=app.season_id, user_id=ALICE, today=app.now.date())
+    text = ru.journal_text(view, None)
+    assert "Пройдено <b>1</b> неделя из 12" in text, "the late chapter is journal, not a passed week"
+    assert "📔 <b>Неделя 1" in text and "дослано позже" in text
+    assert "✅ <b>Неделя 3" in text
+
+
+async def test_a_late_photo_in_a_stamped_week_is_marked_in_the_pdf(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    early = await make_app(db_session, tmp_path, monkeypatch, moscow(2026, 9, 2, 15))
+    await early.client.post("/api/reports", data={"text": "вовремя"}, headers=early.headers(ALICE))
+    late = await make_app(db_session, tmp_path, monkeypatch, WEEK3)
+    r = await late.client.post(
+        "/api/reports",
+        data={"week_number": "1"},
+        files=[("files", ("late.jpg", JPEG, "image/jpeg"))],
+        headers=late.headers(ALICE),
+    )
+    assert r.status_code == 201 and r.json()["late"] is True
+    view = await journal.build(late.session, season_id=late.season_id, user_id=ALICE, today=late.now.date())
+    (week1,) = [w for w in view.weeks if w.number == 1]
+    assert week1.stamped and not week1.late_only and week1.late_media == 1
+    html = render_journal_html(view, media_root=late.store.root)
+    assert "1 фото — дослано позже" in html
+
+
+async def test_a_week_whose_stamp_mila_removed_is_not_a_late_chapter(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from romantika.services import stamps
+
+    early = await make_app(db_session, tmp_path, monkeypatch, moscow(2026, 9, 2, 15))
+    await early.client.post("/api/reports", data={"text": "вовремя"}, headers=early.headers(ALICE))
+    await stamps.admin_set(
+        early.session,
+        actor_id=ADMIN_ID,
+        season_id=early.season_id,
+        user_id=ALICE,
+        week_number=1,
+        level=None,
+        now=early.now,
+    )
+    late = await make_app(db_session, tmp_path, monkeypatch, WEEK3)
+    view = await journal.build(late.session, season_id=late.season_id, user_id=ALICE, today=late.now.date())
+    assert [w.number for w in view.weeks] == [], "no stamp and nothing late: no chapter, as before"
+    await late.client.post("/api/reports", data={"text": "потом", "week_number": "1"}, headers=late.headers(ALICE))
+    view = await journal.build(late.session, season_id=late.season_id, user_id=ALICE, today=late.now.date())
+    (week,) = view.weeks
+    assert not week.stamped and not week.late_only, "on-time text plus a late one: no stamp, but not «all late»"
+    html = render_journal_html(view)
+    assert "дослано позже · без штампа" not in html and "дослано позже" in html

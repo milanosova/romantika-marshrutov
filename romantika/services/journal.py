@@ -31,6 +31,8 @@ class JournalMedia:
     tg_file_id: str | None
     """None until a Mini App upload has been sent to Telegram once; the bot then sends from disk."""
     week_id: int | None = None
+    late: bool = False
+    """The file came with a report sent after the week ended (DOMAIN §2)."""
     mime: str | None = None
 
 
@@ -66,9 +68,20 @@ class JournalWeek:
         return [entry.text for entry in self.entries]
 
     @property
+    def stamped(self) -> bool:
+        return self.level is not None
+
+    @property
     def late_only(self) -> bool:
-        """No stamp: everything here was added after the week ended."""
-        return self.level is None
+        """Everything here was added after the week ended, and no stamp stands for it.
+
+        Not the same as «no stamp»: a week Mila took the stamp from keeps its on-time
+        reports, and those are not late."""
+        return self.level is None and all(e.late for e in self.entries) and all(m.late for m in self.media)
+
+    @property
+    def late_media(self) -> int:
+        return sum(1 for m in self.media if m.late)
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,10 +118,14 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
     texts = await _texts(session, season_id=season_id, user_id=user_id)
     media = await _media(session, season_id=season_id, user_id=user_id)
 
-    # Chapters: every stamped week, plus every week the person wrote into after it ended.
+    # Chapters: every stamped week, plus every week the person wrote into after it ended
+    # (DOMAIN §2). A week whose stamp Mila took away stays out, as before.
     by_id = {week.id: week for week in ordered}
     chapters: dict[int, StampLevel | None] = dict(levels)
-    for week_id in set(texts) | {item.week_id for item in media if item.week_id is not None}:
+    late_week_ids = {wid for wid, entries in texts.items() if any(e.late for e in entries)} | {
+        item.week_id for item in media if item.late and item.week_id is not None
+    }
+    for week_id in late_week_ids:
         week = by_id.get(week_id)
         if week is not None and week.number not in chapters:
             chapters[week.number] = None
@@ -190,6 +207,7 @@ async def _media(session: AsyncSession, *, season_id: int, user_id: int) -> list
             models.Media.tg_file_id,
             models.Report.week_id,
             models.Media.mime,
+            models.Report.late,
         )
         .join(models.Report, models.Report.id == models.Media.report_id)
         .where(
@@ -209,8 +227,9 @@ async def _media(session: AsyncSession, *, season_id: int, user_id: int) -> list
             tg_file_id=tg_file_id,
             week_id=week_id,
             mime=mime,
+            late=bool(late),
         )
-        for media_id, path, downloaded_at, tg_file_id, week_id, mime in (await session.execute(query)).all()
+        for media_id, path, downloaded_at, tg_file_id, week_id, mime, late in (await session.execute(query)).all()
     ]
 
 
