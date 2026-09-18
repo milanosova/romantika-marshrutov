@@ -534,7 +534,7 @@
     // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
     const running = (w) => h.week && w.id === h.week.id;
     out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${running(w) ? "▸" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
-    out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой. За первое слово — ❄️ +1 заморозка.</p>
+    out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой.${(h.passport.freeze_reasons || []).includes("word") ? "" : " За первое слово — ❄️ +1 заморозка."}</p>
       <input id="word-text" placeholder="слово — что оно значит"><button class="btn block" id="word-send" style="margin-top:10px">Записать</button></div>`;
     out += `<h3>Слова недели</h3>`;
     out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(w.title)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;

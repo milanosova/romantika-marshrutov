@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator, Sequence
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Path, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy import text as sql_text
@@ -430,9 +431,13 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
     )
 
 
+#: A report id is an int4 in the database: anything beyond it is «no such report», not a 500.
+ReportId = Annotated[int, Path(ge=1, le=2_147_483_647)]
+
+
 @router.patch("/reports/{report_id}", response_model=schemas.ReportEditOut)
 async def edit_report(
-    report_id: int,
+    report_id: ReportId,
     principal: PrincipalDep,
     session: SessionDep,
     season: SeasonDep,
@@ -548,7 +553,7 @@ async def _report_media(session: SessionDep, report_id: int) -> list[models.Medi
 
 @router.post("/reports/{report_id}/cancel", response_model=schemas.CancelOut)
 async def cancel_report(
-    report_id: int,
+    report_id: ReportId,
     principal: PrincipalDep,
     session: SessionDep,
     season: SeasonDep,
