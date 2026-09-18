@@ -306,6 +306,7 @@
           <li><span>✅</span> минимум</li>
           <li><span>❄️</span> пропуск закрыт заморозкой</li>
           <li><span>◦</span> пропущена или была до твоего прихода</li>
+          <li><span>▸</span> идёт сейчас</li>
           <li><span>🔒</span> откроется в понедельник</li>
         </ul>
         <p class="note" style="margin:8px 0 0">Нажми на неделю — откроется задание; за прошедшую можно добавить в журнал.</p></div>`;
@@ -317,25 +318,29 @@
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
     $("freezes-how").addEventListener("click", (e) => { e.preventDefault(); openFreezes(state.home.passport); });
-    await renderMineInto($("mine-box"));
-    await renderJournalInto($("journal-box"));
+    await Promise.all([renderMineInto($("mine-box")), renderJournalInto($("journal-box"))]);
   }
 
   // A person's own words and facts: seen only by them, kept for their journal (DOMAIN §6, 15.09.2026).
   async function renderMineInto(box) {
     const [dict, facts] = await Promise.allSettled([RM.api("/api/dictionary"), RM.api("/api/facts")]);
     if (!box.isConnected) return;
-    const words = dict.status === "fulfilled" ? dict.value.user_words : [];
-    const mine = facts.status === "fulfilled" ? facts.value.facts.filter((x) => x.mine) : [];
+    // Personal entries have one copy on screen: a failed load must look like a failure, not like «пусто».
+    const failed = [dict, facts].find((r) => r.status === "rejected");
+    if (failed) { box.innerHTML = errorBox(failed.reason); return; }
+    const words = dict.value.user_words;
+    // Mila's own facts carry no author and are the club's shared ones (DOMAIN §6): her card says so.
+    const isAdmin = !!state.home.user.is_admin;
+    const mine = facts.value.facts.filter((x) => isAdmin ? !x.author : x.mine);
     const firstWord = !(state.home.passport.freeze_reasons || []).includes("word");
     box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои слова</h3>
       ${words.length ? `<ul class="list tight">${words.map((w) => `<li><span class="mark">✍️</span><span class="body"><div class="title">${esc(w.word)}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="muted">Пока пусто — слова, которые зацепили тебя в этой стране.</p>`}
       <div class="row" style="margin-top:8px"><input id="word-text" placeholder="слово — что оно значит" style="flex:1"><button class="btn small" id="word-send">Записать</button></div>
       <p class="note" style="margin:8px 0 0">Видишь только ты; будут в твоём журнале сезона.${firstWord ? " За первое слово — ❄️ +1 заморозка." : ""}</p></div>
-      <div class="card"><h3 style="margin-top:0">Мои факты</h3>
+      <div class="card"><h3 style="margin-top:0">${isAdmin ? "Факты клуба" : "Мои факты"}</h3>
       ${mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row" style="margin-top:8px"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
-      <p class="note" style="margin:8px 0 0">Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — в «Сезоне».</p></div>`;
+      <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все в «Сезоне», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — в «Сезоне»."}</p></div>`;
     const again = async () => { const y = window.scrollY; await refreshHome(); await renderMineInto(box); window.scrollTo(0, y); };
     $("word-send").addEventListener("click", async () => {
       const text = $("word-text").value.trim();
@@ -345,8 +350,8 @@
         const r = await RM.api("/api/words", { method: "POST", body: { text } });
         RM.haptic("success");
         RM.alert(r.message.replace(/<[^>]+>/g, ""));
-        await again();
-        if (r.freeze_granted) await renderBag(); // the freezes tile above changed
+        if (r.freeze_granted) { const y = window.scrollY; await refreshHome(); await renderBag(); window.scrollTo(0, y); } // the freezes tile above changed
+        else await again();
       } catch (e) { $("word-send").disabled = false; RM.toast(e.message); }
     });
     $("fact-send").addEventListener("click", async () => {

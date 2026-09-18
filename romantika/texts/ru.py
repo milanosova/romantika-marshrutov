@@ -456,8 +456,7 @@ def passport_text(view: PassportView, bonus_reasons: list[str]) -> str:
         if state is WeekState.STAMPED:
             level = view.stamps.get(week.number)
             mark = "⭐" if level is StampLevel.MAX else "✅"
-            title = view.stamp_titles.get(week.number) or week.title
-            lines.append(f"{mark}  {week.number}. {escape(title)}")
+            lines.append(f"{mark}  {week.number}. {escape(week.title)}")  # the current title, as in the app
             continue
         tail = {WeekState.FROZEN: " · заморозка", WeekState.BEFORE_JOIN: " · до тебя"}.get(state, "")
         lines.append(f"{marks[state]}  {week.number}. {escape(week.title)}{tail}")

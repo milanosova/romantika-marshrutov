@@ -254,9 +254,9 @@ async def update_week(
     Texts are editable at any time, a finished week included (Mila, 18.09.2026: a mistake
     found later must be fixable; DOMAIN §1). What a finished week keeps frozen is its
     calendar and its stamps — the title a stamp carries was frozen when it was awarded.
-    `today` is accepted for the callers that pass it and is not used for a check any more.
+    `today` is accepted for the callers that pass it; nothing about texts depends on the day.
     """
-    del today  # kept in the signature for the callers; no calendar check on texts (DOMAIN §1)
+    del today  # no calendar check on texts (DOMAIN §1); the parameter stays for the callers
     unknown = sorted(set(changes) - EDITABLE_WEEK_FIELDS)
     if unknown:
         raise ValueError(f"week fields {unknown} are not editable (allowed: {sorted(EDITABLE_WEEK_FIELDS)})")
