@@ -1,5 +1,23 @@
 # Changelog
 
+## v2.5.0 — unreleased (Mila's edits of 18.09: the week tab, freezes, personal words and facts)
+
+For participants: the «Неделя» tab opens with the club name small, the season name large in
+the accent colour, then the date and the week line; the day card is one line about the Maya
+day (no memory word, no disclaimer); the report forms say «Загрузить фото или видео». The
+«Заморозки» sheet is a plain sentence and a list, with the letter form as its own block; the
+legend under the week grid is a column; the chronicle in «Сезон» shows each week's own mark
+(⭐ ✅ ❄️ ◦) instead of ✓. «О клубе» no longer breaks its sentences at bold words. **Own words
+and facts are personal**: «Мои слова» and «Мои факты» with their forms live in «Рюкзак» and
+are seen by the author only (and by Mila in the person's card); «Сезон» keeps the week words
+and Mila's facts; the bot's `/words` and `/facts` show the same; the journal and the PDF
+carry the person's own. The freeze for the first word stays.
+
+For Mila: the texts of any week — a finished one included — are editable in the admin app
+and in «⚙️ Мила» (only the calendar of a started week stays frozen); the person's card shows
+their facts. «Что будет в конце сезона» lists what the PDF holds in plain words. «Берусь /
+Попробую / Мимо» stay three buttons: the acceptance suite pins them (skills-log).
+
 ## v2.4.0 — 2026-09-18 (late reports into the journal)
 
 For participants: a week that has ended takes a report until the season ends — «Добавить в

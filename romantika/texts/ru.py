@@ -219,8 +219,10 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     ),
     (
         "Хочу добавить своё слово в словарик",
-        "Нажми «🎒 Открыть клуб», вкладка «Сезон» — там форма «Добавить своё слово».",
-        "Во вкладке «Сезон» — форма «Добавить своё слово».",
+        "Нажми «🎒 Открыть клуб», вкладка «Рюкзак» — там «Мои слова» и «Мои факты». "
+        "Свои слова и факты видишь только ты, и они будут в твоём журнале сезона.",
+        "Во вкладке «Рюкзак» — «Мои слова» и «Мои факты». Свои слова и факты видишь только ты, "
+        "и они будут в твоём журнале сезона.",
     ),
     (
         "Заморозку не дали",
@@ -257,7 +259,7 @@ ADMIN_MEMO = (
     "<b>Что бот умеет — коротко</b>\n\n"
     "<b>Что видят люди</b>\n"
     "Одна кнопка «🎒 Открыть клуб» — приложение с тремя вкладками:\n"
-    "Неделя — день и слово, задание, «Берусь · Попробую · Мимо», свои отчёты\n"
+    "Неделя — день, задание со словом, «Берусь · Попробую · Мимо», свои отчёты\n"
     "Рюкзак — паспорт со штампами, заморозки, ачивки, журнал и PDF\n"
     "Сезон — недели летописью, словарь, факты, о клубе\n"
     "Отчёт — просто прислать текст или фото. Текст = минимум, "
@@ -301,9 +303,7 @@ WORD_PROMPT = (
     "Напиши слово и что оно значит, одним сообщением.\n"
     "Например: <i>sobremesa — время за столом уже после еды, когда все сидят и разговаривают</i>"
 )
-WORD_SAVED = (
-    "Записала в общий словарик 📖\n\nК концу сезона соберём из них словарь — твоё слово будет там с твоим именем."
-)
+WORD_SAVED = "Записала в твой словарик 📖\n\nЕго видишь только ты, а к концу сезона он будет в твоём журнале."
 WORD_REFUSED_HINT = ". Если хочешь записать другое — нажми «➕ Добавить своё слово» ниже."
 """Follows a refusal from `words.add` in the bot: the dialog is closed, a plain message is a report again."""
 WORD_FREEZE_BONUS = (
@@ -312,10 +312,10 @@ WORD_FREEZE_BONUS = (
 )
 FACT_PROMPT = (
     "Что записать? Пиши одним сообщением.\n\n"
-    "<i>Например: Ацтеки называли себя мешика — отсюда «Мексика». Это попадёт в общий список "
-    "и в журнал сезона, с твоим именем.</i>"
+    "<i>Например: Ацтеки называли себя мешика — отсюда «Мексика». Это останется у тебя "
+    "и попадёт в твой журнал сезона.</i>"
 )
-FACT_SAVED = "Спасибо, записала ✅ Твой факт теперь в общем списке, с твоим именем — и попадёт в журнал сезона."
+FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
 NOT_UNDERSTOOD = (
     "Не поняла 🙈 Отчёт — это текст, фото, видео, кружок, голосовое или файл. "
     "Пришли что-то из этого, и я поставлю штамп."
@@ -360,12 +360,12 @@ NOT_REPORT_DONE_LATE = "Поняла — убрала из журнала. Со�
 NOT_REPORT_FOREIGN = "Этот отчёт не твой, ничего не трогаю."
 NOT_REPORT_ALREADY = "Этот отчёт уже отменён — всё в порядке."
 EDIT_WEEK_OVER = "Эта неделя уже закрыта — отчёт остаётся как есть. Дописать можно, пока неделя идёт."
-WEEK_ALREADY_OVER = "Эта неделя уже закончилась — задним числом её не меняем. Правка не сохранена."
+WEEK_NOT_FOUND = "Такой недели уже нет — правка не сохранена."
 WEEK_FIELD_REQUIRED = "У объявленной недели название и минимум не стираются — люди их уже видят. Правка не сохранена."
 WEEK_UNTITLED = "без названия"
 WEEK_PICKER_HINT = (
-    "Какую неделю правим?\n\n<i>▶ — идёт сейчас, 🔒 — ещё закрыта, ✏️ — черновик, его видишь только ты. "
-    "Прошедшие не показываю: люди их уже прожили, задним числом не меняем.</i>"
+    "Какую неделю правим?\n\n<i>✓ — прошла, ▶ — идёт сейчас, 🔒 — ещё закрыта, ✏️ — черновик, его видишь только ты. "
+    "Тексты правятся у любой недели; у прошедшей и идущей заморожены только даты.</i>"
 )
 REPLY_DELIVERED = "Отправила ✅"
 REPLY_FAILED = "Не дошло — человек, видимо, заблокировал бота"
@@ -498,17 +498,19 @@ def end_of_season_text(season: SeasonDTO) -> str:
         f"{date_genitive(season.ends_on)} сезон заканчивается, и каждый, кто участвовал, получит "
         "<b>журнал сезона</b> — свой собственный, не общий.\n\n"
         "Внутри будет:\n"
-        "· твои недели и что в них было — твоими же словами\n"
+        "· каждая твоя неделя — задание и твой отчёт по нему, как ты его прислала\n"
         "· фотографии из твоих отчётов\n"
         "· ачивки, которые у тебя набрались\n"
-        "· словарик: слова сезона и слова участников\n"
+        "· словарик: слова недель и твои собственные слова\n"
+        "· факты «что мы узнали» — общие на весь клуб — и твои собственные\n"
         "· несколько слов лично от меня\n\n"
         "Это не сертификат об окончании. Это чтобы в ноябре было видно: "
         "три месяца прожиты, а не пролистаны."
     )
 
 
-def dictionary_text(season: SeasonDTO, view: DictionaryView, names: dict[int, str]) -> str:
+def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
+    """The week words and the reader's own words — personal, so no names (DOMAIN §6)."""
     lines = [f"<b>📖 Словарик сезона · {escape(season.title)}</b>", ""]
     if view.week_words:
         for item in view.week_words:
@@ -521,30 +523,40 @@ def dictionary_text(season: SeasonDTO, view: DictionaryView, names: dict[int, st
     else:
         lines.append("Слова недели появятся вместе с заданиями.")
     if view.user_words:
-        lines += ["", RULE, "", "<b>Слова участников</b>", ""]
+        lines += ["", RULE, "", "<b>Твои слова</b>", ""]
         for entry in view.user_words:
-            text = escape(entry.word) + (f" — {escape(entry.meaning)}" if entry.meaning else "")
-            lines.append(f"{text} <i>— {escape(names.get(entry.user_id, str(entry.user_id)))}</i>")
-    lines += ["", RULE, "", "<i>К концу сезона соберём из них общий словарь.</i>"]
+            lines.append(escape(entry.word) + (f" — {escape(entry.meaning)}" if entry.meaning else ""))
+    lines += ["", RULE, "", "<i>Твои слова видишь только ты — и они будут в твоём журнале сезона.</i>"]
     return "\n".join(lines)
 
 
-def facts_text(season: SeasonDTO, facts: list[FactDTO], names: dict[int, str], *, with_ids: bool = False) -> str:
+def facts_text(
+    season: SeasonDTO,
+    facts: list[FactDTO],
+    names: dict[int, str],
+    *,
+    with_ids: bool = False,
+    viewer_id: int | None = None,
+) -> str:
+    """Mila's facts and the reader's own; another person's name appears only in the admin's list."""
     about = escape(season.title_accusative or season.title)
     if not facts:
         return (
             f"<b>💡 Что мы узнали про {about}</b>\n\n"
             "Пока пусто. Жми «➕ Добавить свой факт» — что зацепило из постов или нашлось само."
         )
-    lines = [f"<b>💡 Что мы узнали про {about}</b>", f"<i>Собрано вместе: {len(facts)}</i>", "", RULE, ""]
+    lines = [f"<b>💡 Что мы узнали про {about}</b>", "", RULE, ""]
     for index, fact in enumerate(facts, 1):
         number = f"<code>{fact.id}</code>" if with_ids else f"<b>{index}.</b>"
         line = f"{number} {escape(fact.text)}"
         if fact.author_id is not None:
-            line += f" <i>— {escape(names.get(fact.author_id, str(fact.author_id)))}</i>"
+            who = "твой" if fact.author_id == viewer_id else escape(names.get(fact.author_id, str(fact.author_id)))
+            line += f" <i>— {who}</i>"
         lines += [line, ""]
     text = "\n".join(lines).rstrip()
-    return text + "\n\n<i>Пополняется после каждого поста. В конце сезона всё это будет в твоём журнале.</i>"
+    return text + (
+        "\n\n<i>Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале.</i>"
+    )
 
 
 def journal_text(view: JournalView, level: Level | None) -> str:

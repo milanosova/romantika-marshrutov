@@ -93,6 +93,8 @@ def more_menu(public_base_url: str) -> InlineKeyboardMarkup:
 
 
 def task_buttons(week_number: int) -> InlineKeyboardMarkup:
+    """Three answers. Mila asked for two (18.09.2026: no «Попробую») — pinned to three by
+    tests/acceptance/test_stage3_bot.py, which only Dima changes (CLAUDE.md rule 5)."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -250,7 +252,7 @@ def achievement_choices(user_id: int, catalogue: list[AchievementTypeDTO]) -> In
 def week_choices(weeks: list[WeekDTO], *, today: date) -> InlineKeyboardMarkup:
     rows = []
     for week in weeks:
-        prefix = "✏️ " if week.is_draft else "▶ " if week.starts_on <= today else "🔒 "
+        prefix = "✏️ " if week.is_draft else "✓ " if week.ends_on < today else "▶ " if week.starts_on <= today else "🔒 "
         title = week.title or ru.WEEK_UNTITLED
         label = f"{prefix}{week.number} · {title}"[:60]
         rows.append([InlineKeyboardButton(text=label, callback_data=f"adm:week:{week.number}")])

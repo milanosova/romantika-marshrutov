@@ -68,6 +68,9 @@ a { color: var(--accent); }
 .screen { max-width: 640px; margin: 0 auto; padding: 14px 14px calc(var(--tabbar) + var(--safe-bottom) + 20px); }
 .screen-head { padding: 6px 2px 12px; }
 .screen-head h1 { font-size: 24px; }
+.screen-head h1.season-title { font-size: 30px; color: var(--accent); margin: 0 0 2px; letter-spacing: -0.01em; }
+.screen-head .date-line { font-size: 19px; font-weight: 600; margin: 0 0 2px; }
+.card.day .daytitle { font-size: 14px; }
 .loading { display: grid; place-items: center; gap: 10px; padding: 80px 0; }
 .spinner { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -95,7 +98,7 @@ a { color: var(--accent); }
 .card.accent { border-color: transparent; background: var(--accent-soft); }
 .card.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .card.locked { opacity: 0.8; }
-.card.day .advice { font-style: italic; margin: 4px 0 8px; }
+.card.day .advice { font-style: italic; margin: 4px 0 0; font-size: 14px; }
 .card .meta { color: var(--muted); font-size: 13px; }
 .kv { margin: 6px 0 0; display: grid; gap: 8px; }
 .kv .k { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 2px; }
@@ -144,6 +147,11 @@ dd { margin: 0; }
 
 /* --- stamps grid (passport) --- */
 .stamps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.legend { list-style: none; margin: 10px 0 0; padding: 0; color: var(--muted); font-size: 13px; }
+.legend li { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+.legend li span { width: 20px; text-align: center; flex: none; }
+ul.plain { margin: 0 0 10px; padding-left: 18px; }
+ul.plain li { margin: 2px 0; }
 .stamp {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; aspect-ratio: 1;
   border: 1px solid var(--line); border-radius: 14px; background: var(--card); font: inherit; color: var(--ink); cursor: pointer; padding: 6px;
@@ -226,8 +234,9 @@ details.card summary::after { content: "›"; color: var(--muted); font-size: 22
 details.card[open] summary::after { transform: rotate(-90deg); }
 details.card .content { margin-top: 10px; }
 .helptext { line-height: 1.5; }
-.helptext b { display: block; margin-top: 12px; }
+.helptext b { display: block; margin-top: 12px; } /* the FAQ: bold lines are headings */
 .helptext b:first-child { margin-top: 0; }
+.richtext { line-height: 1.5; } /* bot texts with inline bold: never split a sentence */
 .rich { white-space: normal; }
 
 /* --- sheet (sub-screen) --- */

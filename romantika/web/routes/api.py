@@ -659,7 +659,7 @@ async def send_letter(
 async def dictionary(
     principal: PrincipalDep, session: SessionDep, season: SeasonDep, today: TodayDep
 ) -> schemas.DictionaryOut:
-    view = await words.season_dictionary(session, season.id, today=today)
+    view = await words.season_dictionary(session, season.id, today=today, viewer_id=principal.user.id)
     names = await people.display_names(session, [item.user_id for item in view.user_words], short=True)
     return schemas.DictionaryOut(
         about=season.title,
@@ -719,7 +719,8 @@ async def add_word(
 
 @router.get("/facts", response_model=schemas.FactsOut)
 async def list_facts(principal: PrincipalDep, session: SessionDep, season: SeasonDep) -> schemas.FactsOut:
-    listed = await facts.list_active(session, season.id)
+    """Mila's facts and the viewer's own (DOMAIN §6); the admin sees everyone's."""
+    listed = await facts.list_active(session, season.id, viewer_id=None if principal.is_admin else principal.user.id)
     names = await people.display_names(session, [f.author_id for f in listed if f.author_id is not None], short=True)
     return schemas.FactsOut(
         about=season.title_accusative or season.title,

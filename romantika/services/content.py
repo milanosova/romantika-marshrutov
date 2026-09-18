@@ -251,17 +251,16 @@ async def update_week(
 ) -> WeekDTO:
     """Edit the texts of a week. Only content fields; the calendar is not editable here.
 
-    «Прошедшие недели задним числом не меняем — люди их уже прожили» (DOMAIN §1, §8): with
-    `today` given, a week that is already over is refused. Callers that edit content on
-    behalf of an admin always pass the Moscow day; `None` skips the calendar check for
-    fixtures and imports.
+    Texts are editable at any time, a finished week included (Mila, 18.09.2026: a mistake
+    found later must be fixable; DOMAIN §1). What a finished week keeps frozen is its
+    calendar and its stamps — the title a stamp carries was frozen when it was awarded.
+    `today` is accepted for the callers that pass it and is not used for a check any more.
     """
+    del today  # kept in the signature for the callers; no calendar check on texts (DOMAIN §1)
     unknown = sorted(set(changes) - EDITABLE_WEEK_FIELDS)
     if unknown:
         raise ValueError(f"week fields {unknown} are not editable (allowed: {sorted(EDITABLE_WEEK_FIELDS)})")
     row = await _week_of_season(session, week_id, season_id)
-    if today is not None and row.announced_at is not None and row.ends_on < today:
-        raise ContentError(f"week {row.number} ended on {row.ends_on} and is not edited afterwards")
     if row.announced_at is not None:
         # An announced week never falls back to a draft: its stamps would be orphaned.
         for field_name in ("title", "task_min"):

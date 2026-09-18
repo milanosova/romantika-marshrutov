@@ -332,11 +332,7 @@ async def handle_admin(
             "Попадёт в его журнал в конце сезона.",
         )
     elif action == "edit":
-        weeks = [
-            week
-            for week in await content.weeks(session, season.id, include_drafts=True)
-            if week.is_draft or week.ends_on >= today
-        ]
+        weeks = await content.weeks(session, season.id, include_drafts=True)  # finished ones too (DOMAIN §1)
         await safe_send(
             bot,
             chat_id,

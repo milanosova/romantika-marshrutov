@@ -270,10 +270,12 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     assert r.status_code == 201 and r.json()["word"] == "sobremesa" and r.json()["freeze_granted"] is True
     home = (await app.client.get("/api/home", headers=app.headers(ALICE))).json()
     assert home["passport"]["freezes_total"] == 3 and home["passport"]["freeze_reasons"] == ["word"]
+    # A participant's words are personal (DOMAIN §6): Bob does not see Alice's, Alice sees her own.
     d = (await app.client.get("/api/dictionary", headers=app.headers(BOB, "Боб"))).json()
     assert d["week_words"][0]["week_number"] == 1 and len(d["week_words"]) == 1, "only released weeks"
-    assert d["user_words"][0]["word"] == "sobremesa" and d["user_words"][0]["mine"] is False
-    assert d["user_words"][0]["author"] == "Алиса"
+    assert d["user_words"] == []
+    mine = (await app.client.get("/api/dictionary", headers=app.headers(ALICE))).json()
+    assert mine["user_words"][0]["word"] == "sobremesa" and mine["user_words"][0]["mine"] is True
 
     assert (
         await app.client.post("/api/facts", json={"text": "Ацтеки называли себя мешика"}, headers=app.headers(ALICE))
@@ -284,6 +286,9 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     facts = (await app.client.get("/api/facts", headers=app.headers(ALICE))).json()
     assert [f["mine"] for f in facts["facts"]] == [True, False]
     assert facts["facts"][0]["author"] == "Алиса" and facts["facts"][1]["author"] is None
+    # Bob sees Mila's fact and not Alice's — facts of participants are personal too.
+    bobs = (await app.client.get("/api/facts", headers=app.headers(BOB, "Боб"))).json()
+    assert [f["author"] for f in bobs["facts"]] == [None]
 
     r = await app.client.post(
         "/api/letters", json={"text": "Мила, я оставила комментарий!"}, headers=app.headers(ALICE)

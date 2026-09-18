@@ -263,6 +263,7 @@ async def participant(
             for r in reports
         ],
         words=[schemas.WordOut(word=w.word, meaning=w.meaning) for w in jview.words],
+        facts=[f.text for f in jview.facts if f.author_id == user_id],
     )
 
 

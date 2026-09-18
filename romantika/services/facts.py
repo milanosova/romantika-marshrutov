@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
@@ -45,13 +45,19 @@ async def add(
     return row.id
 
 
-async def list_active(session: AsyncSession, season_id: int) -> list[FactDTO]:
-    """Facts of the season that were not removed, oldest first."""
+async def list_active(session: AsyncSession, season_id: int, *, viewer_id: int | None = None) -> list[FactDTO]:
+    """Facts of the season that were not removed, oldest first.
+
+    With a `viewer_id`: Mila's facts (no author) plus the viewer's own — a participant's facts
+    are personal (DOMAIN §6, 15.09.2026). Without one, everything: the admin's view.
+    """
     query = (
         select(models.Fact)
         .where(models.Fact.season_id == season_id, models.Fact.deleted_at.is_(None))
         .order_by(models.Fact.created_at, models.Fact.id)
     )
+    if viewer_id is not None:
+        query = query.where(or_(models.Fact.author_id.is_(None), models.Fact.author_id == viewer_id))
     return [
         FactDTO(
             id=row.id,
