@@ -295,6 +295,21 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     assert (await app.client.post("/api/letters", json={"text": ""}, headers=app.headers(ALICE))).status_code == 422
 
 
+async def test_validation_errors_speak_russian(app: App) -> None:
+    """The app shows `detail` as is, so pydantic's JSON must never reach a person."""
+    too_long = await app.client.post("/api/words", json={"text": "x" * 4001}, headers=app.headers(ALICE))
+    assert too_long.status_code == 422
+    assert too_long.json()["detail"] == "текст длиннее 4000 знаков"
+
+    blank = await app.client.post("/api/letters", json={"text": "   "}, headers=app.headers(ALICE))
+    assert blank.status_code == 422
+    assert blank.json()["detail"] == "пустой текст"
+
+    garbage = await app.client.post("/api/words", json={"text": 5}, headers=app.headers(ALICE))
+    assert garbage.status_code == 422
+    assert garbage.json()["detail"] == "не поняла, что прислали — попробуй ещё раз"
+
+
 # --- admin extras ------------------------------------------------------------------
 
 

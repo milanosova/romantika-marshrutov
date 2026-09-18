@@ -123,7 +123,10 @@ def greeting(season: SeasonDTO | None, *, app: bool = False) -> str:
 OPEN_CLUB = "🎒 Открыть клуб"
 """The one button under the chat: it opens the Mini App (DOMAIN §7)."""
 
-GREETING_CTA = "\n\nВсё остальное — паспорт, журнал, словарь — за кнопкой ниже 👇"
+GREETING_CTA = (
+    "\n\nВсё остальное — за кнопкой ниже 👇 Там три вкладки: «Неделя» с заданием, "
+    "«Рюкзак» с паспортом и журналом, «Сезон» со словарём."
+)
 """The bot appends this to the greeting; the Mini App shows the greeting without it."""
 
 OPEN_CLUB_HINT = "Паспорт, журнал, словарь и задание недели — в приложении. Открой его кнопкой ниже 👇"
@@ -131,6 +134,10 @@ OPEN_CLUB_HINT = "Паспорт, журнал, словарь и задание
 
 OPEN_CLUB_LINK = "Паспорт, журнал, словарь и задание недели — в приложении: {url}"
 """The same answer without a button: the address is not https, so Telegram allows no web_app."""
+
+API_TOO_LONG = "текст длиннее {limit} знаков"
+API_BAD_INPUT = "не поняла, что прислали — попробуй ещё раз"
+"""What the Mini App shows when a request body fails validation (web/app.py)."""
 
 
 #: (heading, answer in the bot, answer in the Mini App or None when it is the same).
@@ -209,8 +216,8 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         "Что-то другое",
         "Нажми «✉️ Написать Миле» под этим сообщением — это обычное сообщение, не отчёт по заданию. "
         "Я прочитаю и отвечу. Это я, а не робот.",
-        "Напиши мне в чат с ботом — это обычное сообщение, не отчёт по заданию. "
-        "Я прочитаю и отвечу. Это я, а не робот.",
+        "Напиши мне: в «Рюкзаке» у заморозок есть форма письма, а в чате с ботом — /help → "
+        "«✉️ Написать Миле». Это обычное сообщение, не отчёт по заданию. Я прочитаю и отвечу. Это я, а не робот.",
     ),
 )
 

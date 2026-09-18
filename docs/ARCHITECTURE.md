@@ -213,8 +213,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 - Reply keyboard (DOMAIN.md §7, 14.09.2026): one `web_app` button «🎒 Открыть клуб»
   (`keyboards.main_keyboard`; a plain label when `PUBLIC_BASE_URL` is not https — Telegram
   refuses `web_app` over http — answered with a link), admin panel «⚙️» below it for admins.
-  `setMyCommands` lists `start` and `help` only (`romantika.ops.telegram_setup`); the menu
-  button is the same door. The legacy labels and commands (Задание / Сегодня / Паспорт /
+  `setMyCommands` lists `start` and `help` only and the menu button is the same door — both
+  applied by the bot at every start (`romantika.ops.telegram_setup.apply_menu` from
+  `bot/main.py`; `MenuButtonCommands` when the base URL is not https), the name and the
+  descriptions by `python -m romantika.ops.telegram_setup` by hand. The legacy labels and commands (Задание / Сегодня / Паспорт /
   Словарь / Что узнали / Ещё / Помощь / Написать Миле, `/task` …) keep answering — cached
   keyboards live until the next `/start`. Button detection by normalized word
   (emoji-insensitive) as in legacy. `/help` carries «✉️ Написать Миле» (`help_buttons`):

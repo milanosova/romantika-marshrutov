@@ -37,3 +37,10 @@ def test_empty_media_dir_fails_with_an_explicit_message(monkeypatch: pytest.Monk
 def test_packaged_data_dir_holds_the_season_content() -> None:
     assert (DATA_DIR / "tzolkin.json").is_file()
     assert (DATA_DIR / "seasons" / "mexico-2026.json").is_file()
+
+
+def test_public_base_url_loses_its_trailing_slash(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("MEDIA_DIR", str(tmp_path / "media"))
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://romantika.example.test/ ")
+
+    assert Settings(_env_file=None).public_base_url == "https://romantika.example.test"

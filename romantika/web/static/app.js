@@ -10,7 +10,7 @@
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
   const TAB_ALIASES = { today: "week", passport: "bag", journal: "bag", words: "season", more: "season" };
-  const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, dictionary: null, facts: null, files: [], clientId: null, sent: null };
+  const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, dictionary: null, facts: null, files: [], clientId: null };
 
   boot();
 
@@ -106,7 +106,7 @@
   // Every report of the running week, not only the last one: the journal's cards, filtered.
   async function renderWeekReportsInto(box, w) {
     let j;
-    try { j = state.journal = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    try { j = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
     if (state.tab !== "week" || !box.isConnected) return;
     const rs = j.reports.filter((r) => r.week_number === w.number);
     if (!rs.length) { box.innerHTML = ""; return; }
@@ -233,7 +233,6 @@
     try {
       const r = await RM.upload("/api/reports", form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; });
       RM.haptic("success");
-      state.sent = r;
       state.clientId = RM.uid();
       await refreshHome();
       renderWeek(); // the task card above changes too: the intent question gives way to the stamp
@@ -256,33 +255,14 @@
     const canRaise = !r.out_of_week && r.stamp_level === "min";
     box.innerHTML = `<div class="row between"><h2 style="margin:0">${r.out_of_week ? "Сохранила" : "Принято"}</h2>${stampChip(w)}</div>
       <div class="result ${r.out_of_week ? "" : "ok"}"><div class="rich">${html(r.message)}</div></div>
-      <div class="row" style="margin-top:12px">
-        ${canRaise ? `<button class="btn soft small" id="fix-level">⭐ Это был максимум</button>` : ""}
-        ${!r.out_of_week ? `<button class="btn soft small" id="edit-sent">✏️ Поправить</button><button class="btn ghost small" id="not-report">Это не отчёт</button>` : ""}
-      </div>
-      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Поправить текст и фото можно до конца недели — в «Журнале» тоже."}</p>
+      ${canRaise ? `<div class="row" style="margin-top:12px"><button class="btn soft small" id="fix-level">⭐ Это был максимум</button></div>` : ""}
+      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Отчёт теперь в списке ниже: там его можно поправить, пока неделя идёт, или пометить «это не отчёт»."}</p>
       <button class="btn link" id="again" style="margin-top:4px">Отправить ещё один</button>`;
     if ($("fix-level")) $("fix-level").addEventListener("click", async () => {
       try {
         const res = await RM.api(`/api/weeks/${r.week_number}/level`, { method: "POST", body: { level: "max" } });
         RM.alert(res.message.replace(/<[^>]+>/g, ""));
         if (res.ok) { r.stamp_level = res.stamp_level; r.level = "max"; r.message = res.message; await refreshHome(); renderWeek(); showResult(r); }
-      } catch (e) { RM.toast(e.message); }
-    });
-    if ($("edit-sent")) $("edit-sent").addEventListener("click", async () => {
-      try {
-        const j = await RM.api("/api/journal");
-        const report = j.reports.find((x) => x.id === r.report_id);
-        if (report) openEditor(report, async () => { await refreshHome(); renderWeek(); });
-      } catch (e) { RM.toast(e.message); }
-    });
-    if ($("not-report")) $("not-report").addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
-      try {
-        const res = await RM.api(`/api/reports/${r.report_id}/cancel`, { method: "POST", body: {} });
-        RM.alert(res.message.replace(/<[^>]+>/g, ""));
-        await refreshHome();
-        renderWeek();
       } catch (e) { RM.toast(e.message); }
     });
     $("again").addEventListener("click", () => { box.innerHTML = composerHtml(w); bindComposer(w); });
@@ -486,7 +466,9 @@
     let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1>${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
     // Weeks as a chronicle, newest first; future weeks are not shown (DOMAIN §1).
     out += `<h3>Недели</h3>`;
-    out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▸" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${w.state === "current" ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
+    // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
+    const running = (w) => h.week && w.id === h.week.id;
+    out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${running(w) ? "▸" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
     out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой. За первое слово — ❄️ +1 заморозка.</p>
       <input id="word-text" placeholder="слово — что оно значит"><button class="btn block" id="word-send" style="margin-top:10px">Записать</button></div>`;
     out += `<h3>Слова недели</h3>`;
@@ -511,7 +493,7 @@
       const text = $("fact-text").value.trim();
       if (!text) return RM.toast("Напиши факт");
       $("fact-send").disabled = true;
-      try { const r = await RM.api("/api/facts", { method: "POST", body: { text } }); RM.haptic("success"); RM.toast(r.message.replace(/<[^>]+>/g, "")); renderSeason(); }
+      try { const r = await RM.api("/api/facts", { method: "POST", body: { text } }); RM.haptic("success"); RM.toast(r.message.replace(/<[^>]+>/g, "")); await rerenderSeasonInPlace(); }
       catch (e) { $("fact-send").disabled = false; RM.toast(e.message); }
     });
     $("word-send").addEventListener("click", async () => {
@@ -523,9 +505,16 @@
         RM.haptic("success");
         RM.alert(r.message.replace(/<[^>]+>/g, ""));
         await refreshHome();
-        renderSeason();
+        await rerenderSeasonInPlace();
       } catch (e) { $("word-send").disabled = false; RM.toast(e.message); }
     });
+  }
+
+  // After «Записать» the person stays where they were, not at the top of the tab.
+  async function rerenderSeasonInPlace() {
+    const y = window.scrollY;
+    await renderSeason();
+    window.scrollTo(0, y);
   }
 
   // --- helpers -------------------------------------------------------------------------
