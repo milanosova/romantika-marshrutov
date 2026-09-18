@@ -127,10 +127,26 @@ async def test_the_first_own_fact_earns_a_freeze_and_the_second_does_not(
 
 
 async def test_mila_own_fact_earns_her_nothing(harness: Harness, db_session: AsyncSession) -> None:
-    """Her facts are the club's, not personal: no author, no freeze (DOMAIN §6)."""
+    """Her facts are the club's, not personal: no author, no freeze (DOMAIN §6) — and the
+    screen must not promise her one either (critic-code, 19.09)."""
     await harness.callback(ADMIN_ID, "addfact")
     await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")
     assert await count(db_session, models.Freeze) == 0
+
+    await harness.text(ADMIN_ID, "💡 Что узнали")
+    assert "+1 заморозка" not in harness.session.last_text(ADMIN_ID), "she can never earn it"
+
+
+async def test_the_facts_screen_offers_the_freeze_until_it_is_earned(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    await harness.text(ALICE, "💡 Что узнали")
+    assert "За первый свой факт" in harness.session.last_text(ALICE)
+
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Какао было валютой")
+    await harness.text(ALICE, "💡 Что узнали")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE), "the freeze is in the passport now"
 
 
 async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:

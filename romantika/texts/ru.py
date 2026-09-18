@@ -95,8 +95,10 @@ def deadline_text(week: WeekDTO) -> str:
     return f"{WEEKDAYS_NOMINATIVE[week.ends_on.weekday()]} {week.ends_on:%d.%m}, 18:00"
 
 
-#: The word Mila writes in a week's name («Неделя rola [музыка]», as the channel names it).
-_LEADING_WEEK = re.compile(r"^\s*неделя\s+", re.IGNORECASE)
+#: «Неделя rola [музыка]» — the way the channel names a week: the word, then the week's own
+#: word in Spanish. Only a latin word after «Неделя» is trimmed, so «Неделя памяти» — a name
+#: written in Russian — survives whole (critic-ui, 19.09.2026).
+_LEADING_WEEK = re.compile(r"^\s*неделя\s+(?=[a-z])", re.IGNORECASE)
 
 
 def week_name(title: str) -> str:
@@ -577,6 +579,7 @@ def facts_text(
     *,
     with_ids: bool = False,
     viewer_id: int | None = None,
+    freeze_offer: bool = False,
 ) -> str:
     """Mila's facts and the reader's own; another person's name appears only in the admin's list."""
     about = escape(season.title_accusative or season.title)
@@ -584,6 +587,7 @@ def facts_text(
         return (
             f"<b>💡 Что мы узнали про {about}</b>\n\n"
             "Пока пусто. Жми «➕ Добавить свой факт» — что зацепило из постов или нашлось само."
+            + (" За первый свой факт — ❄️ +1 заморозка." if freeze_offer else "")
         )
     lines = [f"<b>💡 Что мы узнали про {about}</b>", "", RULE, ""]
     for index, fact in enumerate(facts, 1):
@@ -595,7 +599,7 @@ def facts_text(
         lines += [line, ""]
     text = "\n".join(lines).rstrip()
     tail = "Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале."
-    if viewer_id is not None and not any(fact.author_id == viewer_id for fact in facts):
+    if freeze_offer:  # the caller knows whether the freeze is still to be earned (DOMAIN §3)
         tail += " За первый свой факт — ❄️ +1 заморозка."
     return f"{text}\n\n<i>{tail}</i>"
 

@@ -111,3 +111,35 @@ async def test_late_downgrade_refuses_while_late_reports_exist(engine: AsyncEngi
         await connection.execute(sa.text("DELETE FROM reports WHERE user_id = 9002"))
         await connection.execute(sa.text("DELETE FROM users WHERE id = 9002"))
         await connection.execute(sa.text("DELETE FROM seasons WHERE id = 9001"))
+
+
+async def test_fact_freeze_downgrade_refuses_while_such_freezes_exist(engine: AsyncEngine, database_url: str) -> None:
+    """`e7f8a9b0c1d2`: the previous release forbids `reason = 'fact'` by its CHECK constraint,
+    so the downgrade refuses until no freeze was earned that way (DOMAIN §3, 19.09.2026)."""
+    import pytest
+
+    async with engine.begin() as connection:
+        await connection.execute(
+            sa.text(
+                "INSERT INTO seasons (id, slug, title, title_accusative, hashtag, starts_on, ends_on, status) "
+                "VALUES (9002, 'fact-probe', 'Проба', 'Пробу', '#проба', '2026-01-05', '2026-03-29', 'draft')"
+            )
+        )
+        await connection.execute(sa.text("INSERT INTO users (id, joined_at) VALUES (9002, now())"))
+        await connection.execute(
+            sa.text("INSERT INTO freezes (season_id, user_id, reason) VALUES (9002, 9002, 'fact')")
+        )
+
+    with pytest.raises(Exception, match="first fact"):
+        await asyncio.to_thread(run_alembic, database_url, "d5e6f7a8b9c0", downgrade=True)
+    async with engine.connect() as connection:
+        kept = await connection.scalar(sa.text("SELECT count(*) FROM freezes WHERE reason = 'fact'"))
+    assert kept == 1, "the refusal left the participant's freeze untouched (CLAUDE.md rule 1)"
+
+    async with engine.begin() as connection:
+        await connection.execute(sa.text("DELETE FROM freezes WHERE season_id = 9002"))
+    await asyncio.to_thread(run_alembic, database_url, "d5e6f7a8b9c0", downgrade=True)
+    await asyncio.to_thread(run_alembic, database_url, "head")
+    async with engine.begin() as connection:
+        await connection.execute(sa.text("DELETE FROM users WHERE id = 9002"))
+        await connection.execute(sa.text("DELETE FROM seasons WHERE id = 9002"))

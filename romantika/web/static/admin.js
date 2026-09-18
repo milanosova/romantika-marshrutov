@@ -169,7 +169,7 @@
         <div class="tile"><div class="big">${p.stamps} <span class="muted">/ ${p.weeks_total}</span></div><div class="label">штампов${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}</div></div>
         <div class="tile"><div class="big">${esc(RM.levelLabel(p.level))}</div><div class="label">статус · цепочка ${p.current_streak}/${p.best_streak}</div></div>
       </div>
-      <div class="card"><h3 style="margin-top:0">Штампы по неделям</h3><div class="stampbar">${d.weeks.map((w) => `<button data-week="${w.number}" class="${w.level || ""}" title="${esc(w.title)}">${w.number} ${w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : (RM.stateMark[w.state] || "·")}</button>`).join("")}</div>
+      <div class="card"><h3 style="margin-top:0">Штампы по неделям</h3><div class="stampbar">${d.weeks.map((w) => `<button data-week="${w.number}" class="${w.level || ""}" title="${esc(RM.weekName(w.title))}">${w.number} ${w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : (RM.stateMark[w.state] || "·")}</button>`).join("")}</div>
         <div id="stamp-pick" hidden></div>
         <p class="note">Нажми на неделю и выбери штамп. Ручной штамп важнее автоматического: отчёты его не перебивают.</p></div>
       <div class="card"><h3 style="margin-top:0">Заморозка · осталось ${p.freezes_left} из ${p.freezes_total}</h3>
@@ -354,14 +354,14 @@
         } catch (err) { const why = calendarError(err); RM.toast(textsSaved ? "Тексты сохранила, а даты нет: " + why.charAt(0).toLowerCase() + why.slice(1) : why, 5000); }
       });
       if ($("week-announce")) $("week-announce").addEventListener("click", async () => {
-        if (!(await RM.confirm(`Объявить неделю ${w.number} «${w.title}»? Её увидят участники; назад в черновик её не вернуть.`))) return;
+        if (!(await RM.confirm(`Объявить неделю ${w.number} «${RM.weekName(w.title)}»? Её увидят участники; назад в черновик её не вернуть.`))) return;
         try {
           Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}/announce`, { method: "POST" }));
           RM.haptic("success"); RM.toast("Объявила"); closeSheet(); renderContent();
         } catch (err) { RM.toast(calendarError(err), 5000); }
       });
       if ($("week-del")) $("week-del").addEventListener("click", async () => {
-        if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${w.title}»` : ""}? Это записывается в «Изменения».`))) return;
+        if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${RM.weekName(w.title)}»` : ""}? Это записывается в «Изменения».`))) return;
         try {
           await RM.api(`/api/admin/weeks/${w.id}`, { method: "DELETE" });
           state.weeks = state.weeks.filter((x) => x.id !== w.id);
@@ -393,7 +393,7 @@
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
         <b>Отчёты</b> Человек присылает боту текст или фото — или отправляет их из приложения. Текст = минимум ✅, фото или видео = максимум ⭐. Копия приходит тебе в чат с шапкой «📨 Отчёт за неделю N от…»; ответь на неё реплаем — бот передаст автору.
         <b>Штампы</b> Ставятся сами по первому отчёту недели и никогда не понижаются (кроме «это не отчёт»). Ручной штамп ставишь во вкладке «Люди»; он важнее автоматического.
-        <b>Заморозки</b> Две базовые, до пяти. Пропущенная неделя тратит одну сама. За слово в словарике и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
+        <b>Заморозки</b> Две базовые, до пяти. Пропущенная неделя тратит одну сама. За слово в словарике, за свой факт про страну и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
         <b>Задания</b> Тексты любой недели — и прошедшей тоже — правятся во вкладке «Задания» и появляются в боте сразу. У прошедшей и идущей недели заморожены только даты.
         <b>Сводка</b> Вкладка «Неделя»: кто взялся, кто сдал, ядро (две недели подряд) и черновик «Привала».
         <b>Письма</b> Вкладка «Письма»: всё, что пришло не отчётом. Ответ отсюда или реплаем в чате — одно и то же, письмо помечается отвеченным.

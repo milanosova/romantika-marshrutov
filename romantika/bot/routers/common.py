@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from romantika.bot import keyboards
 from romantika.bot.send import safe_send
 from romantika.config import Settings
+from romantika.db import models
 from romantika.domain.tzolkin import tzolkin_day
 from romantika.services import content, facts, freezes, journal, passport, people, stamps, words
 from romantika.services.content import SeasonDTO
@@ -93,10 +94,20 @@ async def send_facts(
         return
     listed = await facts.list_active(session, season.id, viewer_id=None if is_admin else viewer_id)
     names = await people.display_names(session, [f.author_id for f in listed if f.author_id is not None], short=True)
+    # Mila's facts are the club's and earn her nothing; a participant is offered the freeze
+    # until it is in their passport — the app reads the same list (DOMAIN §3).
+    earned = [] if is_admin else await freezes.reasons(session, season.id, viewer_id)
     await safe_send(
         bot,
         chat_id,
-        ru.facts_text(season, listed, names, with_ids=is_admin, viewer_id=viewer_id),
+        ru.facts_text(
+            season,
+            listed,
+            names,
+            with_ids=is_admin,
+            viewer_id=viewer_id,
+            freeze_offer=not is_admin and models.FreezeReason.FACT.value not in earned,
+        ),
         reply_markup=keyboards.facts_buttons(is_admin=is_admin, has_facts=bool(listed)),
     )
 

@@ -49,6 +49,7 @@ def test_week_name_drops_the_word_mila_writes_in_the_title() -> None:
     assert ru.week_name("Неделя rola [музыка]") == "rola [музыка]"
     assert ru.week_name("неделя antojo [еда]") == "antojo [еда]"
     assert ru.week_name("Недели города") == "Недели города", "only the standalone word is dropped"
+    assert ru.week_name("Неделя памяти") == "Неделя памяти", "a Russian name is a name"
     assert ru.week_name("За столом") == "За столом"
     assert ru.week_name("Неделя") == "Неделя", "a title of one word survives as it is"
     assert ru.week_name("") == ""
@@ -60,8 +61,12 @@ def test_the_task_of_a_week_says_its_number_once() -> None:
     assert "Неделя rola" not in ru.task_text(named)
 
 
-def test_a_week_nobody_has_seen_keeps_its_placeholder() -> None:
-    """The app sends «Неделя 7» as the name of a week that has not opened: trimming it would
-    leave a bare «7» in the sheet's heading (critic-code, 19.09)."""
-    assert ru.week_name("Неделя 7") == "7", "the helper itself trims"
-    # The app compares the raw title with the placeholder before trimming — see app.js openWeek.
+def test_only_a_foreign_word_is_trimmed_after_the_word_week() -> None:
+    """Mila writes «Неделя rola [музыка]» — the word, then the week's own word in Spanish.
+    A name written in Russian («Неделя памяти») is a name, not a repetition (critic-ui, 19.09);
+    so is the placeholder the API sends for a week nobody has seen («Неделя 7», views.py)."""
+    assert ru.week_name("Неделя rola [музыка]") == "rola [музыка]"
+    assert ru.week_name("НЕДЕЛЯ libro") == "libro"
+    assert ru.week_name("Неделя памяти") == "Неделя памяти"
+    assert ru.week_name("Неделя тишины") == "Неделя тишины"
+    assert ru.week_name("Неделя 7") == "Неделя 7"

@@ -261,9 +261,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   text passes through it (`safe_send`).
 - `romantika.texts.ru.week_name(title) -> str` (mirrored by `RM.weekName` in `static/tg.js` and
   exposed to the public page as the `week_name` Jinja filter) drops the
-  leading «Неделя » Mila writes in a week's name, so a screen that prints the number itself
-  («Неделя N ·», «N. ») never says the word twice (DOMAIN §7). The name is stored as she typed
-  it; only the printing side trims.
+  leading «Неделя » Mila writes in a week's name — but only before a latin word, so a Russian
+  name («Неделя памяти») and the placeholder of an unopened week («Неделя 7») survive whole.
+  A screen that prints the number itself («Неделя N ·», «N. ») then never says the word twice
+  (DOMAIN §7). The name is stored as she typed it; only the printing side trims.
 - `romantika.bot.keyboards.normalize_button(text) -> str` (drops emoji/variation selectors,
   collapses spaces, lower-cases) and `button_action(text) -> str | None` with actions
   `app, task, today, passport, words, facts, more, help, write, admin`; a message that starts
