@@ -84,7 +84,7 @@
           ${w.task_max ? `<div><div class="k">Максимум ⭐ · на вечер</div><div class="v">${esc(w.task_max)}</div></div>` : ""}
         </div>
         ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
-        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."} Прислать ещё можно ниже.</p>` : `<h3>Берёшься?</h3>
+        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."}</p>` : `<h3>Берёшься?</h3>
         <div class="segment" id="intent">${["take", "try", "skip"].map((c) => `<button data-choice="${c}" class="${w.intent === c ? "active" : ""}">${RM.intentName[c]}</button>`).join("")}</div>
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь» или «Попробую»."}</p>`}
       </div>`;
@@ -180,7 +180,7 @@
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
     return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
-      <textarea id="report-text" maxlength="4000" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
+      <textarea id="report-text" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
       <div class="attach"><label class="btn soft small" for="report-files">📷 Фото или видео</label><input id="report-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="files-count"></span></div>
       <div class="previews" id="previews" hidden></div>
       <div class="bar" id="bar" hidden><i></i></div>
@@ -255,9 +255,14 @@
     } catch (e) {
       RM.haptic("error");
       button.disabled = false;
-      button.textContent = "Отправить ещё раз";
       bar.hidden = true;
-      RM.toast("Не отправилось: " + e.message + ". Нажми ещё раз — второго отчёта не будет.", 4500);
+      if (e.status === 422) { // the server refused what was typed: a retry as is will not help
+        button.textContent = "Отправить";
+        RM.toast(e.message, 4500);
+      } else {
+        button.textContent = "Отправить ещё раз";
+        RM.toast("Не отправилось: " + e.message + ". Нажми ещё раз — второго отчёта не будет.", 4500);
+      }
     }
   }
 
@@ -297,7 +302,7 @@
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>
-        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · ◦ пропущена или была до твоего прихода · 🔒 откроется в понедельник. Нажми на неделю — откроется задание; за прошедшую можно дописать в журнал.</p></div>`;
+        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · ◦ пропущена или была до твоего прихода · 🔒 откроется в понедельник. Нажми на неделю — откроется задание; за прошедшую можно добавить в журнал.</p></div>`;
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="journal-box">${loading()}</div>`;
@@ -378,7 +383,8 @@
       <p class="note" id="late-note" style="margin:8px 0 0">${lateNote(late)}</p>`;
     // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
     // After an edit or a cancel the sheet is reopened from fresh state: the week's stamp may have moved.
-    bindReportActions(box, j, async () => { await syncBag(); openWeek(w.number); });
+    bindReportActions(box, j, async () => { state.sheetReturn = null; await syncBag(); openWeek(w.number); });
+    box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { state.sheetReturn = () => openWeek(w.number); }));
     $("late-open").addEventListener("click", () => {
       const form = document.createElement("div");
       form.className = "composer";
@@ -445,14 +451,14 @@
     const week = (state.home.weeks || []).find((w) => w.number === r.week_number);
     const added = [], removed = new Set();
     const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
-      <textarea id="edit-text" maxlength="4000" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
+      <textarea id="edit-text" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
       ${r.media.length ? `<p class="note" style="margin:10px 0 4px">Файлы в отчёте — нажми, чтобы убрать</p><div class="previews" id="edit-existing">${r.media.map((m) => `<button class="pv keep" data-id="${m.id}" title="${esc(m.mime || "")}">${m.mime && m.mime.startsWith("image/") && m.downloaded ? `<img src="${m.url}" alt="">` : `<span>${kindName(m.mime && m.mime.startsWith("video/") ? "video" : "document")}</span>`}<span class="x" aria-hidden="true">✕</span></button>`).join("")}</div>` : ""}
       <div class="attach" style="margin-top:10px"><label class="btn soft small" for="edit-files">📷 Добавить фото или видео</label><input id="edit-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="edit-count"></span></div>
       <div class="previews" id="edit-previews" hidden></div>
       <div class="bar" id="edit-bar" hidden><i></i></div>
       <button class="btn block" id="edit-save" style="margin-top:12px">Сохранить</button>
       <p class="note" style="margin:8px 0 0">${r.late ? "Штамп это не трогает: поздний отчёт живёт только в журнале." : "После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум."}</p>`;
-    openSheet("Поправить отчёт", body, () => {
+    openSheet(r.late ? "Поправить запись" : "Поправить отчёт", body, () => {
       const existing = $("edit-existing");
       if (existing) existing.querySelectorAll(".pv").forEach((b) => b.addEventListener("click", () => {
         const id = b.dataset.id;
@@ -593,5 +599,8 @@
     $("sheet").hidden = true;
     document.body.style.overflow = "";
     RM.onBack(null);
+    const back = state.sheetReturn;
+    state.sheetReturn = null;
+    if (back) back(); // the editor was opened over the week sheet: come back to it
   }
 })();

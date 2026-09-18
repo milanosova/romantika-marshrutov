@@ -403,6 +403,8 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
     week_dto = await content.week_by_number(session, season.id, week.number)
     assert week_dto is not None
     if row.late:
+        # The retried answer must read like the first one: the same chapter, the same stamp.
+        others = await reports.count_for_week(session, user_id=row.user_id, week_id=week.id) - 1
         return schemas.ReportResult(
             report_id=row.id,
             week_number=week.number,
@@ -410,7 +412,7 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
             level=row.level,
             stamp_level=stamp.value if stamp else None,
             freeze_granted=False,
-            message=ru.late_receipt(week_dto, first_of_week=True),
+            message=ru.late_receipt(week_dto, first_of_week=others <= 0, stamped=stamp is not None),
             late=True,
         )
     return schemas.ReportResult(
@@ -515,6 +517,7 @@ async def edit_report(
             (text or "").strip() or None,
             added=len(result.media_ids),
             removed=result.removed,
+            late=result.late,
         ),
         media_ids=result.media_ids,
         report_id=report_id,
