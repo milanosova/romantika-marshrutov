@@ -687,13 +687,12 @@ def admin_fact_added(author: str, text: str, week_number: int | None = None) -> 
     return f"💡 Новый факт от {escape(author)}{where}: {escape(text)}"
 
 
-def admin_late_header(week_number: int, author: str, text: str | None, kind: str) -> str:
-    """Mila's copy of a report for a week that has ended: no stamp behind it (DOMAIN §2)."""
+def admin_late_header(week_number: int, author: str, text: str | None, kind: str, *, stamped: bool = False) -> str:
+    """Mila's copy of a report for a week that has ended (DOMAIN §2): the stamp line agrees
+    with the participant's receipt — the week's stamp stays as it is, or there is none."""
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
-    return (
-        f"📨 {escape(author)} дослала за неделю {week_number}{body}"
-        "\n\n<i>Штамп не ставится. Ответь реплаем — передам.</i>"
-    )
+    stamp = "Штамп за неделю как был." if stamped else "Штамп не ставится."
+    return f"📨 {escape(author)} дослала за неделю {week_number}{body}\n\n<i>{stamp} Ответь реплаем — передам.</i>"
 
 
 def admin_out_of_week_header(author: str, text: str | None, kind: str) -> str:

@@ -380,7 +380,7 @@
     box.innerHTML = `${notice ? `<div class="result ok" style="margin-bottom:12px"><div class="rich">${html(notice)}</div></div>` : ""}
       ${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
       <button class="btn block" id="late-open" style="margin-top:10px">${late.again ? "Дописать в журнал" : "Добавить в журнал"}</button>
-      <p class="note" id="late-note" style="margin:8px 0 0">${lateNote(late)}</p>`;
+      <p class="note" id="late-note" style="margin:8px 0 0"${notice ? " hidden" : ""}>${lateNote(late)}</p>`;
     // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
     // After an edit or a cancel the sheet is reopened from fresh state: the week's stamp may have moved.
     bindReportActions(box, j, async () => { state.sheetReturn = null; await syncBag(); openWeek(w.number); });
@@ -457,7 +457,7 @@
       <div class="previews" id="edit-previews" hidden></div>
       <div class="bar" id="edit-bar" hidden><i></i></div>
       <button class="btn block" id="edit-save" style="margin-top:12px">Сохранить</button>
-      <p class="note" style="margin:8px 0 0">${r.late ? "Штамп это не трогает: поздний отчёт живёт только в журнале." : "После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум."}</p>`;
+      <p class="note" style="margin:8px 0 0">${r.late ? "Штамп это не трогает: поздняя запись живёт только в журнале." : "После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум."}</p>`;
     openSheet(r.late ? "Поправить запись" : "Поправить отчёт", body, () => {
       const existing = $("edit-existing");
       if (existing) existing.querySelectorAll(".pv").forEach((b) => b.addEventListener("click", () => {

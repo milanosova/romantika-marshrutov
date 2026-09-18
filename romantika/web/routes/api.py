@@ -286,7 +286,9 @@ async def submit_report(
         week = await content.week_by_number(session, season.id, result.week_number)
         assert week is not None
         message = ru.late_receipt(week, first_of_week=result.first_of_week, stamped=result.stamp_level is not None)
-        header = ru.admin_late_header(week.number, author, incoming.text, kind.value)
+        header = ru.admin_late_header(
+            week.number, author, incoming.text, kind.value, stamped=result.stamp_level is not None
+        )
         week_id = week.id
         letter_id: int | None = None
     elif result.out_of_week or result.week_number is None:
