@@ -6,11 +6,14 @@ For participants: the day of the Maya calendar is four lines now — the label, 
 its sign, what it means, and «Узнай своё предназначение →» where the calendar link used to
 sit. The status line says what the deadline is for («дедлайн задания до воскресенья, 18:00»).
 The task card carries the week's name as Mila wrote it, with no number in front; every screen
-that prints the number itself («Неделя 3 · …», «3. …») drops the word «Неделя» from the name,
-so a week named as the channel names it («Неделя rola [музыка]») never says it twice. The
+that prints the number itself («Неделя 3 · …», «3. …») drops the word «Неделя» from the name
+when a latin word follows it, so a week named as the channel names it («Неделя rola [музыка]»)
+never says it twice, while a Russian name («Неделя памяти») stays whole. The
 season's name on the «Сезон» tab is in the accent colour, like on «Неделя». **The first own
 fact of a season earns a freeze**, like the first own word: the form promises it, the sheet
-lists it, the answer carries it and the tile above redraws. The end-of-season list no longer
+lists it, the answer carries it and the tile above redraws; the bot promises a freeze only
+while `freezes.pending` says it can still be earned — never to Mila, whose facts are the
+club's, and never above the ceiling. The end-of-season list no longer
 guesses the reader's gender and no longer names the month.
 
 For Mila: name the weeks as the channel does — the guide says what the screens then show.

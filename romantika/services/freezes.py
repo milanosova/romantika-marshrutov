@@ -123,6 +123,20 @@ async def total(session: AsyncSession, season_id: int, user_id: int) -> int:
     )
 
 
+async def pending(session: AsyncSession, *, season_id: int, user_id: int, reason: models.FreezeReason) -> bool:
+    """Can this person still earn the freeze given for `reason`?
+
+    The screens promise a bonus («За первый свой факт — ❄️ +1 заморозка»), and the promise has
+    to be true: the freeze is granted once a season, and never above the ceiling (DOMAIN §3).
+    """
+    if reason not in AUTO_REASONS:
+        return False
+    season = await content.require_season(session, season_id)
+    if season.base_freezes + await bonus_count(session, season_id, user_id) >= season.max_freezes:
+        return False
+    return reason.value not in await reasons(session, season_id, user_id)
+
+
 async def reasons(session: AsyncSession, season_id: int, user_id: int) -> list[str]:
     """Reasons of the earned freezes in the order they were granted (passport footnote)."""
     query = (

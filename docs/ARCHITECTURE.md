@@ -318,7 +318,9 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   has ended and after the stamp; a repeated answer is stored but not copied to Mila), `POST
   /api/letters`, `POST /api/words` (422 for a word the person already has), `POST /api/facts`
   (422 for a fact the person already has; answers `FactAdded` with `freeze_granted` — the
-  first own fact of a season earns a freeze, DOMAIN §3).
+  first own fact of a season earns a freeze, DOMAIN §3). Whether a screen may still promise
+  that freeze is one service call, `freezes.pending(session, season_id=, user_id=, reason=)`:
+  once a season, never above the ceiling.
 - Multipart limits (`routes/api.py`): the request is refused with 413 from `Content-Length`
   before parsing when it exceeds 200 MB; `request.form(max_files=11, max_fields=64)`; one file
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are

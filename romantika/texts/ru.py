@@ -548,7 +548,7 @@ def end_of_season_text(season: SeasonDTO) -> str:
     )
 
 
-def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
+def dictionary_text(season: SeasonDTO, view: DictionaryView, *, freeze_offer: bool = False) -> str:
     """The week words and the reader's own words — personal, so no names (DOMAIN §6)."""
     lines = [f"<b>📖 Словарик сезона · {escape(season.title)}</b>", ""]
     if view.week_words:
@@ -566,7 +566,7 @@ def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
         for entry in view.user_words:
             lines.append(escape(entry.word) + (f" — {escape(entry.meaning)}" if entry.meaning else ""))
     tail = "Твои слова видишь только ты — и они будут в твоём журнале сезона."
-    if not view.user_words:
+    if freeze_offer:  # the service knows whether it can still be earned (DOMAIN §3)
         tail += " За первое своё слово — ❄️ +1 заморозка."
     lines += ["", RULE, "", f"<i>{tail}</i>"]
     return "\n".join(lines)
