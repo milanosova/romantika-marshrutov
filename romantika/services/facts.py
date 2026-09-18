@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
-from romantika.services import content
+from romantika.services import content, locks
 from romantika.services.errors import Refused
 
 
@@ -39,6 +39,8 @@ async def add(
     body = text.strip()
     if not body:
         raise Refused("факт без текста не запишу")
+    # Concurrent copies of one fact (a double tap, two devices) wait for each other here.
+    await locks.serialise(session, f"fact:{season_id}:{author_id}")
     duplicate = await session.execute(
         select(models.Fact.id).where(
             models.Fact.season_id == season_id,

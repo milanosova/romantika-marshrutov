@@ -149,6 +149,7 @@
   function bindIntent(w) {
     $("intent").querySelectorAll("button").forEach((b) => b.addEventListener("click", async () => {
       const choice = b.dataset.choice;
+      if (b.classList.contains("active")) return; // the same answer again: nothing to send
       $("intent").querySelectorAll("button").forEach((x) => (x.disabled = true));
       try {
         const r = await RM.api("/api/intent", { method: "POST", body: { week_number: w.number, choice } });
@@ -581,9 +582,7 @@
     const [dict, facts] = await Promise.allSettled([RM.api("/api/dictionary"), RM.api("/api/facts")]);
     if (state.tab !== "season") return; // the tab changed while the season loaded
     if (dict.status === "rejected") return (screen.innerHTML = errorBox(dict.reason));
-    state.dictionary = dict.value;
-    state.facts = facts.status === "fulfilled" ? facts.value : null;
-    const h = state.home, d = state.dictionary, f = state.facts;
+    const h = state.home, d = dict.value, f = facts.status === "fulfilled" ? facts.value : null;
     const released = h.weeks.filter((w) => w.state !== "locked");
     let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1>${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
     // Weeks as a chronicle, newest first; future weeks are not shown (DOMAIN §1).

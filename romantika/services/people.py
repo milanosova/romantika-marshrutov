@@ -8,13 +8,16 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
+from romantika.services import locks
+from romantika.services.content import WeekDTO
+from romantika.services.errors import Refused
 
 #: A «ждём от человека...» state older than this is stale and ignored (DOMAIN §10.8).
 DIALOG_TTL = timedelta(hours=6)
@@ -83,6 +86,9 @@ def to_dto(row: models.User) -> UserDTO:
 
 async def upsert_user(session: AsyncSession, tg: TelegramUser, *, now: datetime) -> UserDTO:
     """Create the person on the first contact, refresh the name later; `joined_at` is kept."""
+    # The first two requests of a newcomer arrive together (two tabs, the app's parallel
+    # fetches): the second waits here and finds the row instead of hitting the primary key.
+    await locks.serialise(session, f"user:{tg.id}")
     row = await session.get(models.User, tg.id)
     if row is None:
         row = models.User(id=tg.id, joined_at=now)
@@ -180,6 +186,50 @@ async def set_intent(
     row.choice = choice.value
     row.updated_at = now
     await session.flush()
+
+
+#: «try» is what buttons on old messages still send; it means the same as «take» (18.09.2026).
+_INTENT_MEANING = {"take": "take", "try": "take", "skip": "skip"}
+
+
+@dataclass(frozen=True)
+class IntentOutcome:
+    changed: bool
+    """A new or a different answer: Mila is told. The same answer again: she was told already."""
+
+
+async def choose_intent(
+    session: AsyncSession,
+    *,
+    season_id: int,
+    user_id: int,
+    week: WeekDTO,
+    choice: models.IntentChoice,
+    today: date,
+    now: datetime,
+) -> IntentOutcome:
+    """The rules of «берусь / мимо», shared by the bot button and the app (DOMAIN §2):
+    only an announced week that is running, and only before the stamp.
+
+    Refuses with the sentence for the person; the caller decides how to show it.
+    """
+    from romantika.texts import ru  # texts import UserDTO from here: a module-level import would loop
+
+    if week.is_draft or week.starts_on > today:
+        raise Refused(ru.INTENT_NOT_OPEN)
+    if week.ends_on < today:
+        raise Refused(ru.INTENT_WEEK_OVER)
+    stamped = await session.execute(
+        select(models.Stamp.id).where(models.Stamp.user_id == user_id, models.Stamp.week_id == week.id)
+    )
+    if stamped.first() is not None:
+        raise Refused(ru.INTENT_ALREADY_STAMPED)
+    # Two taps at once: the second waits, reads the first one's row and counts as a repeat.
+    await locks.serialise(session, f"intent:{user_id}:{week.id}")
+    previous = await get_intent(session, user_id=user_id, week_id=week.id)
+    await set_intent(session, season_id=season_id, user_id=user_id, week_id=week.id, choice=choice, now=now)
+    same = previous is not None and _INTENT_MEANING.get(previous) == _INTENT_MEANING[choice.value]
+    return IntentOutcome(changed=not same)
 
 
 async def get_intent(session: AsyncSession, *, user_id: int, week_id: int) -> str | None:

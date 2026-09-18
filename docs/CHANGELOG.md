@@ -18,7 +18,18 @@ and in «⚙️ Мила» (only the calendar of a started week stays frozen); t
 their facts. «Что будет в конце сезона» lists what the PDF holds in plain words. Under the
 task there are two answers now — «Берусь» and «В этот раз мимо»; an old «Попробую» button on
 a cached message still answers and counts as «берусь». A bare word typed into the chat
-(«Паспорт», «Сегодня») is a one-word report, not a button: buttons carry their emoji.
+(«Паспорт», «Паспорт!», «Сегодня») is a one-word report, not a button: a button starts with
+its emoji. Three refusals people can see are new: «Эта неделя уже прошла…» and «Штамп за эту
+неделю у тебя уже есть…» on an intent button (in the bot and in the app alike), «такой факт у
+тебя уже записан» on a repeated fact.
+
+Under the hood: the intent rules live in `people.choose_intent`, shared by the bot button and
+`POST /api/intent` (a repeated answer is stored but not copied to Mila); every «once per
+person» write whose duplicate check is read-then-write — a word, a fact, an intent, the first
+row of a user — takes a transaction-scoped advisory lock (`services/locks.py`), so a double tap
+or two devices no longer make copies or a 500; the texts of a week are bounded like their
+columns (255 / 4000 characters, no NUL) and answer 422 in Russian; the stand's demo facts of
+Mila carry no author, as production does.
 
 ## v2.4.0 — 2026-09-18 (late reports into the journal)
 

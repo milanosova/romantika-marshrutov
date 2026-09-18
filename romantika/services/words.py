@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
-from romantika.services import content, freezes, people
+from romantika.services import content, freezes, locks, people
 from romantika.services.errors import Refused
 
 #: The first dash surrounded by spaces, or the first colon, separates word and meaning.
@@ -88,6 +88,8 @@ async def add(
     if not word:
         raise Refused("нужно само слово, а не только его значение")
     await people.ensure_member(session, season_id, user_id, now=now)
+    # Two copies of one word sent at the same moment wait for each other here (bugs/2026-09-18).
+    await locks.serialise(session, f"word:{season_id}:{user_id}")
     if await _has_word(session, season_id=season_id, user_id=user_id, word=word[:WORD_LENGTH]):
         raise Refused(f"слово «{word[:WORD_LENGTH]}» у тебя в словарике уже есть")
 

@@ -79,6 +79,12 @@ def test_split_text_prefers_paragraph_then_line_then_space() -> None:
         ("🎒 Открыть клуб", "app"),
         ("Открыть клуб", None),  # a bare word is a report, a button always carries its emoji
         ("Паспорт", None),
+        ("Паспорт!", None),  # a typed word with punctuation or a flag is still a report:
+        ("паспорт.", None),  # the emoji of a button stands first
+        ("Паспорт 🇲🇽", None),
+        ("Сегодня!", None),
+        ("Задание 1", None),
+        ("  📘 Паспорт", "passport"),  # leading spaces do not hide the emoji
         ("ЗАДАНИЕ", None),
         ("тако удались, фото ниже", None),
         ("", None),

@@ -25,7 +25,18 @@ def _utc_iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _no_nul(value: str) -> str:
+    """Postgres refuses a NUL byte inside text; say so in Russian instead of a 500."""
+    if "\x00" in value:
+        raise ValueError("в тексте недопустимые символы")
+    return value
+
+
 NonBlank = Annotated[str, AfterValidator(_non_blank)]
+#: A one-line field of a week (title, word): the columns are 255 characters wide.
+WeekLine = Annotated[str, Field(max_length=255), AfterValidator(_no_nul)]
+#: A paragraph of a week: it travels in one Telegram message, so it is bounded like a report.
+WeekText = Annotated[str, Field(max_length=4000), AfterValidator(_no_nul)]
 UtcDateTime = Annotated[datetime, PlainSerializer(_utc_iso, return_type=str)]
 
 
@@ -138,13 +149,13 @@ class SessionIn(BaseModel):
 class WeekEdit(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    title: str | None = None
-    intro: str | None = None
-    task_min: str | None = None
-    task_max: str | None = None
-    word: str | None = None
-    word_ru: str | None = None
-    word_meaning: str | None = None
+    title: WeekLine | None = None
+    intro: WeekText | None = None
+    task_min: WeekText | None = None
+    task_max: WeekText | None = None
+    word: WeekLine | None = None
+    word_ru: WeekLine | None = None
+    word_meaning: WeekText | None = None
 
 
 class WeekCreate(BaseModel):
@@ -155,13 +166,13 @@ class WeekCreate(BaseModel):
     number: int = Field(ge=1)
     starts_on: date
     ends_on: date
-    title: str = Field(default="", max_length=255)
-    intro: str = ""
-    task_min: str = ""
-    task_max: str = ""
-    word: str = Field(default="", max_length=255)
-    word_ru: str = Field(default="", max_length=255)
-    word_meaning: str = ""
+    title: WeekLine = ""
+    intro: WeekText = ""
+    task_min: WeekText = ""
+    task_max: WeekText = ""
+    word: WeekLine = ""
+    word_ru: WeekLine = ""
+    word_meaning: WeekText = ""
     announce: bool = False
     """Announce right away (needs a title and a minimum); otherwise the week is a draft."""
 
