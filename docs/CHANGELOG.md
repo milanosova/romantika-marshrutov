@@ -15,8 +15,10 @@ carry the person's own. The freeze for the first word stays.
 
 For Mila: the texts of any week — a finished one included — are editable in the admin app
 and in «⚙️ Мила» (only the calendar of a started week stays frozen); the person's card shows
-their facts. «Что будет в конце сезона» lists what the PDF holds in plain words. «Берусь /
-Попробую / Мимо» stay three buttons: the acceptance suite pins them (skills-log).
+their facts. «Что будет в конце сезона» lists what the PDF holds in plain words. Under the
+task there are two answers now — «Берусь» and «В этот раз мимо»; an old «Попробую» button on
+a cached message still answers and counts as «берусь». A bare word typed into the chat
+(«Паспорт», «Сегодня») is a one-word report, not a button: buttons carry their emoji.
 
 ## v2.4.0 — 2026-09-18 (late reports into the journal)
 

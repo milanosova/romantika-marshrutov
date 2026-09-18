@@ -46,9 +46,12 @@ def normalize_button(text: str | None) -> str:
 
 
 def button_action(text: str | None) -> str | None:
-    """The word alone counts, with or without its emoji (tests/acceptance/test_stage3_bot.py
-    pins «сегодня» → today): a typed «Паспорт» is the button, not a one-word report."""
-    return BUTTON_ACTIONS.get(normalize_button(text))
+    """A button press carries its emoji (whatever selector the client adds); a bare word
+    someone typed — «Паспорт» as a one-word report — is not a button (DOMAIN §7, 18.09.2026)."""
+    raw = text or ""
+    if not any(not (ch.isalpha() or ch.isspace() or ch == "-") for ch in raw):
+        return None
+    return BUTTON_ACTIONS.get(normalize_button(raw))
 
 
 def main_keyboard(*, is_admin: bool, app_url: str | None = None) -> ReplyKeyboardMarkup:
@@ -93,13 +96,12 @@ def more_menu(public_base_url: str) -> InlineKeyboardMarkup:
 
 
 def task_buttons(week_number: int) -> InlineKeyboardMarkup:
-    """Three answers. Mila asked for two (18.09.2026: no «Попробую») — pinned to three by
-    tests/acceptance/test_stage3_bot.py, which only Dima changes (CLAUDE.md rule 5)."""
+    """Two answers (Mila, 18.09.2026): «Берусь» or «В этот раз мимо». The old «Попробую» button
+    on cached messages still answers and counts as «берусь»."""
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(text="Берусь", callback_data=f"intent:{week_number}:take"),
-                InlineKeyboardButton(text="Попробую", callback_data=f"intent:{week_number}:try"),
                 InlineKeyboardButton(text="В этот раз мимо", callback_data=f"intent:{week_number}:skip"),
             ]
         ]

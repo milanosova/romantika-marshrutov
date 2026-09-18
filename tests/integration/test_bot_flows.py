@@ -197,7 +197,8 @@ async def test_dialog_state_expires_after_six_hours(harness: Harness, db_session
 # =====================================================================================
 
 
-@pytest.mark.parametrize(("choice", "word"), [("take", "берусь"), ("try", "попробую"), ("skip", "мимо")])
+# «try» is what buttons on old messages still send (before 19.09 there were three): it reads as «берусь».
+@pytest.mark.parametrize(("choice", "word"), [("take", "берусь"), ("try", "берусь"), ("skip", "мимо")])
 async def test_intent_buttons_store_the_choice_and_tell_mila(
     harness: Harness, db_session: AsyncSession, choice: str, word: str
 ) -> None:
@@ -647,6 +648,13 @@ async def test_old_button_labels_still_answer(harness: Harness) -> None:
     """The keyboard is cached on the client until /start: «📋 Задание» must keep working."""
     await harness.text(ALICE, "📋 Задание")
     assert any("Неделя" in t for t in harness.session.sent_texts(ALICE)), "the old label still opens the task"
+
+
+async def test_a_bare_label_word_is_a_report_not_a_button(harness: Harness, db_session: AsyncSession) -> None:
+    """With no buttons on the keyboard a typed «Паспорт» is a one-word report (DOMAIN §2, §7)."""
+    await harness.text(ALICE, "Паспорт")
+    assert await count(db_session, models.Report) == 1
+    assert "Записала" in harness.session.last_text(ALICE)
 
 
 async def test_admin_keyboard_has_the_panel_button(harness: Harness) -> None:

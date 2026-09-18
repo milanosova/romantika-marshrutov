@@ -99,7 +99,7 @@
     $("week-body").innerHTML = `
       <div class="tiles" style="margin-top:12px">
         <div class="tile"><div class="big">${s.submitted.length} <span class="muted">/ ${s.members_total}</span></div><div class="label">сдали из тех, кто в боте</div></div>
-        <div class="tile"><div class="big">${s.took.length}</div><div class="label">нажали «берусь» или «попробую»</div></div>
+        <div class="tile"><div class="big">${s.took.length}</div><div class="label">нажали «берусь»</div></div>
         <div class="tile"><div class="big">${s.core_current} <span class="muted">/ ${s.core_best}</span></div><div class="label">в ядре сейчас / были за сезон · две недели подряд</div></div>
         <div class="tile"><div class="big">${s.reports_total}</div><div class="label">${RM.plural(s.reports_total, "отчёт", "отчёта", "отчётов")} за неделю</div></div>
       </div>
@@ -135,7 +135,7 @@
     const weekMark = (p) => {
       if (!cur) return "";
       const stamp = p.week_level === "max" ? "⭐" : p.week_level === "min" ? "✅" : "";
-      const intent = p.week_intent === "take" ? "берусь" : p.week_intent === "try" ? "попробую" : p.week_intent === "skip" ? "мимо" : "";
+      const intent = p.week_intent === "take" || p.week_intent === "try" ? "берусь" : p.week_intent === "skip" ? "мимо" : "";
       const reports = p.week_reports ? `${p.week_reports} ${RM.plural(p.week_reports, "отчёт", "отчёта", "отчётов")}, штамп снят` : "";
       return `<div class="sub">неделя ${cur.number}: ${stamp ? stamp + " есть штамп" : reports ? reports : intent ? intent + " · пока без отчёта" : "без ответа"}</div>`;
     };
@@ -387,7 +387,7 @@
   async function renderMore() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · админка</p><h1>Ещё</h1></header>
       <div class="card"><div class="row between"><h2 style="margin:0">Автонапоминания</h2><label class="toggle"><input type="checkbox" id="rem-toggle"> <span id="rem-state">…</span></label></div>
-        <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» или «Попробую» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
+        <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
         <button class="btn soft small" id="remind-now">⏰ Напомнить сейчас</button></div>
       <a class="card tight linkcard" href="#" id="open-facts"><div class="row between"><div style="flex:1;min-width:0"><b>💡 Факты про страну</b><div class="muted small">Что мы узнали за сезон — общий список для журналов.</div></div><span class="muted chevron">›</span></div></a>
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
