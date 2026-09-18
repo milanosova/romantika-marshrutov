@@ -68,6 +68,8 @@ class WeekOut(BaseModel):
     level: str | None = None
     starts_on: date
     ends_on: date
+    late_open: bool = False
+    """The week has ended and the season has not: a report may still be added to its journal chapter."""
     intro: str = ""
     task_min: str = ""
     task_max: str = ""
@@ -96,6 +98,8 @@ class ReportOut(BaseModel):
     edited_at: UtcDateTime | None = None
     editable: bool = False
     """True while the report's week is open: text and files may still be changed (DOMAIN §2)."""
+    late: bool = False
+    """Sent after the week ended: journal only, no stamp behind it (DOMAIN §2)."""
 
 
 class WordOut(BaseModel):
@@ -389,6 +393,8 @@ class ReportResult(BaseModel):
     stamp_level: str | None
     freeze_granted: bool
     message: str
+    late: bool = False
+    """The report went into a past week's journal chapter; `stamp_level` is what the week already had."""
 
 
 class LevelIn(BaseModel):

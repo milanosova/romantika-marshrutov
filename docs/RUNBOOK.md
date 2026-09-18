@@ -179,6 +179,13 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   `c4e8f1a2b9d3` (weeks.announced_at) **refuses to downgrade while draft weeks exist**: the
   previous release would show them to participants. Announce or delete the drafts in the
   admin app («Задания»), then downgrade.
+  `d5e6f7a8b9c0` (reports.late, v2.4.0) **refuses to downgrade while late reports exist**,
+  and rolling back the *code* to v2.3.0 is unsafe for the same reason: v2.3.0's stamp
+  recomputation does not know `late`, so the next cancel or edit would award stamps for
+  late reports (on the stand: 8 of 61 person-weeks). While `SELECT count(*) FROM reports
+  WHERE late` (read-only, see below) is not zero, **fix forward** — do not roll back
+  v2.4.0. With zero late reports the code may be rolled back without touching the
+  migration: the column keeps `server_default false` and v2.3.0 runs on the new schema.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
   list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before
@@ -201,6 +208,7 @@ select count(distinct user_id) from reports where created_at > now() - interval 
 select count(*) from reports where created_at > now() - interval '7 days' and deleted_at is null; -- reports this week
 select count(*) from letters where replied_at is null;                                           -- unanswered letters
 select count(*) from jobs where status = 'failed' and finished_at > now() - interval '24 hours'; -- failed worker jobs
+select count(*) from reports where late and deleted_at is null;                                  -- late reports (blocks a rollback below v2.4.0)
 ```
 
 Run by hand: `scripts/rc.sh exec -T db psql -U romantika -d romantika -Atc "<one of the above>"`.

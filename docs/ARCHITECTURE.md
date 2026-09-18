@@ -168,6 +168,12 @@ Key flows:
   finds active week (else stores an `other`-kind report with `week_id=None`, and result says
   `out_of_week=True`), creates report, media rows (not yet downloaded), awards/merges stamp
   via `stamps`, grants auto-freeze `max` on first MAX; returns texts to send + admin copy.
+- `reports.accept_late(session, *, season_id, user_id, week_number, message, now) -> AcceptResult`
+  — the same rows for a week that has ended, with `late=True` and no stamp or freeze
+  (DOMAIN §2); raises `Refused` for a running or future week, an unknown week and after the
+  season. Every stamp computation (`_remaining_levels`, `stamps._live_report_ids`) and the
+  week summary read `late = false` only; the journal and the PDF read all of them and mark
+  the late ones (`JournalEntry.late`, `JournalWeek.late_only` when the week has no stamp).
 - `media.MediaStore.download(session, media_id, telegram)` — getFile + stream to
   `MEDIA_DIR/<path>.part` then atomic rename; sets sha256/size/downloaded_at; idempotent.
   Called inline by the bot right after `accept`; failure enqueues job `media_download`.
@@ -308,7 +314,9 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are
   attachments; a zero-size file is refused (422) rather than dropped; a NUL byte in any text
   is 422; `client_id` / `edit_key` longer than 64 characters are 422, never cut; files stored
-  before a failure are removed again; a client that disconnects mid-body gets 400 (nobody
+  before a failure are removed again; `week_number` of a week that has ended makes it a
+  late report (`reports.accept_late`: `late = true`, no stamp, refused for a running or
+  future week and after `season.ends_on`; DOMAIN §2); a client that disconnects mid-body gets 400 (nobody
   is there to read it) and one `upload_client_disconnected` log line, never an ASGI error.
   One person's attempts are serialised with
   `pg_advisory_xact_lock` on `user:client_id` (POST) and `user:edit:report:edit_key` (PATCH),

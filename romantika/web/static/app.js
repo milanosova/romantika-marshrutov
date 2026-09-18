@@ -5,7 +5,7 @@
 // uses); this file only draws. Old tab names still route (links in old messages).
 (function () {
   const RM = window.RM;
-  const esc = RM.escape, html = RM.html, fmt = RM.fmtDate;
+  const esc = RM.escape, html = RM.html, fmt = RM.fmtDate, kindName = RM.kindName;
   const $ = (id) => document.getElementById(id);
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
@@ -84,7 +84,7 @@
           ${w.task_max ? `<div><div class="k">Максимум ⭐ · на вечер</div><div class="v">${esc(w.task_max)}</div></div>` : ""}
         </div>
         ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
-        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."} Дослать можно ниже.</p>` : `<h3>Берёшься?</h3>
+        ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."}</p>` : `<h3>Берёшься?</h3>
         <div class="segment" id="intent">${["take", "try", "skip"].map((c) => `<button data-choice="${c}" class="${w.intent === c ? "active" : ""}">${RM.intentName[c]}</button>`).join("")}</div>
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь» или «Попробую»."}</p>`}
       </div>`;
@@ -117,7 +117,8 @@
   // «Поправить» and «Это не отчёт» on a report card; `done` redraws whatever the card sits in.
   function bindReportActions(box, j, done) {
     box.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
+      const late = j.reports.some((x) => String(x.id) === b.dataset.cancel && x.late);
+      if (!(await RM.confirm(late ? NOT_REPORT_CONFIRM_LATE : NOT_REPORT_CONFIRM))) return;
       try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await done(); } catch (e) { RM.toast(e.message); }
     }));
     box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
@@ -169,12 +170,15 @@
     return `<span class="chip">пока без штампа</span>`;
   }
 
-  function composerHtml(w) {
-    const title = w ? "Сдать отчёт" : "Написать Миле";
-    const note = w
-      ? "Текст — минимум ✅, фото или видео — максимум ⭐. Дослать можно сколько угодно раз."
+  // `late` — the week has ended: the report goes into the journal chapter only (DOMAIN §2).
+  function composerHtml(w, late) {
+    const title = late ? (late.again ? "Дописать в журнал" : "Добавить в журнал") : w ? "Сдать отчёт" : "Написать Миле";
+    const note = late
+      ? lateNote(late)
+      : w
+      ? "Текст — минимум ✅, фото или видео — максимум ⭐. Присылать можно сколько угодно раз."
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
-    return `<div class="row between"><h2 style="margin:0">${title}</h2>${stampChip(w)}</div>
+    return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
       <textarea id="report-text" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
       <div class="attach"><label class="btn soft small" for="report-files">📷 Фото или видео</label><input id="report-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="files-count"></span></div>
@@ -183,12 +187,19 @@
       <button class="btn block" id="send" style="margin-top:12px">Отправить</button>`;
   }
 
-  function bindComposer(w) {
+  // The stamp decides the wording: a stamped week keeps its stamp, an unstamped one gets none.
+  function lateNote(late) {
+    return late.stamped
+      ? "Штамп за неделю уже стоит, он не изменится. Текст и фото лягут в ту же главу журнала."
+      : "Неделя прошла — штамп за неё уже не ставится, а в журнале сезона будет.";
+  }
+
+  function bindComposer(w, late) {
     state.files = [];
     state.clientId = RM.uid(); // one id per attempt: a retry after a lost answer finds the same report
     const input = $("report-files");
     input.addEventListener("change", () => { addFiles(state.files, input.files, 0); input.value = ""; renderPreviews(state.files, $("previews"), $("files-count")); });
-    $("send").addEventListener("click", () => sendReport(w));
+    $("send").addEventListener("click", () => sendReport(w, late));
   }
 
   // Adds what fits within the API's limits and says what did not (D4). `taken` counts files
@@ -219,7 +230,7 @@
   }
   function mb(bytes) { return bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + " КБ" : (bytes / 1024 / 1024).toFixed(bytes > 10 * 1024 * 1024 ? 0 : 1) + " МБ"; }
 
-  async function sendReport(w) {
+  async function sendReport(w, late) {
     const text = $("report-text").value.trim();
     if (!text && !state.files.length) return RM.toast("Напиши хотя бы слово или добавь фото");
     const button = $("send"), bar = $("bar");
@@ -228,12 +239,14 @@
     const form = new FormData();
     form.append("text", text);
     form.append("client_id", state.clientId);
+    if (late) form.append("week_number", String(w.number)); // a past week: journal only
     state.files.forEach((f) => form.append("files", f, f.name));
     if (state.files.length) bar.hidden = false;
     try {
       const r = await RM.upload("/api/reports", form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; });
       RM.haptic("success");
       state.clientId = RM.uid();
+      if (late) { late.done(r); return; }
       await refreshHome();
       // /api/home may have failed silently; the report exists, so the list below must show it.
       if (!r.out_of_week && state.home.week && !state.home.week.reports_count) state.home.week.reports_count = 1;
@@ -242,13 +255,19 @@
     } catch (e) {
       RM.haptic("error");
       button.disabled = false;
-      button.textContent = "Отправить ещё раз";
       bar.hidden = true;
-      RM.toast("Не отправилось: " + e.message + ". Нажми ещё раз — второго отчёта не будет.", 4500);
+      if (e.status === 422) { // the server refused what was typed: a retry as is will not help
+        button.textContent = "Отправить";
+        RM.toast(e.message, 4500);
+      } else {
+        button.textContent = "Отправить ещё раз";
+        RM.toast("Не отправилось: " + e.message + ". Нажми ещё раз — второго отчёта не будет.", 4500);
+      }
     }
   }
 
   const NOT_REPORT_CONFIRM = "Пометить как не отчёт? Штамп за неделю пересчитается, а текст останется у меня как обычное сообщение.";
+  const NOT_REPORT_CONFIRM_LATE = "Убрать из журнала? Текст останется у меня как обычное сообщение; штампов это не касается.";
 
   function showResult(r) {
     const box = $("composer");
@@ -283,7 +302,7 @@
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>
-        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · 🔒 откроется в понедельник. Нажми на неделю — откроется задание.</p></div>`;
+        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · ◦ пропущена или была до твоего прихода · 🔒 откроется в понедельник. Нажми на неделю — откроется задание; за прошедшую можно добавить в журнал.</p></div>`;
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="journal-box">${loading()}</div>`;
@@ -332,9 +351,50 @@
          ${w.intro ? `<p>${esc(w.intro)}</p>` : ""}
          <div class="kv"><div><div class="k">Минимум ✅</div><div class="v">${esc(w.task_min)}</div></div>${w.task_max ? `<div><div class="k">Максимум ⭐</div><div class="v">${esc(w.task_max)}</div></div>` : ""}</div>
          ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
-         ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}`;
+         ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}
+         ${w.late_open ? `<div id="late-box" style="margin-top:14px">${loading()}</div>` : ""}`;
     const title = w.title && w.title !== `Неделя ${w.number}` ? `Неделя ${w.number} · ${w.title}` : `Неделя ${w.number}`;
-    openSheet(title, body, () => { if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week")); });
+    openSheet(title, body, () => {
+      if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week"));
+      if (w.late_open) renderLateBox(w);
+    });
+  }
+
+  // The screen under the sheet follows what the sheet changed: «Это не отчёт» on an on-time
+  // report moves the stamp, so the bag is redrawn whole (the sheet lives outside #screen).
+  async function syncBag() {
+    await refreshHome();
+    if (state.tab === "bag") await renderBag();
+  }
+
+  // The chapter of a past week inside its sheet: what is already there, and the door to add more.
+  async function renderLateBox(w, notice) {
+    const box = $("late-box");
+    if (!box) return;
+    let j;
+    try { j = await RM.api("/api/journal"); } catch (e) { if (box.isConnected) box.innerHTML = errorBox(e); return; }
+    if (!box.isConnected) return;
+    const rs = j.reports.filter((r) => r.week_number === w.number);
+    const fresh = (state.home.weeks || []).find((x) => x.number === w.number) || w;
+    const late = { again: rs.length > 0, stamped: !!fresh.level };
+    box.innerHTML = `${notice ? `<div class="result ok" style="margin-bottom:12px"><div class="rich">${html(notice)}</div></div>` : ""}
+      ${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
+      <button class="btn block" id="late-open" style="margin-top:10px">${late.again ? "Дописать в журнал" : "Добавить в журнал"}</button>
+      <p class="note" id="late-note" style="margin:8px 0 0"${notice ? " hidden" : ""}>${lateNote(late)}</p>`;
+    // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
+    // After an edit or a cancel the sheet is reopened from fresh state: the week's stamp may have moved.
+    bindReportActions(box, j, async () => { state.sheetReturn = null; await syncBag(); openWeek(w.number); });
+    box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => { state.sheetReturn = () => openWeek(w.number); }));
+    $("late-open").addEventListener("click", () => {
+      const form = document.createElement("div");
+      form.className = "composer";
+      form.id = "composer";
+      form.innerHTML = composerHtml(w, late);
+      $("late-note").remove();
+      $("late-open").replaceWith(form);
+      bindComposer(w, { ...late, done: async (r) => { await renderLateBox(w, r.message); await syncBag(); } });
+      $("report-text").focus();
+    });
   }
 
   // --- Журнал --------------------------------------------------------------------------
@@ -353,8 +413,11 @@
     weeksDone.forEach((n) => {
       const week = j.weeks.find((w) => w.number === n) || { title: "" };
       const rs = byWeek.get(n);
-      const level = week.level === "max" ? "⭐" : "✅";
-      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}</h2>${rs.map(reportHtml).join("")}</div>`;
+      // No stamp behind the chapter: everything in it was added after the week ended.
+      const lateOnly = !week.level && rs.every((r) => r.late);
+      // The mark follows the stamp: none → «◦» like the grid above; all late → the journal mark.
+      const level = lateOnly ? "📔" : week.level === "max" ? "⭐" : week.level ? "✅" : "◦";
+      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
@@ -368,8 +431,10 @@
     const images = r.media.filter((m) => m.mime && m.mime.startsWith("image/") && m.downloaded);
     const others = r.media.filter((m) => !images.includes(m));
     const edited = r.edited_at ? ` · <span class="edited">изменено ${RM.fmtDateTime(r.edited_at)}</span>` : "";
+    // A late report has no stamp behind it: the mark replaces the level (DOMAIN §2).
+    const level = r.late ? "📔 дослано позже" : r.level === "max" ? "⭐ максимум" : "✅ минимум";
     return `<article class="report">
-      <div class="meta">${RM.fmtDateTime(r.created_at)} · ${r.level === "max" ? "⭐ максимум" : "✅ минимум"} · ${kindName(r.kind)}${edited}</div>
+      <div class="meta">${RM.fmtDateTime(r.created_at)} · ${level} · ${kindName(r.kind)}${edited}</div>
       ${r.text ? `<div class="text">${esc(r.text)}</div>` : ""}
       ${images.length ? `<div class="gallery">${images.map((m, i) => `<a href="${m.url}" target="_blank"><img src="${m.url}" alt="${r.week_number ? `Фото ${i + 1} из отчёта за неделю ${r.week_number}` : `Фото ${i + 1} из сообщения`}" loading="lazy"></a>`).join("")}</div>` : ""}
       ${others.map((m) => m.downloaded ? `<a class="btn ghost small" href="${m.url}" target="_blank" style="margin-top:8px">Открыть файл</a>` : `<span class="muted small">файл ещё скачивается</span>`).join(" ")}
@@ -385,15 +450,15 @@
   function openEditor(r, done) {
     const week = (state.home.weeks || []).find((w) => w.number === r.week_number);
     const added = [], removed = new Set();
-    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}пока неделя идёт, отчёт можно менять — я увижу новую версию.</p>
+    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
       <textarea id="edit-text" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
       ${r.media.length ? `<p class="note" style="margin:10px 0 4px">Файлы в отчёте — нажми, чтобы убрать</p><div class="previews" id="edit-existing">${r.media.map((m) => `<button class="pv keep" data-id="${m.id}" title="${esc(m.mime || "")}">${m.mime && m.mime.startsWith("image/") && m.downloaded ? `<img src="${m.url}" alt="">` : `<span>${kindName(m.mime && m.mime.startsWith("video/") ? "video" : "document")}</span>`}<span class="x" aria-hidden="true">✕</span></button>`).join("")}</div>` : ""}
       <div class="attach" style="margin-top:10px"><label class="btn soft small" for="edit-files">📷 Добавить фото или видео</label><input id="edit-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="edit-count"></span></div>
       <div class="previews" id="edit-previews" hidden></div>
       <div class="bar" id="edit-bar" hidden><i></i></div>
       <button class="btn block" id="edit-save" style="margin-top:12px">Сохранить</button>
-      <p class="note" style="margin:8px 0 0">После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум.</p>`;
-    openSheet("Поправить отчёт", body, () => {
+      <p class="note" style="margin:8px 0 0">${r.late ? "Штамп это не трогает: поздняя запись живёт только в журнале." : "После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум."}</p>`;
+    openSheet(r.late ? "Поправить запись" : "Поправить отчёт", body, () => {
       const existing = $("edit-existing");
       if (existing) existing.querySelectorAll(".pv").forEach((b) => b.addEventListener("click", () => {
         const id = b.dataset.id;
@@ -420,6 +485,7 @@
         try {
           const res = await RM.upload(`/api/reports/${r.id}`, form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; }, "PATCH");
           RM.haptic("success");
+          state.sheetReturn = null; // `done` reopens the week sheet itself, from fresh state
           closeSheet();
           if (res.message) RM.toast(res.message.replace(/<[^>]+>/g, ""), 4000);
           if (done) await done();
@@ -430,10 +496,6 @@
         }
       });
     });
-  }
-
-  function kindName(kind) {
-    return { text: "текст", photo: "фото", video: "видео", video_note: "кружок", voice: "голосовое", audio: "аудио", document: "файл", other: "сообщение" }[kind] || kind;
   }
 
   async function requestPdf() {
@@ -472,7 +534,7 @@
     // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
     const running = (w) => h.week && w.id === h.week.id;
     out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${running(w) ? "▸" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
-    out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой. За первое слово — ❄️ +1 заморозка.</p>
+    out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой.${(h.passport.freeze_reasons || []).includes("word") ? "" : " За первое слово — ❄️ +1 заморозка."}</p>
       <input id="word-text" placeholder="слово — что оно значит"><button class="btn block" id="word-send" style="margin-top:10px">Записать</button></div>`;
     out += `<h3>Слова недели</h3>`;
     out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(w.title)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
@@ -538,5 +600,8 @@
     $("sheet").hidden = true;
     document.body.style.overflow = "";
     RM.onBack(null);
+    const back = state.sheetReturn;
+    state.sheetReturn = null;
+    if (back) back(); // the editor was opened over the week sheet: come back to it
   }
 })();

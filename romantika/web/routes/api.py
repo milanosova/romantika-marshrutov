@@ -11,8 +11,9 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator, Sequence
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi import APIRouter, HTTPException, Path, Request, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy import text as sql_text
@@ -241,7 +242,8 @@ async def submit_report(
     request: Request,
 ) -> schemas.ReportResult:
     """A report from the Mini App: multipart `text`, `client_id` and `files`, judged by the
-    bot's rules (DOMAIN §2).
+    bot's rules (DOMAIN §2). With `week_number` of a week that has ended it is a late report:
+    journal only, no stamp, Mila's copy is headed as a late one.
 
     Files are streamed straight onto the media disk and hashed before the row is marked
     downloaded — the same guarantee as for files fetched from Telegram. Mila gets the usual
@@ -269,11 +271,28 @@ async def submit_report(
     incoming_files = [_incoming_file(upload) for upload in uploads]
     kind = incoming_files[0].kind if incoming_files else ReportKind.TEXT
     incoming = IncomingMessage(kind=kind, text=body or None, files=incoming_files, client_id=client_id or None)
-    result = await reports.accept(session, season_id=season.id, user_id=principal.user.id, message=incoming, now=now)
+    late_week = _late_week_number(fields)
+    if late_week is not None:
+        result = await reports.accept_late(
+            session, season_id=season.id, user_id=principal.user.id, week_number=late_week, message=incoming, now=now
+        )
+    else:
+        result = await reports.accept(
+            session, season_id=season.id, user_id=principal.user.id, message=incoming, now=now
+        )
     await _store_uploads(session, media_store, result.media_ids, uploads, now)
 
     author = principal.user.display_name_with_username
-    if result.out_of_week or result.week_number is None:
+    if result.late and result.week_number is not None:
+        week = await content.week_by_number(session, season.id, result.week_number)
+        assert week is not None
+        message = ru.late_receipt(week, first_of_week=result.first_of_week, stamped=result.stamp_level is not None)
+        header = ru.admin_late_header(
+            week.number, author, incoming.text, kind.value, stamped=result.stamp_level is not None
+        )
+        week_id = week.id
+        letter_id: int | None = None
+    elif result.out_of_week or result.week_number is None:
         message = ru.OUT_OF_WEEK
         header = ru.admin_out_of_week_header(author, incoming.text, kind.value)
         week_id = None
@@ -286,7 +305,7 @@ async def submit_report(
             report_id=result.report_id,
             now=now,
         )
-        letter_id: int | None = letter.id
+        letter_id = letter.id
     else:
         week = await content.week_by_number(session, season.id, result.week_number)
         assert week is not None
@@ -316,7 +335,20 @@ async def submit_report(
         stamp_level=result.stamp_level.value if result.stamp_level else None,
         freeze_granted=result.freeze_granted,
         message=message,
+        late=result.late,
     )
+
+
+def _late_week_number(fields: dict[str, str]) -> int | None:
+    """`week_number` of a late report; absent or blank means the running week."""
+    raw = fields.get("week_number", "").strip()
+    if not raw:
+        return None
+    if not (raw.isascii() and raw.isdigit()):  # `isdigit` alone accepts superscripts int() refuses
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, ru.LATE_NO_WEEK)
+    if len(raw) > 4:  # a week number is small; anything longer would overflow the column's int32
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, ru.LATE_NO_WEEK)
+    return int(raw)
 
 
 def _incoming_file(upload: UploadFile) -> IncomingFile:
@@ -375,6 +407,19 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
     stamp = await stamps.get_level(session, user_id=row.user_id, week_id=week.id)
     week_dto = await content.week_by_number(session, season.id, week.number)
     assert week_dto is not None
+    if row.late:
+        # The retried answer must read like the first one: the same chapter, the same stamp.
+        others = await reports.count_for_week(session, user_id=row.user_id, week_id=week.id) - 1
+        return schemas.ReportResult(
+            report_id=row.id,
+            week_number=week.number,
+            out_of_week=False,
+            level=row.level,
+            stamp_level=stamp.value if stamp else None,
+            freeze_granted=False,
+            message=ru.late_receipt(week_dto, first_of_week=others <= 0, stamped=stamp is not None),
+            late=True,
+        )
     return schemas.ReportResult(
         report_id=row.id,
         week_number=week.number,
@@ -386,9 +431,13 @@ async def _already_submitted(session: SessionDep, season: SeasonDep, row: models
     )
 
 
+#: A report id is an int4 in the database: anything beyond it is «no such report», not a 500.
+ReportId = Annotated[int, Path(ge=1, le=2_147_483_647)]
+
+
 @router.patch("/reports/{report_id}", response_model=schemas.ReportEditOut)
 async def edit_report(
-    report_id: int,
+    report_id: ReportId,
     principal: PrincipalDep,
     session: SessionDep,
     season: SeasonDep,
@@ -428,14 +477,15 @@ async def edit_report(
         await session.refresh(row)  # the winner of the race may have changed it while we waited
         if await reports.edit_applied(session, report_id=report_id, edit_key=edit_key):
             fresh = await views.report_out(session, report_id, today=today)
-            assert fresh is not None
+            if fresh is None:  # the edit was applied, then the report was taken back
+                raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
             level = await stamps.level_for_week(session, user_id=principal.user.id, week_id=row.week_id)
             week_dto = next((w for w in await content.weeks(session, season.id) if w.id == row.week_id), None)
             return schemas.ReportEditOut(
                 report=fresh,
                 stamp_level=level.value if level else None,
                 freeze_granted=False,
-                message=ru.edit_reply(week_dto, level, freeze_granted=False) if week_dto else "",
+                message=ru.edit_reply(week_dto, level, freeze_granted=False, late=row.late) if week_dto else "",
             )
     live = len([m for m in await _report_media(session, report_id) if m.hidden_at is None and m.id not in remove_ids])
     if live + len(uploads) > MAX_UPLOAD_FILES:
@@ -458,13 +508,15 @@ async def edit_report(
             raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
         if result.reason == reports.EMPTY:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "пустой отчёт: нужен текст или файл")
+        if result.reason == reports.SEASON_OVER:
+            raise HTTPException(status.HTTP_409_CONFLICT, ru.EDIT_SEASON_OVER)
         raise HTTPException(status.HTTP_409_CONFLICT, ru.EDIT_WEEK_OVER)
     await _store_uploads(session, media_store, result.media_ids, uploads, now)
 
     assert result.week_number is not None
     week = await content.week_by_number(session, season.id, result.week_number)
     assert week is not None
-    message = ru.edit_reply(week, result.stamp_level, freeze_granted=result.freeze_granted)
+    message = ru.edit_reply(week, result.stamp_level, freeze_granted=result.freeze_granted, late=result.late)
     await _notify_admin(
         session,
         settings,
@@ -475,6 +527,7 @@ async def edit_report(
             (text or "").strip() or None,
             added=len(result.media_ids),
             removed=result.removed,
+            late=result.late,
         ),
         media_ids=result.media_ids,
         report_id=report_id,
@@ -483,7 +536,8 @@ async def edit_report(
     )
     await notify.enqueue_message(session, chat_id=principal.user.id, text=message, now=now)
     fresh = await views.report_out(session, report_id, today=today)
-    assert fresh is not None
+    if fresh is None:  # «это не отчёт» won the race against this edit
+        raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
     return schemas.ReportEditOut(
         report=fresh,
         stamp_level=result.stamp_level.value if result.stamp_level else None,
@@ -499,7 +553,7 @@ async def _report_media(session: SessionDep, report_id: int) -> list[models.Medi
 
 @router.post("/reports/{report_id}/cancel", response_model=schemas.CancelOut)
 async def cancel_report(
-    report_id: int,
+    report_id: ReportId,
     principal: PrincipalDep,
     session: SessionDep,
     season: SeasonDep,
@@ -537,7 +591,7 @@ async def cancel_report(
     return schemas.CancelOut(
         ok=True,
         stamp_level=cancelled.stamp_level.value if cancelled.stamp_level else None,
-        message=ru.NOT_REPORT_DONE,
+        message=ru.NOT_REPORT_DONE_LATE if row is not None and row.late else ru.NOT_REPORT_DONE,
     )
 
 
