@@ -57,7 +57,7 @@ def main_keyboard(*, is_admin: bool, app_url: str | None = None) -> ReplyKeyboar
     label the bot answers with a link. Old labels stay recognised (`BUTTON_ACTIONS`).
     """
     door = (
-        KeyboardButton(text=ru.OPEN_CLUB, web_app=WebAppInfo(url=f"{app_url.rstrip('/')}/app"))
+        KeyboardButton(text=ru.OPEN_CLUB, web_app=WebAppInfo(url=app_page_url(app_url)))
         if app_url and app_url.startswith("https://")
         else KeyboardButton(text=ru.OPEN_CLUB)
     )
@@ -65,6 +65,11 @@ def main_keyboard(*, is_admin: bool, app_url: str | None = None) -> ReplyKeyboar
     if is_admin:
         rows.append([KeyboardButton(text="⚙️ Мила")])
     return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
+
+
+def app_page_url(public_base_url: str, path: str = "/app") -> str:
+    """The Mini App address under the public base URL, whatever slash the base ends with."""
+    return f"{public_base_url.rstrip('/')}{path}"
 
 
 def _web_app_button(text: str, url: str) -> InlineKeyboardButton | None:
@@ -80,7 +85,7 @@ def more_menu(public_base_url: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="✉️ Написать Миле", callback_data="more:write")],
         [InlineKeyboardButton(text="❔ Помощь", callback_data="more:help")],
     ]
-    if button := _web_app_button("📱 Открыть приложение", f"{public_base_url}/app"):
+    if button := _web_app_button("📱 Открыть приложение", app_page_url(public_base_url)):
         rows.insert(0, [button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -115,13 +120,13 @@ def report_buttons(week_number: int, level: StampLevel, report_id: int) -> Inlin
 
 def passport_buttons(public_base_url: str) -> InlineKeyboardMarkup:
     rows = [[InlineKeyboardButton(text="📔 Что будет в конце сезона", callback_data="endofseason")]]
-    if button := _web_app_button("📱 Паспорт в приложении", f"{public_base_url}/app/passport"):
+    if button := _web_app_button("📱 Паспорт в приложении", app_page_url(public_base_url, "/app/bag")):
         rows.append([button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def app_button(public_base_url: str) -> InlineKeyboardMarkup | None:
-    button = _web_app_button(ru.OPEN_CLUB, f"{public_base_url}/app")
+    button = _web_app_button(ru.OPEN_CLUB, app_page_url(public_base_url))
     return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
 
 
@@ -131,13 +136,13 @@ def help_buttons(public_base_url: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text="✉️ Написать Миле", callback_data="more:write")]
     ]
-    if button := _web_app_button(ru.OPEN_CLUB, f"{public_base_url}/app"):
+    if button := _web_app_button(ru.OPEN_CLUB, app_page_url(public_base_url)):
         rows.append([button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def journal_app_button(public_base_url: str) -> InlineKeyboardMarkup | None:
-    button = _web_app_button("📱 Журнал в приложении", f"{public_base_url}/app/journal")
+    button = _web_app_button("📱 Журнал в приложении", app_page_url(public_base_url, "/app/bag"))
     return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
 
 
@@ -163,7 +168,7 @@ def facts_buttons(*, is_admin: bool, has_facts: bool) -> InlineKeyboardMarkup:
 
 
 def calendar_button(public_base_url: str) -> InlineKeyboardMarkup | None:
-    button = _web_app_button("☀️ Узнать свой день", f"{public_base_url}/calendar")
+    button = _web_app_button("☀️ Узнать свой день", app_page_url(public_base_url, "/calendar"))
     return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
 
 
@@ -198,7 +203,7 @@ def panel(*, reminders_enabled: bool, public_base_url: str) -> InlineKeyboardMar
         ],
         [InlineKeyboardButton(text="👥 Кто в боте", callback_data="adm:who")],
     ]
-    if button := _web_app_button("🛠 Открыть админку", f"{public_base_url}/app/admin"):
+    if button := _web_app_button("🛠 Открыть админку", app_page_url(public_base_url, "/app/admin")):
         rows.append([button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 

@@ -12,7 +12,9 @@ import asyncio
 from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 
 from romantika.bot.factory import make_bot
+from romantika.bot.keyboards import app_page_url
 from romantika.config import get_settings
+from romantika.texts import ru
 
 NAME = "Романтика маршрутов"
 SHORT_DESCRIPTION = "Бот клуба «Романтика маршрутов»: задания недели, паспорт со штампами, журнал сезона."
@@ -37,11 +39,10 @@ async def run() -> None:
         await bot.set_my_short_description(SHORT_DESCRIPTION)
         await bot.set_my_description(DESCRIPTION)
         await bot.set_my_commands([BotCommand(command=command, description=text) for command, text in COMMANDS])
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="Открыть клуб", web_app=WebAppInfo(url=f"{settings.public_base_url}/app"))
-        )
+        app_url = app_page_url(settings.public_base_url)
+        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text=ru.OPEN_CLUB, web_app=WebAppInfo(url=app_url)))
         me = await bot.get_me()
-        print(f"configured @{me.username} ({me.first_name}); menu button → {settings.public_base_url}/app")
+        print(f"configured @{me.username} ({me.first_name}); menu button → {app_url}")
     finally:
         await bot.session.close()
 

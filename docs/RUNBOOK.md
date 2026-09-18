@@ -153,7 +153,8 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
    Check the reconciliation table it prints against the legacy counts.
 5. In BotFather (Mila's account): `/newapp` twice for `@romantika_marshrutov_bot` with the URLs
    `https://romantika.vibe-coding.trade/app/journal` (short name `journal`) and `/calendar`
-   (`calendar`); `/setmenubutton` → journal. `/setcommands` with the list from `GUIDE-RU.md`.
+   (`calendar`). Commands and the menu button come from `romantika.ops.telegram_setup`, not
+   from BotFather (`/setcommands` there would be overwritten at the next setup run).
 6. Send `/start` to the bot from Mila's account and from a participant's; check `/results`.
 7. Run `scripts/backup.sh` once by hand (`BACKUP_ON_START=1` in `.env` for the first start).
 

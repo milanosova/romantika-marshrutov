@@ -133,7 +133,10 @@ async def handle_text(
         await safe_send(bot, chat_id, ru.WHOAMI.format(user_id=user.id))
     elif action == "app":
         # The door button opens the app by itself over https; a plain label lands here.
-        await safe_send(bot, chat_id, ru.OPEN_CLUB_HINT, reply_markup=keyboards.app_button(settings.public_base_url))
+        markup = keyboards.app_button(settings.public_base_url)
+        app_url = keyboards.app_page_url(settings.public_base_url)
+        text = ru.OPEN_CLUB_HINT if markup else ru.OPEN_CLUB_LINK.format(url=app_url)
+        await safe_send(bot, chat_id, text, reply_markup=markup)
     elif action == "more":
         await safe_send(bot, chat_id, ru.MORE_MENU, reply_markup=keyboards.more_menu(settings.public_base_url))
     elif action == "task":

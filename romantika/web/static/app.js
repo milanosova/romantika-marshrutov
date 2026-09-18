@@ -89,6 +89,7 @@
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь» или «Попробую»."}</p>`}
       </div>`;
       out += `<div class="card composer" id="composer">${composerHtml(w)}</div>`;
+      if (w.reports_count) out += `<div id="week-reports">${loading()}</div>`;
     } else {
       const next = h.next_week_starts_on ? h.weeks.find((x) => x.starts_on === h.next_week_starts_on) : null;
       out += `<div class="card"><h2>Сейчас неделя не идёт</h2><p class="muted">${h.next_week_starts_on ? `Задание ${next ? `недели ${next.number} ` : ""}придёт в понедельник, ${fmt(h.next_week_starts_on)}.` : "Сезон завершён. Спасибо тебе за него."}</p></div>`;
@@ -99,6 +100,30 @@
 
     if (w && !w.level) bindIntent(w);
     bindComposer(w);
+    if (w && w.reports_count) renderWeekReportsInto($("week-reports"), w);
+  }
+
+  // Every report of the running week, not only the last one: the journal's cards, filtered.
+  async function renderWeekReportsInto(box, w) {
+    let j;
+    try { j = state.journal = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    if (state.tab !== "week" || !box.isConnected) return;
+    const rs = j.reports.filter((r) => r.week_number === w.number);
+    if (!rs.length) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои отчёты · ${rs.length} ${RM.plural(rs.length, "отчёт", "отчёта", "отчётов")}</h3>${rs.map(reportHtml).join("")}</div>`;
+    bindReportActions(box, j, async () => { await refreshHome(); renderWeek(); });
+  }
+
+  // «Поправить» and «Это не отчёт» on a report card; `done` redraws whatever the card sits in.
+  function bindReportActions(box, j, done) {
+    box.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
+      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
+      try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await done(); } catch (e) { RM.toast(e.message); }
+    }));
+    box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+      const report = j.reports.find((x) => String(x.id) === b.dataset.edit);
+      if (report) openEditor(report, done);
+    }));
   }
 
   function capital(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -211,7 +236,7 @@
       state.sent = r;
       state.clientId = RM.uid();
       await refreshHome();
-      renderToday(); // the task card above changes too: the intent question gives way to the stamp
+      renderWeek(); // the task card above changes too: the intent question gives way to the stamp
       showResult(r);
     } catch (e) {
       RM.haptic("error");
@@ -241,14 +266,14 @@
       try {
         const res = await RM.api(`/api/weeks/${r.week_number}/level`, { method: "POST", body: { level: "max" } });
         RM.alert(res.message.replace(/<[^>]+>/g, ""));
-        if (res.ok) { r.stamp_level = res.stamp_level; r.level = "max"; r.message = res.message; await refreshHome(); renderToday(); showResult(r); }
+        if (res.ok) { r.stamp_level = res.stamp_level; r.level = "max"; r.message = res.message; await refreshHome(); renderWeek(); showResult(r); }
       } catch (e) { RM.toast(e.message); }
     });
     if ($("edit-sent")) $("edit-sent").addEventListener("click", async () => {
       try {
         const j = await RM.api("/api/journal");
         const report = j.reports.find((x) => x.id === r.report_id);
-        if (report) openEditor(report, async () => { await refreshHome(); renderToday(); });
+        if (report) openEditor(report, async () => { await refreshHome(); renderWeek(); });
       } catch (e) { RM.toast(e.message); }
     });
     if ($("not-report")) $("not-report").addEventListener("click", async () => {
@@ -257,13 +282,11 @@
         const res = await RM.api(`/api/reports/${r.report_id}/cancel`, { method: "POST", body: {} });
         RM.alert(res.message.replace(/<[^>]+>/g, ""));
         await refreshHome();
-        renderToday();
+        renderWeek();
       } catch (e) { RM.toast(e.message); }
     });
     $("again").addEventListener("click", () => { box.innerHTML = composerHtml(w); bindComposer(w); });
   }
-
-  // --- Паспорт -------------------------------------------------------------------------
 
   // --- Рюкзак --------------------------------------------------------------------------
 
@@ -305,7 +328,7 @@
       const text = $("letter-text").value.trim();
       if (!text) return RM.toast("Пустое письмо не отправлю");
       $("letter-send").disabled = true;
-      try { const r = await RM.api("/api/letters", { method: "POST", body: { text } }); RM.haptic("success"); $("letter-text").value = ""; RM.alert(r.message); closeSheet(); }
+      try { const r = await RM.api("/api/letters", { method: "POST", body: { text } }); RM.haptic("success"); $("letter-text").value = ""; RM.alert(r.message.replace(/<[^>]+>/g, "")); closeSheet(); }
       catch (e) { RM.toast(e.message); }
       $("letter-send").disabled = false;
     });
@@ -336,6 +359,7 @@
 
   async function renderJournalInto(box) {
     try { state.journal = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    if (!box.isConnected) return; // the tab changed while the journal loaded
     const j = state.journal;
     const live = j.reports.filter((r) => r.week_number !== null);
     const letters = j.reports.filter((r) => r.week_number === null);
@@ -353,14 +377,7 @@
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
     box.innerHTML = out;
-    box.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
-      try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await refreshHome(); renderJournalInto(box); } catch (e) { RM.toast(e.message); }
-    }));
-    box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
-      const report = j.reports.find((x) => String(x.id) === b.dataset.edit);
-      if (report) openEditor(report, async () => { await refreshHome(); renderJournalInto(box); });
-    }));
+    bindReportActions(box, j, async () => { await refreshHome(); renderJournalInto(box); });
     if ($("pdf")) $("pdf").addEventListener("click", requestPdf);
   }
 
@@ -455,15 +472,15 @@
     } catch (e) { status.textContent = "Не получилось: " + e.message; button.disabled = false; }
   }
 
-  // --- Словарь -------------------------------------------------------------------------
-
   // --- Сезон ---------------------------------------------------------------------------
 
   async function renderSeason() {
     screen.innerHTML = loading();
-    try {
-      [state.dictionary, state.facts] = await Promise.all([RM.api("/api/dictionary"), RM.api("/api/facts")]);
-    } catch (e) { return (screen.innerHTML = errorBox(e)); }
+    const [dict, facts] = await Promise.allSettled([RM.api("/api/dictionary"), RM.api("/api/facts")]);
+    if (state.tab !== "season") return; // the tab changed while the season loaded
+    if (dict.status === "rejected") return (screen.innerHTML = errorBox(dict.reason));
+    state.dictionary = dict.value;
+    state.facts = facts.status === "fulfilled" ? facts.value : null;
     const h = state.home, d = state.dictionary, f = state.facts;
     const released = h.weeks.filter((w) => w.state !== "locked");
     let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1>${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
@@ -476,19 +493,21 @@
     out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(w.title)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
     out += `<h3>Слова участников</h3>`;
     out += d.user_words.length ? `<ul class="list">${d.user_words.map((w) => `<li class="${w.mine ? "mine" : ""}"><span class="mark">${w.mine ? "✍️" : "💬"}</span><span class="body"><div class="title">${esc(w.word)}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">${w.mine ? "ты" : esc(w.author)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Пока пусто — добавь первое.</p>`;
-    out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>
+    if (f) out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>
       ${f.facts.length ? `<ol style="padding-left:20px;margin:0 0 10px">${f.facts.map((x) => `<li${x.mine ? ' style="font-weight:600"' : ""}>${esc(x.text)}${x.author ? ` <span class="muted small">— ${esc(x.author)}</span>` : ""}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
       <p class="note" style="margin:8px 0 0">Попадёт в общий список и в журнал сезона, с твоим именем.</p></div>`;
+    else out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали</h2><p class="muted">Факты не загрузились — открой вкладку ещё раз.</p></div>`;
     out += `<details class="card"><summary>О клубе</summary><div class="content helptext">${html(h.texts.greeting)}</div></details>`;
+    out += `<details class="card"><summary>❔ Если что-то пошло не так</summary><div class="content helptext">${html(unhead(h.texts.help))}</div></details>`;
     const links = [];
     if (h.links.channel_url) links.push(`<a class="btn soft" href="${esc(h.links.channel_url)}">📣 Канал клуба</a>`);
     if (h.links.admin_app) links.push(`<a class="btn" href="/app/admin${location.hash}">🛠 Админка</a>`);
     if (links.length) out += `<div class="actions" style="margin-top:4px">${links.join("")}</div>`;
-    out += `<p class="muted small" style="margin-top:20px;text-align:center">Помощь и письмо Миле — в чате с ботом${h.links.bot_username ? ` @${esc(h.links.bot_username)}` : ""}: /help или просто сообщение.</p>`;
+    out += `<p class="muted small" style="margin-top:20px;text-align:center">Письмо Миле — в «Рюкзаке» у заморозок или в чате с ботом${h.links.bot_username ? ` @${esc(h.links.bot_username)}` : ""}: /help → «Написать Миле».</p>`;
     screen.innerHTML = out;
     screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeek(+li.dataset.week)));
-    $("fact-send").addEventListener("click", async () => {
+    if ($("fact-send")) $("fact-send").addEventListener("click", async () => {
       const text = $("fact-text").value.trim();
       if (!text) return RM.toast("Напиши факт");
       $("fact-send").disabled = true;

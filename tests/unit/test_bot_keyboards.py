@@ -223,5 +223,9 @@ def test_main_keyboard_is_one_web_app_door() -> None:
     plain = main_keyboard(is_admin=False, app_url="http://127.0.0.1:8010")  # Telegram refuses non-https web apps
     assert plain.keyboard[0][0].web_app is None
 
+    slashed = main_keyboard(is_admin=False, app_url="https://romantika.example.test/")
+    assert slashed.keyboard[0][0].web_app is not None
+    assert slashed.keyboard[0][0].web_app.url == "https://romantika.example.test/app"
+
     admin = main_keyboard(is_admin=True, app_url="https://romantika.example.test")
     assert [[b.text for b in row] for row in admin.keyboard] == [["🎒 Открыть клуб"], ["⚙️ Мила"]]

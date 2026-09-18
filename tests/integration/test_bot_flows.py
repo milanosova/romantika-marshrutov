@@ -8,6 +8,7 @@ what was actually sent and what ended up in the database, not merely that nothin
 from __future__ import annotations
 
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 from aiogram.methods import AnswerCallbackQuery, CopyMessage, SendMessage
@@ -600,6 +601,27 @@ async def test_participant_keyboard_is_one_door(harness: Harness) -> None:
     labels = [b.text for row in markup.keyboard for b in row]
     assert labels == ["🎒 Открыть клуб"], labels
     assert "⚙️ Мила" not in labels
+
+
+async def test_door_label_answers_with_a_button_over_https(harness: Harness) -> None:
+    """A cached plain label (or a tap on the text) gets the app as an inline button."""
+    await harness.text(ALICE, "🎒 Открыть клуб")
+    message = harness.session.messages(ALICE)[-1]
+    assert "👇" in message.text, message.text
+    button = message.reply_markup.inline_keyboard[0][0]
+    assert button.web_app is not None and button.web_app.url == "https://romantika.example.test/app"
+
+
+async def test_door_label_without_https_answers_with_the_address(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Over http Telegram allows no web_app button, so the door press must still lead somewhere."""
+    harness = await build_harness(db_session, tmp_path, monkeypatch, public_base_url="http://127.0.0.1:8010/")
+    await harness.text(ALICE, "🎒 Открыть клуб")
+    message = harness.session.messages(ALICE)[-1]
+    assert "http://127.0.0.1:8010/app" in message.text, message.text
+    assert "👇" not in message.text, "no button below — the text must not promise one"
+    assert message.reply_markup is None
 
 
 async def test_old_button_labels_still_answer(harness: Harness) -> None:
