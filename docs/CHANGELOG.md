@@ -21,8 +21,8 @@ a cached message still answers and counts as «берусь». A bare word typed
 («Паспорт», «Паспорт!», «Сегодня») is a one-word report, not a button: a button starts with
 its emoji. Four refusals people can see are new: «Эта неделя уже прошла…», «Штамп за эту
 неделю у тебя уже есть…» and «Эта неделя ещё не открылась…» on an intent button (in the bot
-and in the app alike), «такой факт у тебя уже записан» on a repeated fact (with a hint how to
-try again). Mila's fact form in the bot says her facts are the club's; the help sheet no
+and in the app alike), «Такой факт у тебя уже записан» on a repeated fact (with a hint how to
+try again); a fact is capped at 4000 characters in the bot as in the app. Mila's fact form in the bot says her facts are the club's; the help sheet no
 longer breaks a sentence at «две заморозки»; the freezes sheet says «в канале» like the rest.
 
 Under the hood: the intent rules live in `people.choose_intent`, shared by the bot button and

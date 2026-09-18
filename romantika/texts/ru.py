@@ -322,6 +322,14 @@ FACT_PROMPT_ADMIN = (
 )
 FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
 FACT_DUPLICATE = "такой факт у тебя уже записан"
+FACT_TOO_LONG = "факт длиннее 4000 знаков — сократи, пожалуйста"
+
+
+def sentence(text: str) -> str:
+    """A refusal written as a tail («такой факт у тебя уже записан») opening a message of its own."""
+    return text[:1].upper() + text[1:]
+
+
 FACT_REFUSED_HINT = ". Если хочешь записать другой — нажми «➕ Добавить свой факт» ниже."
 """Follows a refusal from `facts.add` in the bot: the dialog is closed, a plain message is a report again."""
 NOT_UNDERSTOOD = (

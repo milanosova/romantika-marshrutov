@@ -202,7 +202,10 @@ async def answer_dialog(
             # The dialog is already closed (the caller cleared it): the next message is a report again.
             logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
             await safe_send(
-                bot, chat_id, f"{escape(str(exc))}{ru.WORD_REFUSED_HINT}", reply_markup=keyboards.word_button()
+                bot,
+                chat_id,
+                f"{escape(ru.sentence(str(exc)))}{ru.WORD_REFUSED_HINT}",
+                reply_markup=keyboards.word_button(),
             )
             return
         await safe_send(
@@ -258,7 +261,7 @@ async def answer_dialog(
             await safe_send(
                 bot,
                 chat_id,
-                f"{escape(str(exc))}{ru.FACT_REFUSED_HINT}",
+                f"{escape(ru.sentence(str(exc)))}{ru.FACT_REFUSED_HINT}",
                 reply_markup=keyboards.facts_buttons(is_admin=is_admin, has_facts=is_admin),
             )
             return

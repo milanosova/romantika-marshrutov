@@ -69,7 +69,7 @@ async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.callback(ALICE, "addword")
     await harness.text(ALICE, "sobremesa — снова")
 
-    assert harness.session.last_text(ALICE).startswith("слово «sobremesa» у тебя в словарике уже есть")
+    assert harness.session.last_text(ALICE).startswith("Слово «sobremesa» у тебя в словарике уже есть")
     assert await count(db_session, models.Word) == 1
     assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
 
@@ -116,7 +116,7 @@ async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.callback(ALICE, "addfact")
     await harness.text(ALICE, "ацтеки называли себя мешика")
 
-    assert "уже записан" in harness.session.last_text(ALICE)
+    assert harness.session.last_text(ALICE).startswith("Такой факт у тебя уже записан"), "a sentence of its own"
     assert "Добавить свой факт" in harness.session.last_text(ALICE), "the person is told how to try again"
     assert await count(db_session, models.Fact) == 1
     assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
@@ -124,6 +124,13 @@ async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, 
     await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
     assert await count(db_session, models.Fact) == 1, "a report after a refused fact is not a fact"
     assert await count(db_session, models.Report) == 1
+
+
+async def test_a_fact_longer_than_a_message_is_refused(harness: Harness, db_session: AsyncSession) -> None:
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "ф" * 4001)
+    assert "4000" in harness.session.last_text(ALICE)
+    assert await count(db_session, models.Fact) == 0
 
 
 async def test_fact_dialog_from_admin_has_no_author(harness: Harness, db_session: AsyncSession) -> None:
