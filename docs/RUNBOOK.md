@@ -180,7 +180,12 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   previous release would show them to participants. Announce or delete the drafts in the
   admin app («Задания»), then downgrade.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
-  unacknowledged updates for 24 h).
+  unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
+  list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before
+  v2.3.0 does not undo that: run `rc exec -T bot python -m romantika.ops.telegram_setup` from
+  the rolled-back tree afterwards. Reply keyboards are cached on people's phones until their
+  next `/start`; a client too old for `web_app` buttons sends «🎒 Открыть клуб» as text, which
+  a pre-v2.3.0 bot would take for a report inside a week.
 
 ## Read-only queries
 

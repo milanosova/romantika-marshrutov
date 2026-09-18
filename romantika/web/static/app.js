@@ -235,6 +235,8 @@
       RM.haptic("success");
       state.clientId = RM.uid();
       await refreshHome();
+      // /api/home may have failed silently; the report exists, so the list below must show it.
+      if (!r.out_of_week && state.home.week && !state.home.week.reports_count) state.home.week.reports_count = 1;
       renderWeek(); // the task card above changes too: the intent question gives way to the stamp
       showResult(r);
     } catch (e) {
@@ -288,7 +290,7 @@
     out += `<details class="card"><summary>Что будет в конце сезона</summary><div class="content helptext">${html(unhead(h.texts.end_of_season))}</div></details>`;
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
-    $("freezes-how").addEventListener("click", (e) => { e.preventDefault(); openFreezes(p); });
+    $("freezes-how").addEventListener("click", (e) => { e.preventDefault(); openFreezes(state.home.passport); });
     await renderJournalInto($("journal-box"));
   }
 
@@ -357,7 +359,8 @@
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
     box.innerHTML = out;
-    bindReportActions(box, j, async () => { await refreshHome(); renderJournalInto(box); });
+    // The passport tiles and the week grid above the journal change with the stamp: redraw the tab.
+    bindReportActions(box, j, async () => { await refreshHome(); render(); });
     if ($("pdf")) $("pdf").addEventListener("click", requestPdf);
   }
 

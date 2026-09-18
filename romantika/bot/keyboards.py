@@ -82,10 +82,10 @@ def _web_app_button(text: str, url: str) -> InlineKeyboardButton | None:
 def more_menu(public_base_url: str) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
         [InlineKeyboardButton(text="📔 Мой журнал", callback_data="more:journal")],
-        [InlineKeyboardButton(text="✉️ Написать Миле", callback_data="more:write")],
+        [InlineKeyboardButton(text=ru.WRITE_MILA, callback_data="more:write")],
         [InlineKeyboardButton(text="❔ Помощь", callback_data="more:help")],
     ]
-    if button := _web_app_button("📱 Открыть приложение", app_page_url(public_base_url)):
+    if button := _web_app_button(ru.OPEN_CLUB, app_page_url(public_base_url)):
         rows.insert(0, [button])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -133,9 +133,7 @@ def app_button(public_base_url: str) -> InlineKeyboardMarkup | None:
 def help_buttons(public_base_url: str) -> InlineKeyboardMarkup:
     """Under the FAQ: the way to write Mila (inside a week a plain message is a report,
     DOMAIN §2, so the letter needs its own door) and the app."""
-    rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton(text="✉️ Написать Миле", callback_data="more:write")]
-    ]
+    rows: list[list[InlineKeyboardButton]] = [[InlineKeyboardButton(text=ru.WRITE_MILA, callback_data="more:write")]]
     if button := _web_app_button(ru.OPEN_CLUB, app_page_url(public_base_url)):
         rows.append([button])
     return InlineKeyboardMarkup(inline_keyboard=rows)

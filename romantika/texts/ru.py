@@ -123,6 +123,9 @@ def greeting(season: SeasonDTO | None, *, app: bool = False) -> str:
 OPEN_CLUB = "🎒 Открыть клуб"
 """The one button under the chat: it opens the Mini App (DOMAIN §7)."""
 
+WRITE_MILA = "✉️ Написать Миле"
+"""The inline button under /help and in the legacy «Ещё» menu."""
+
 GREETING_CTA = (
     "\n\nВсё остальное — за кнопкой ниже 👇 Там три вкладки: «Неделя» с заданием, "
     "«Рюкзак» с паспортом и журналом, «Сезон» со словарём."
@@ -270,7 +273,7 @@ ADMIN_MEMO = (
 
 WHOAMI = "Твой id: <code>{user_id}</code>\nПоложи его в <code>ADMIN_IDS</code>, чтобы получить админские команды."
 UNKNOWN_COMMAND = "Такой команды нет. Жми кнопку внизу 👇"
-NOT_ADMIN = "Это команда Милы. Тебе — кнопки внизу 👇"
+NOT_ADMIN = "Это команда Милы. Тебе — кнопка внизу 👇"
 NO_WEEK_TASK = "Сейчас неделя сезона не идёт. Ближайшее задание — в понедельник."
 NO_SEASON = "Сезон ещё не начался. Как только рандомайзер выберет страну — здесь появится задание."
 MORE_MENU = "Что открыть:"
