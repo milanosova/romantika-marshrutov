@@ -257,7 +257,10 @@ async def participant(
         achievements=view.achievements,
         wish=jview.wish,
         reports=[
-            views.reports_out(r, week_ends={w.number: w.ends_on for w in view.weeks}, today=today) for r in reports
+            views.reports_out(
+                r, week_ends={w.number: w.ends_on for w in view.weeks}, today=today, season_ends_on=season.ends_on
+            )
+            for r in reports
         ],
         words=[schemas.WordOut(word=w.word, meaning=w.meaning) for w in jview.words],
     )

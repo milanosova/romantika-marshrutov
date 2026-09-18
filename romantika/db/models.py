@@ -282,6 +282,8 @@ class Report(Base, TimestampMixin):
     """Idempotency key of a Mini App submission; None for messages that came through the bot."""
     edited_at: Mapped[datetime | None] = mapped_column(Timestamp)
     """Last edit in the Mini App (text or files); the previous text is in `audit_log`."""
+    late: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    """Sent for a week that had already ended (DOMAIN §2): journal only, never a stamp."""
     deleted_at: Mapped[datetime | None] = mapped_column(Timestamp)
 
 

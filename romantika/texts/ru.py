@@ -175,6 +175,16 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
         None,
     ),
     (
+        "Хочу сделать прошедшую неделю",
+        "Можно, до конца сезона — в приложении: «🎒 Открыть клуб», «Сезон», нажми на неделю, "
+        "там «Добавить в журнал». Текст и фото лягут в твой журнал и в книгу сезона. Штамп за "
+        "прошедшую неделю уже не ставится и заморозка не возвращается: паспорт — про «вовремя», "
+        "журнал — про «вообще». Сюда, в чат, такое слать не надо — я не пойму, к какой неделе.",
+        "Можно, до конца сезона: вкладка «Сезон», нажми на неделю, там «Добавить в журнал». "
+        "Текст и фото лягут в твой журнал и в книгу сезона. Штамп за прошедшую неделю уже не "
+        "ставится и заморозка не возвращается: паспорт — про «вовремя», журнал — про «вообще».",
+    ),
+    (
         "Как заработать ещё заморозку",
         "Всего можно накопить пять. Сверх двух базовых:\n"
         "· +1 за своё слово в словарике — сразу, автоматически\n"
@@ -309,8 +319,20 @@ NOT_UNDERSTOOD = (
     "Пришли что-то из этого, и я поставлю штамп."
 )
 OUT_OF_WEEK = "Спасибо! Сейчас неделя сезона не идёт, так что штамп не ставлю — но сообщение сохранила и прочитаю."
+
+# --- late reports: a past week, journal only (DOMAIN §2) ---------------------------------
+LATE_SAVED = "📔 Записала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в книгу сезона попадёт."
+LATE_ADDED = "📔 Дописала в журнал недели {number} «{title}». Штамп за неделю как был — он не меняется."
+LATE_MARK = "дослано позже"
+"""The mark on a late report in the journal, the PDF and Mila's admin app."""
+LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за неё ставит штамп, отправь его как обычно"
+LATE_WEEK_FUTURE = "эта неделя ещё не началась"
+LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
+LATE_NO_WEEK = "такой недели нет"
+"""Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
 JOURNAL_NOW = "Так он выглядит сейчас. К {end} здесь будет весь сезон."
 NOT_REPORT_DONE = "Поняла, это не отчёт — штамп пересчитала. Сохранила как обычное сообщение, прочитаю."
+NOT_REPORT_DONE_LATE = "Поняла — убрала из журнала. Сохранила как обычное сообщение, прочитаю."
 NOT_REPORT_FOREIGN = "Этот отчёт не твой, ничего не трогаю."
 NOT_REPORT_ALREADY = "Этот отчёт уже отменён — всё в порядке."
 EDIT_WEEK_OVER = "Эта неделя уже закрыта — отчёт остаётся как есть. Дописать можно, пока неделя идёт."
@@ -603,8 +625,11 @@ def admin_edit_header(week_number: int, author: str, text: str | None, *, added:
     )
 
 
-def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool) -> str:
-    """The receipt after an edit in the Mini App; names the stamp the week actually has."""
+def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool, late: bool = False) -> str:
+    """The receipt after an edit in the Mini App; names the stamp the week actually has.
+    A late report has none behind it, so the receipt speaks of the journal only."""
+    if late:
+        return f"✏️ Запись в журнале недели «{escape(week.title)}» обновила. Штамп это не трогает."
     if level is StampLevel.MAX:
         text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — штамп со звёздочкой ⭐ на месте."
     elif level is StampLevel.MIN:
@@ -632,6 +657,15 @@ def admin_word_added(author: str, text: str, week_number: int | None = None) -> 
 def admin_fact_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
     return f"💡 Новый факт от {escape(author)}{where}: {escape(text)}"
+
+
+def admin_late_header(week_number: int, author: str, text: str | None, kind: str) -> str:
+    """Mila's copy of a report for a week that has ended: no stamp behind it (DOMAIN §2)."""
+    body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
+    return (
+        f"📨 {escape(author)} дослала за неделю {week_number}{body}"
+        "\n\n<i>Штамп не ставится. Ответь на это сообщение — я передам ответ автору.</i>"
+    )
 
 
 def admin_out_of_week_header(author: str, text: str | None, kind: str) -> str:

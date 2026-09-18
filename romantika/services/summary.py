@@ -202,6 +202,7 @@ async def _require_week(session: AsyncSession, season_id: int, week_number: int)
 
 
 async def _report_count(session: AsyncSession, *, season_id: int, week_id: int) -> int:
+    """Reports of the week itself: what was sent after it ended is journal-only (DOMAIN §2)."""
     query = (
         select(func.count())
         .select_from(models.Report)
@@ -209,6 +210,7 @@ async def _report_count(session: AsyncSession, *, season_id: int, week_id: int) 
             models.Report.season_id == season_id,
             models.Report.week_id == week_id,
             models.Report.deleted_at.is_(None),
+            models.Report.late.is_(False),
         )
     )
     return int((await session.execute(query)).scalar_one())
@@ -231,6 +233,7 @@ async def _quotes(session: AsyncSession, *, season_id: int, week_id: int) -> dic
             models.Report.season_id == season_id,
             models.Report.week_id == week_id,
             models.Report.deleted_at.is_(None),
+            models.Report.late.is_(False),
             models.Report.text.is_not(None),
             models.Report.text != "",
         )

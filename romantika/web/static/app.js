@@ -5,7 +5,7 @@
 // uses); this file only draws. Old tab names still route (links in old messages).
 (function () {
   const RM = window.RM;
-  const esc = RM.escape, html = RM.html, fmt = RM.fmtDate;
+  const esc = RM.escape, html = RM.html, fmt = RM.fmtDate, kindName = RM.kindName;
   const $ = (id) => document.getElementById(id);
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
@@ -117,7 +117,8 @@
   // «Поправить» and «Это не отчёт» on a report card; `done` redraws whatever the card sits in.
   function bindReportActions(box, j, done) {
     box.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
+      const late = j.reports.some((x) => String(x.id) === b.dataset.cancel && x.late);
+      if (!(await RM.confirm(late ? NOT_REPORT_CONFIRM_LATE : NOT_REPORT_CONFIRM))) return;
       try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await done(); } catch (e) { RM.toast(e.message); }
     }));
     box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
@@ -169,12 +170,15 @@
     return `<span class="chip">пока без штампа</span>`;
   }
 
-  function composerHtml(w) {
-    const title = w ? "Сдать отчёт" : "Написать Миле";
-    const note = w
+  // `late` — the week has ended: the report goes into the journal chapter only (DOMAIN §2).
+  function composerHtml(w, late) {
+    const title = late ? (late.again ? "Дописать в журнал" : "Добавить в журнал") : w ? "Сдать отчёт" : "Написать Миле";
+    const note = late
+      ? (late.again ? "Штамп за неделю уже стоит, он не изменится. Текст и фото лягут в ту же главу журнала." : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт.")
+      : w
       ? "Текст — минимум ✅, фото или видео — максимум ⭐. Дослать можно сколько угодно раз."
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
-    return `<div class="row between"><h2 style="margin:0">${title}</h2>${stampChip(w)}</div>
+    return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
       <textarea id="report-text" placeholder="${w ? "Что было на этой неделе?" : "Что хочешь сказать?"}"></textarea>
       <div class="attach"><label class="btn soft small" for="report-files">📷 Фото или видео</label><input id="report-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="files-count"></span></div>
@@ -183,12 +187,12 @@
       <button class="btn block" id="send" style="margin-top:12px">Отправить</button>`;
   }
 
-  function bindComposer(w) {
+  function bindComposer(w, late) {
     state.files = [];
     state.clientId = RM.uid(); // one id per attempt: a retry after a lost answer finds the same report
     const input = $("report-files");
     input.addEventListener("change", () => { addFiles(state.files, input.files, 0); input.value = ""; renderPreviews(state.files, $("previews"), $("files-count")); });
-    $("send").addEventListener("click", () => sendReport(w));
+    $("send").addEventListener("click", () => sendReport(w, late));
   }
 
   // Adds what fits within the API's limits and says what did not (D4). `taken` counts files
@@ -219,7 +223,7 @@
   }
   function mb(bytes) { return bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + " КБ" : (bytes / 1024 / 1024).toFixed(bytes > 10 * 1024 * 1024 ? 0 : 1) + " МБ"; }
 
-  async function sendReport(w) {
+  async function sendReport(w, late) {
     const text = $("report-text").value.trim();
     if (!text && !state.files.length) return RM.toast("Напиши хотя бы слово или добавь фото");
     const button = $("send"), bar = $("bar");
@@ -228,12 +232,14 @@
     const form = new FormData();
     form.append("text", text);
     form.append("client_id", state.clientId);
+    if (late) form.append("week_number", String(w.number)); // a past week: journal only
     state.files.forEach((f) => form.append("files", f, f.name));
     if (state.files.length) bar.hidden = false;
     try {
       const r = await RM.upload("/api/reports", form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; });
       RM.haptic("success");
       state.clientId = RM.uid();
+      if (late) { late.done(r); return; }
       await refreshHome();
       // /api/home may have failed silently; the report exists, so the list below must show it.
       if (!r.out_of_week && state.home.week && !state.home.week.reports_count) state.home.week.reports_count = 1;
@@ -249,6 +255,7 @@
   }
 
   const NOT_REPORT_CONFIRM = "Пометить как не отчёт? Штамп за неделю пересчитается, а текст останется у меня как обычное сообщение.";
+  const NOT_REPORT_CONFIRM_LATE = "Убрать из журнала? Текст останется у меня как обычное сообщение; штампов это не касается.";
 
   function showResult(r) {
     const box = $("composer");
@@ -283,7 +290,7 @@
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>
-        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · 🔒 откроется в понедельник. Нажми на неделю — откроется задание.</p></div>`;
+        <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · ◦ пропущена или была до твоего прихода · 🔒 откроется в понедельник. Нажми на неделю — откроется задание; за прошедшую можно дописать в журнал.</p></div>`;
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="journal-box">${loading()}</div>`;
@@ -332,9 +339,44 @@
          ${w.intro ? `<p>${esc(w.intro)}</p>` : ""}
          <div class="kv"><div><div class="k">Минимум ✅</div><div class="v">${esc(w.task_min)}</div></div>${w.task_max ? `<div><div class="k">Максимум ⭐</div><div class="v">${esc(w.task_max)}</div></div>` : ""}</div>
          ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
-         ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}`;
+         ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}
+         ${w.late_open ? `<div id="late-box" style="margin-top:14px">${loading()}</div>` : ""}`;
     const title = w.title && w.title !== `Неделя ${w.number}` ? `Неделя ${w.number} · ${w.title}` : `Неделя ${w.number}`;
-    openSheet(title, body, () => { if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week")); });
+    openSheet(title, body, () => {
+      if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week"));
+      if (w.late_open) renderLateBox(w);
+    });
+  }
+
+  // The chapter of a past week inside its sheet: what is already there, and the door to add more.
+  async function renderLateBox(w) {
+    const box = $("late-box");
+    if (!box) return;
+    let j;
+    try { j = await RM.api("/api/journal"); } catch (e) { if (box.isConnected) box.innerHTML = errorBox(e); return; }
+    if (!box.isConnected) return;
+    const rs = j.reports.filter((r) => r.week_number === w.number);
+    const again = rs.length > 0;
+    box.innerHTML = `${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
+      <button class="btn block" id="late-open" style="margin-top:10px">${again ? "Дописать в журнал" : "Добавить в журнал"}</button>
+      <p class="note" style="margin:8px 0 0">${again ? "Штамп за неделю уже стоит, он не изменится." : "Неделя прошла — штамп за неё уже не ставится, а в журнал и в книгу сезона попадёт."}</p>`;
+    // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
+    bindReportActions(box, j, () => { if ($("late-box")) renderLateBox(w); else openWeek(w.number); });
+    $("late-open").addEventListener("click", () => {
+      const form = document.createElement("div");
+      form.className = "composer";
+      form.id = "composer";
+      form.innerHTML = composerHtml(w, { again });
+      $("late-open").replaceWith(form);
+      bindComposer(w, { again, done: (r) => showLateResult(w, r) });
+      $("report-text").focus();
+    });
+  }
+
+  function showLateResult(w, r) {
+    const box = $("composer");
+    if (box) box.innerHTML = `<div class="result ok"><div class="rich">${html(r.message)}</div></div>`;
+    renderLateBox(w); // the new entry joins the chapter; the passport above is untouched (no stamp)
   }
 
   // --- Журнал --------------------------------------------------------------------------
@@ -353,8 +395,10 @@
     weeksDone.forEach((n) => {
       const week = j.weeks.find((w) => w.number === n) || { title: "" };
       const rs = byWeek.get(n);
-      const level = week.level === "max" ? "⭐" : "✅";
-      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}</h2>${rs.map(reportHtml).join("")}</div>`;
+      // No stamp behind the chapter: everything in it was added after the week ended.
+      const lateOnly = !week.level && rs.every((r) => r.late);
+      const level = lateOnly ? "📔" : week.level === "max" ? "⭐" : "✅";
+      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
@@ -368,8 +412,10 @@
     const images = r.media.filter((m) => m.mime && m.mime.startsWith("image/") && m.downloaded);
     const others = r.media.filter((m) => !images.includes(m));
     const edited = r.edited_at ? ` · <span class="edited">изменено ${RM.fmtDateTime(r.edited_at)}</span>` : "";
+    // A late report has no stamp behind it: the mark replaces the level (DOMAIN §2).
+    const level = r.late ? "📔 дослано позже" : r.level === "max" ? "⭐ максимум" : "✅ минимум";
     return `<article class="report">
-      <div class="meta">${RM.fmtDateTime(r.created_at)} · ${r.level === "max" ? "⭐ максимум" : "✅ минимум"} · ${kindName(r.kind)}${edited}</div>
+      <div class="meta">${RM.fmtDateTime(r.created_at)} · ${level} · ${kindName(r.kind)}${edited}</div>
       ${r.text ? `<div class="text">${esc(r.text)}</div>` : ""}
       ${images.length ? `<div class="gallery">${images.map((m, i) => `<a href="${m.url}" target="_blank"><img src="${m.url}" alt="${r.week_number ? `Фото ${i + 1} из отчёта за неделю ${r.week_number}` : `Фото ${i + 1} из сообщения`}" loading="lazy"></a>`).join("")}</div>` : ""}
       ${others.map((m) => m.downloaded ? `<a class="btn ghost small" href="${m.url}" target="_blank" style="margin-top:8px">Открыть файл</a>` : `<span class="muted small">файл ещё скачивается</span>`).join(" ")}
@@ -385,14 +431,14 @@
   function openEditor(r, done) {
     const week = (state.home.weeks || []).find((w) => w.number === r.week_number);
     const added = [], removed = new Set();
-    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}пока неделя идёт, отчёт можно менять — я увижу новую версию.</p>
+    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
       <textarea id="edit-text" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
       ${r.media.length ? `<p class="note" style="margin:10px 0 4px">Файлы в отчёте — нажми, чтобы убрать</p><div class="previews" id="edit-existing">${r.media.map((m) => `<button class="pv keep" data-id="${m.id}" title="${esc(m.mime || "")}">${m.mime && m.mime.startsWith("image/") && m.downloaded ? `<img src="${m.url}" alt="">` : `<span>${kindName(m.mime && m.mime.startsWith("video/") ? "video" : "document")}</span>`}<span class="x" aria-hidden="true">✕</span></button>`).join("")}</div>` : ""}
       <div class="attach" style="margin-top:10px"><label class="btn soft small" for="edit-files">📷 Добавить фото или видео</label><input id="edit-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="edit-count"></span></div>
       <div class="previews" id="edit-previews" hidden></div>
       <div class="bar" id="edit-bar" hidden><i></i></div>
       <button class="btn block" id="edit-save" style="margin-top:12px">Сохранить</button>
-      <p class="note" style="margin:8px 0 0">После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум.</p>`;
+      <p class="note" style="margin:8px 0 0">${r.late ? "Штамп это не трогает: поздний отчёт живёт только в журнале." : "После сохранения штамп за неделю пересчитается по всем твоим отчётам за неё: есть фото — максимум, только текст — минимум."}</p>`;
     openSheet("Поправить отчёт", body, () => {
       const existing = $("edit-existing");
       if (existing) existing.querySelectorAll(".pv").forEach((b) => b.addEventListener("click", () => {
@@ -432,9 +478,6 @@
     });
   }
 
-  function kindName(kind) {
-    return { text: "текст", photo: "фото", video: "видео", video_note: "кружок", voice: "голосовое", audio: "аудио", document: "файл", other: "сообщение" }[kind] || kind;
-  }
 
   async function requestPdf() {
     const button = $("pdf"), status = $("pdf-status");

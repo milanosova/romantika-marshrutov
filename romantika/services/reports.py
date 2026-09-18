@@ -19,6 +19,8 @@ from romantika.domain import rules
 from romantika.domain.calendar import to_moscow
 from romantika.domain.types import ReportKind, StampLevel
 from romantika.services import content, freezes, media, people, stamps
+from romantika.services.errors import Refused
+from romantika.texts import ru
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +61,10 @@ class AcceptResult:
     stamp_level: StampLevel | None
     freeze_granted: bool
     media_ids: list[uuid.UUID]
+    late: bool = False
+    """Sent for a week that had ended: journal only, the stamp above is the one the week already had."""
+    first_of_week: bool = True
+    """False when the person already had a live report for that week (the app says it added to the chapter)."""
 
 
 #: `FixResult.reason` codes. Named here because the bot matches on them to pick the Russian
@@ -186,6 +192,85 @@ async def accept(
         stamp_level=stamp.level,
         freeze_granted=freeze_granted,
         media_ids=media_ids,
+    )
+
+
+async def accept_late(
+    session: AsyncSession,
+    *,
+    season_id: int,
+    user_id: int,
+    week_number: int,
+    message: IncomingMessage,
+    now: datetime,
+) -> AcceptResult:
+    """Store a report for a week that has already ended — into the journal only (DOMAIN §2).
+
+    No stamp, no freeze back, no place in that week's summary: `late=True` keeps the row out
+    of every stamp computation. Allowed until the season's last day; a running week takes
+    the ordinary path, a future week nothing at all. Refusals carry the Russian text.
+    """
+    season = await content.require_season(session, season_id)
+    await people.ensure_member(session, season_id, user_id, now=now)
+    today = to_moscow(now).date()
+    week = await content.week_by_number(session, season_id, week_number)
+    if week is None:
+        raise Refused(ru.LATE_NO_WEEK)
+    if today < week.starts_on:
+        raise Refused(ru.LATE_WEEK_FUTURE)
+    if today <= week.ends_on:
+        raise Refused(ru.LATE_WEEK_RUNNING)
+    if today > season.ends_on:
+        raise Refused(ru.LATE_SEASON_OVER)
+    first_of_week = not await _has_report(session, user_id=user_id, week_id=week.id, include_late=True)
+
+    level = rules.report_level(message.kind)
+    report = models.Report(
+        season_id=season_id,
+        user_id=user_id,
+        week_id=week.id,
+        kind=message.kind.value,
+        text=message.text,
+        level=level.value,
+        tg_chat_id=message.tg_chat_id,
+        tg_message_id=message.tg_message_id,
+        client_id=message.client_id,
+        late=True,
+        created_at=now,
+    )
+    session.add(report)
+    await session.flush()
+    media_rows: list[models.Media] = []
+    for position, item in enumerate(message.files):
+        row = models.Media(
+            report_id=report.id,
+            tg_file_id=item.file_id,
+            tg_file_unique_id=item.file_unique_id,
+            mime=item.mime,
+            size=item.size,
+            width=item.width,
+            height=item.height,
+            path=media.new_relative_path(
+                season_slug=season.slug,
+                user_id=user_id,
+                suffix=media.suffix_for(kind=item.kind, mime=item.mime),
+            ),
+            created_at=now + timedelta(microseconds=position),
+        )
+        session.add(row)
+        media_rows.append(row)
+    if media_rows:
+        await session.flush()
+    return AcceptResult(
+        report_id=report.id,
+        week_number=week.number,
+        out_of_week=False,
+        level=level,
+        stamp_level=await stamps.get_level(session, user_id=user_id, week_id=week.id),
+        freeze_granted=False,
+        media_ids=[row.id for row in media_rows],
+        late=True,
+        first_of_week=first_of_week,
     )
 
 
@@ -343,10 +428,16 @@ class EditResult:
     media_ids: list[uuid.UUID] = field(default_factory=list)
     text_changed: bool = False
     removed: int = 0
+    late: bool = False
 
 
-def editable_until(week_ends_on: date | None, today: date) -> bool:
-    """A report may be edited while its week is open (DOMAIN §2); letters and past weeks are read-only."""
+def editable_until(
+    week_ends_on: date | None, today: date, *, late: bool = False, season_ends_on: date | None = None
+) -> bool:
+    """A report may be edited while its week is open (DOMAIN §2); letters and past weeks are
+    read-only. A late report has no open week: it may be edited until the season ends."""
+    if late:
+        return season_ends_on is not None and today <= season_ends_on
     return week_ends_on is not None and today <= week_ends_on
 
 
@@ -374,10 +465,12 @@ async def edit(
     if report.deleted_at is not None:
         return EditResult(ok=False, reason=CANCELLED)
     week = await session.get(models.Week, report.week_id) if report.week_id is not None else None
-    if week is None or not editable_until(week.ends_on, to_moscow(now).date()):
+    season = await content.require_season(session, report.season_id)
+    if week is None or not editable_until(
+        week.ends_on, to_moscow(now).date(), late=report.late, season_ends_on=season.ends_on
+    ):
         return EditResult(ok=False, reason=WEEK_OVER)
 
-    season = await content.require_season(session, report.season_id)
     body = (text or "").strip() or None
     text_changed = body != (report.text or None)
 
@@ -469,6 +562,7 @@ async def edit(
         media_ids=[row.id for row in new_rows],
         text_changed=text_changed,
         removed=removed,
+        late=report.late,
     )
 
 
@@ -489,30 +583,35 @@ async def find_by_client_id(session: AsyncSession, *, user_id: int, client_id: s
     return (await session.execute(query)).scalar_one_or_none()
 
 
-async def count_for_week(session: AsyncSession, *, user_id: int, week_id: int) -> int:
-    """Live (not cancelled) reports of one participant for one week."""
+async def count_for_week(session: AsyncSession, *, user_id: int, week_id: int, include_late: bool = True) -> int:
+    """Live (not cancelled) reports of one participant for one week, late ones included by default."""
     query = select(func.count(models.Report.id)).where(
         models.Report.user_id == user_id,
         models.Report.week_id == week_id,
         models.Report.deleted_at.is_(None),
     )
+    if not include_late:
+        query = query.where(models.Report.late.is_(False))
     return int((await session.execute(query)).scalar_one())
 
 
-async def _has_report(session: AsyncSession, *, user_id: int, week_id: int) -> bool:
+async def _has_report(session: AsyncSession, *, user_id: int, week_id: int, include_late: bool = False) -> bool:
     query = select(models.Report.id).where(
         models.Report.user_id == user_id,
         models.Report.week_id == week_id,
         models.Report.deleted_at.is_(None),
     )
+    if not include_late:
+        query = query.where(models.Report.late.is_(False))
     return (await session.execute(query.limit(1))).first() is not None
 
 
 async def _remaining_levels(session: AsyncSession, *, user_id: int, week_id: int) -> dict[int, StampLevel]:
-    """`{report_id: level}` of the live reports of one week."""
+    """`{report_id: level}` of the live reports of one week that may hold a stamp — never the late ones."""
     query = select(models.Report.id, models.Report.level).where(
         models.Report.user_id == user_id,
         models.Report.week_id == week_id,
         models.Report.deleted_at.is_(None),
+        models.Report.late.is_(False),
     )
     return {rid: StampLevel(level) for rid, level in (await session.execute(query)).tuples().all()}

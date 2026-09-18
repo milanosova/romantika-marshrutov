@@ -18,6 +18,7 @@ from markupsafe import Markup
 
 from romantika.domain.types import Level, StampLevel
 from romantika.services.journal import JournalView, JournalWeek
+from romantika.texts import ru
 from romantika.texts.ru import plural
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
@@ -55,15 +56,29 @@ def span_words(start: date | None, end: date | None) -> str:
 
 
 @dataclass(frozen=True, slots=True)
+class CardEntry:
+    text: str
+    late: bool = False
+    """Sent after the week ended: the entry carries the late mark (`ru.LATE_MARK`, DOMAIN §2)."""
+
+
+@dataclass(frozen=True, slots=True)
 class WeekCard:
     number: int
     title: str
     star: bool
     dates: str
-    texts: list[str]
+    entries: list[CardEntry]
     photos: list[str]
     files_more: int
     """Files the section does not show: non-images and photos past the cap."""
+    late_only: bool = False
+    """No stamp behind the chapter: everything in it was added after the week ended."""
+    late_mark: str = ru.LATE_MARK
+
+    @property
+    def texts(self) -> list[str]:
+        return [entry.text for entry in self.entries]
 
     @property
     def files_more_label(self) -> str:
@@ -121,12 +136,14 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
                 title=week.title,
                 star=week.level is StampLevel.MAX,
                 dates=span_words(week.starts_on, week.ends_on),
-                texts=[clip(text) for text in week.texts],
+                entries=[CardEntry(text=clip(entry.text), late=entry.late) for entry in week.entries],
                 photos=photos,
                 files_more=skipped,
+                late_only=week.late_only,
             )
         )
-    stamped: dict[int, JournalWeek] = {week.number: week for week in view.weeks}
+    # The passport grid and the cover count stamps only: a late-only chapter is journal, not rhythm.
+    stamped: dict[int, JournalWeek] = {week.number: week for week in view.weeks if not week.late_only}
     grid = []
     # The season's real numbers, not 1..N: a deleted or inserted week must not shift the cells.
     for number in view.week_numbers or range(1, view.weeks_total + 1):
@@ -139,7 +156,7 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
             mark, state = "", "empty"
         grid.append({"number": number, "mark": mark, "title": entry.title if entry else "", "state": state})
     name = view.user.display_name if view.user else ""
-    weeks_done = len(view.weeks)
+    weeks_done = len(stamped)
     stars = sum(1 for week in view.weeks if week.level is StampLevel.MAX)
     photos_total = sum(len(card.photos) for card in cards)
     template = _env.get_template("journal.html")
@@ -157,6 +174,7 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
         starts=date_words(view.season.starts_on),
         ends=date_words(view.season.ends_on, year=True),
         stars=stars,
+        weeks_done=weeks_done,
         stars_label=plural(stars, "со звёздочкой", "со звёздочкой", "со звёздочкой"),
         weeks_label=plural(weeks_done, "неделя со штампом", "недели со штампом", "недель со штампом"),
         photos_total=photos_total,

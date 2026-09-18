@@ -35,21 +35,40 @@ class JournalMedia:
 
 
 @dataclass(frozen=True, slots=True)
-class JournalWeek:
-    """A week the participant has a stamp for, with what they wrote and shot that week.
+class JournalEntry:
+    """One text of the week; `late` marks a report sent after the week ended (DOMAIN §2)."""
 
-    `quote` is the last line they wrote (the bot's short preview); `texts` are all of them in
+    text: str
+    late: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class JournalWeek:
+    """A week the participant has a stamp for — or wrote into later — with what they wrote and
+    shot that week.
+
+    `quote` is the last line they wrote (the bot's short preview); `entries` are all of them in
     order and `media` the files, for the PDF where the week gets its own page section.
+    `level` is None for a chapter that holds only late reports: the week itself was missed.
     """
 
     number: int
     title: str
-    level: StampLevel
+    level: StampLevel | None
     quote: str
     starts_on: date | None = None
     ends_on: date | None = None
-    texts: list[str] = field(default_factory=list)
+    entries: list[JournalEntry] = field(default_factory=list)
     media: list[JournalMedia] = field(default_factory=list)
+
+    @property
+    def texts(self) -> list[str]:
+        return [entry.text for entry in self.entries]
+
+    @property
+    def late_only(self) -> bool:
+        """No stamp: everything here was added after the week ended."""
+        return self.level is None
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,19 +105,26 @@ async def build(session: AsyncSession, *, season_id: int, user_id: int, today: d
     texts = await _texts(session, season_id=season_id, user_id=user_id)
     media = await _media(session, season_id=season_id, user_id=user_id)
 
+    # Chapters: every stamped week, plus every week the person wrote into after it ended.
+    by_id = {week.id: week for week in ordered}
+    chapters: dict[int, StampLevel | None] = dict(levels)
+    for week_id in set(texts) | {item.week_id for item in media if item.week_id is not None}:
+        week = by_id.get(week_id)
+        if week is not None and week.number not in chapters:
+            chapters[week.number] = None
     journal_weeks = [
         JournalWeek(
             number=number,
             title=weeks[number].title,
             level=level,
-            quote=texts.get(weeks[number].id, [""])[-1],
+            quote=(texts.get(weeks[number].id) or [JournalEntry("")])[-1].text,
             starts_on=weeks[number].starts_on,
             ends_on=weeks[number].ends_on,
-            texts=texts.get(weeks[number].id, []),
+            entries=texts.get(weeks[number].id, []),
             media=[item for item in media if item.week_id == weeks[number].id],
         )
         for number, level in sorted(
-            levels.items(),
+            chapters.items(),
             key=lambda item: (weeks[item[0]].starts_on, item[0]) if item[0] in weeks else (date.max, item[0]),
         )
         if number in weeks and weeks[number].starts_on <= today
@@ -126,10 +152,11 @@ async def wish_for(session: AsyncSession, *, season_id: int, user_id: int) -> st
     return await wishes.get_wish(session, season_id, user_id)
 
 
-async def _texts(session: AsyncSession, *, season_id: int, user_id: int) -> dict[int, list[str]]:
-    """`{week_id: [text, ...]}` — everything the participant wrote in that week, oldest first."""
+async def _texts(session: AsyncSession, *, season_id: int, user_id: int) -> dict[int, list[JournalEntry]]:
+    """`{week_id: [entry, ...]}` — everything the participant wrote in that week, oldest first,
+    late reports included and marked."""
     query = (
-        select(models.Report.week_id, models.Report.text)
+        select(models.Report.week_id, models.Report.text, models.Report.late)
         .where(
             models.Report.season_id == season_id,
             models.Report.user_id == user_id,
@@ -140,10 +167,10 @@ async def _texts(session: AsyncSession, *, season_id: int, user_id: int) -> dict
         )
         .order_by(models.Report.created_at, models.Report.id)
     )
-    texts: dict[int, list[str]] = {}
-    for week_id, text in (await session.execute(query)).tuples().all():
+    texts: dict[int, list[JournalEntry]] = {}
+    for week_id, text, late in (await session.execute(query)).tuples().all():
         if week_id is not None and text:
-            texts.setdefault(week_id, []).append(text)
+            texts.setdefault(week_id, []).append(JournalEntry(text=text, late=bool(late)))
     return texts
 
 
@@ -204,6 +231,7 @@ class ReportDTO:
     created_at: datetime
     media: list[ReportMediaDTO]
     edited_at: datetime | None = None
+    late: bool = False
 
 
 async def reports_for_user(session: AsyncSession, *, season_id: int, user_id: int) -> list[ReportDTO]:
@@ -241,6 +269,7 @@ async def reports_for_user(session: AsyncSession, *, season_id: int, user_id: in
             created_at=row.created_at,
             media=by_report.get(row.id, []),
             edited_at=row.edited_at,
+            late=row.late,
         )
         for row in rows
     ]

@@ -53,6 +53,9 @@
   .week .dates { color: var(--muted); font-size: 9pt; margin: 0 0 6pt 30pt; }
   .week .entry { margin: 0 0 6pt 30pt; padding-left: 10pt; border-left: 2pt solid var(--paper); white-space: pre-wrap; }
   .week .entry + .entry { margin-top: 8pt; }
+  .week .badge.late { background: var(--muted); }
+  .week .late-mark { color: var(--muted); font-size: 8.5pt; margin: 0 0 6pt 30pt; text-transform: uppercase; letter-spacing: .04em; }
+  .week .entry .mark { display: block; color: var(--muted); font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2pt; }
   .photos { display: flex; flex-wrap: wrap; gap: 6pt; margin: 8pt 0 0 30pt; }
   .photos img { width: 31.5%; height: 118pt; object-fit: cover; border-radius: 6pt; }
   .photos img:only-child { width: 64%; height: 180pt; }
@@ -82,7 +85,7 @@
   <p class="dates">{{ starts }} — {{ ends }}{% if level_name %} · {{ level_name }}{% endif %}</p>
 
   <div class="totals">
-    <div class="t"><div class="n">{{ view.weeks|length }} <small>/ {{ view.weeks_total }}</small></div><div class="l">{{ weeks_label }}</div></div>
+    <div class="t"><div class="n">{{ weeks_done }} <small>/ {{ view.weeks_total }}</small></div><div class="l">{{ weeks_label }}</div></div>
     <div class="t"><div class="n">{{ stars }}</div><div class="l">{{ stars_label }}</div></div>
     <div class="t"><div class="n">{{ photos_total }}</div><div class="l">{{ photos_label }}</div></div>
   </div>
@@ -102,9 +105,10 @@
   {% if cards %}
     {% for card in cards %}
     <div class="week">
-      <div class="head"><span class="badge {{ 'star' if card.star }}">{{ '★' if card.star else '✓' }}</span><h2>Неделя {{ card.number }} · {{ card.title }}</h2></div>
+      <div class="head"><span class="badge {{ 'star' if card.star }}{{ ' late' if card.late_only }}">{{ '★' if card.star else ('·' if card.late_only else '✓') }}</span><h2>Неделя {{ card.number }} · {{ card.title }}</h2></div>
       <p class="dates">{{ card.dates }}</p>
-      {% for text in card.texts %}<div class="entry">{{ text }}</div>{% endfor %}
+      {% if card.late_only %}<p class="late-mark">{{ card.late_mark }} · без штампа</p>{% endif %}
+      {% for entry in card.entries %}<div class="entry">{% if entry.late and not card.late_only %}<span class="mark">{{ card.late_mark }}</span>{% endif %}{{ entry.text }}</div>{% endfor %}
       {% if not card.texts and not card.photos %}<p class="entry empty">Без слов: в этот раз только {{ 'фото или видео' if card.star else 'файл' }}.</p>{% endif %}
       {% if card.photos %}<div class="photos">{% for src in card.photos %}<img src="{{ src }}" alt="">{% endfor %}</div>{% endif %}
       {% if card.files_more %}<p class="more">{{ card.files_more_label }} в приложении: видео и то, что сюда не поместилось.</p>{% endif %}
