@@ -71,7 +71,7 @@
     });
   }
   const currentWeek = () => state.weeks.find((w) => w.state === "current");
-  const weekOptions = (selected) => state.weeks.map((w) => `<option value="${w.number}" ${w.number === selected ? "selected" : ""}>${w.number}. ${esc(w.title) || "без названия"}${!w.announced_at ? " · черновик" : w.state === "current" ? " · идёт" : w.state === "locked" ? " · 🔒" : ""}</option>`).join("");
+  const weekOptions = (selected) => state.weeks.map((w) => `<option value="${w.number}" ${w.number === selected ? "selected" : ""}>${w.number}. ${esc(RM.weekName(w.title)) || "без названия"}${!w.announced_at ? " · черновик" : w.state === "current" ? " · идёт" : w.state === "locked" ? " · 🔒" : ""}</option>`).join("");
   const plain = (s) => String(s || "").replace(/<[^>]+>/g, "");
 
   // --- Неделя: сводка ------------------------------------------------------------------
@@ -103,11 +103,11 @@
         <div class="tile"><div class="big">${s.core_current} <span class="muted">/ ${s.core_best}</span></div><div class="label">в ядре сейчас / были за сезон · две недели подряд</div></div>
         <div class="tile"><div class="big">${s.reports_total}</div><div class="label">${RM.plural(s.reports_total, "отчёт", "отчёта", "отчётов")} за неделю</div></div>
       </div>
-      <div class="card"><h2>${s.week_number}. ${esc(s.week_title)}</h2>
+      <div class="card"><h2>${s.week_number}. ${esc(RM.weekName(s.week_title))}</h2>
         <h3>Сдали (${s.submitted.length})</h3>${s.submitted.length ? `<div class="chips">${s.submitted.map((x) => `<span class="chip ${x.level === "max" ? "star" : "ok"}">${x.level === "max" ? "⭐" : "✅"} ${esc(x.name)}</span>`).join("")}</div>` : `<p class="muted">Пока никто.</p>`}
         <h3>Взялись, но не прислали (${s.took_not_submitted.length})</h3>${s.took_not_submitted_names.length ? `<div class="chips">${s.took_not_submitted_names.map((n) => `<span class="chip">${esc(n)}</span>`).join("")}</div>${s.week_ended ? `<p class="note" style="margin-top:8px">Неделя прошла — напоминать уже не о чем.</p>` : `<button class="btn soft small" id="remind" style="margin-top:10px">⏰ Напомнить им сейчас</button>`}` : `<p class="muted">Таких нет.</p>`}
       </div>
-      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(s.week_title)} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
+      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(RM.weekName(s.week_title))} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
     if ($("remind")) $("remind").addEventListener("click", () => remindNow(s.week_number, s.week_title));
     if ($("copy")) $("copy").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(s.draft_post); RM.toast("Скопировала"); }
@@ -192,7 +192,7 @@
       body.querySelectorAll(".stampbar button").forEach((x) => x.classList.toggle("picked", x === b));
       const pick = $("stamp-pick");
       pick.hidden = false;
-      pick.innerHTML = `<p class="muted small" style="margin:8px 0 4px">Неделя ${week.number} · ${esc(week.title)} · сейчас ${current === "max" ? "⭐ максимум" : current === "min" ? "✅ минимум" : "без штампа"}</p>
+      pick.innerHTML = `<p class="muted small" style="margin:8px 0 4px">Неделя ${week.number} · ${esc(RM.weekName(week.title))} · сейчас ${current === "max" ? "⭐ максимум" : current === "min" ? "✅ минимум" : "без штампа"}</p>
         <div class="segment" style="margin-top:0">${[["", "Нет"], ["min", "✅ Минимум"], ["max", "⭐ Максимум"]].map(([v, l]) => `<button data-level="${v}" class="${(current || "") === v ? "active" : ""}">${l}</button>`).join("")}</div>`;
       pick.querySelectorAll("button").forEach((x) => x.addEventListener("click", async () => {
         const level = x.dataset.level || null;
@@ -250,7 +250,7 @@
 
   function renderContent() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; тексты любой недели — и прошедшей тоже — правятся; у прошедшей и идущей недели заморожены только даты.</p></header>
-      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
+      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(RM.weekName(w.title)) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
       <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
       <p class="note">Новая неделя — только в будущее, внутри сезона и в свободные даты. Она появляется черновиком: участники её не видят, и она не считается пропуском. Когда впишешь название и минимум — нажми «Объявить».</p>`;
     screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));

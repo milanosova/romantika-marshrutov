@@ -446,6 +446,13 @@ class WordAdded(BaseModel):
     message: str
 
 
+class FactAdded(BaseModel):
+    freeze_granted: bool
+    """The first own fact of a season earns a freeze (DOMAIN §3); the tile above has to redraw."""
+
+    message: str
+
+
 class UserWordOut(BaseModel):
     id: int
     word: str

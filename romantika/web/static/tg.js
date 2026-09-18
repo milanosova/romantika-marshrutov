@@ -101,6 +101,8 @@
 
   RM.levelName = { tourist: "Турист", traveler: "Путешественник", resident: "Резидент", "": "Ещё в пути" };
   RM.stateMark = { stamped: "✅", current: "▸", frozen: "❄️", missed: "◦", before_join: "◦", locked: "🔒" };
+  // «Неделя rola [музыка]» → «rola [музыка]»: screens that print the number say it once.
+  RM.weekName = (title) => String(title || "").replace(/^\s*неделя\s+/i, "") || String(title || "");
   RM.kindName = function (kind) {
     return { text: "текст", photo: "фото", video: "видео", video_note: "кружок", voice: "голосовое", audio: "аудио", document: "файл", other: "сообщение" }[kind] || kind;
   };

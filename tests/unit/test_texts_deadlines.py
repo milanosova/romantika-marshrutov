@@ -3,6 +3,7 @@ Wednesday, not a Sunday (DOMAIN §1, spec v2 D3)."""
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 from romantika.domain.types import StampLevel
@@ -37,3 +38,23 @@ def test_the_journal_file_is_named_after_the_season_and_the_person() -> None:
     assert journal_filename("Мексика", "Алиса") == "Романтика-Мексика-Алиса.pdf"
     assert journal_filename("Мексика", None) == "Романтика-Мексика.pdf"
     assert journal_filename("Южная Корея", "Al/ice ../x") == "Романтика-Южная-Корея-Al-ice-x.pdf"
+
+
+# --- the name Mila writes, next to the number a screen prints itself --------------------------
+
+
+def test_week_name_drops_the_word_mila_writes_in_the_title() -> None:
+    """Mila names weeks as the channel does («Неделя rola [музыка]»), and the bot, the passport
+    and the PDF print «Неделя N ·» themselves: the word must not be said twice."""
+    assert ru.week_name("Неделя rola [музыка]") == "rola [музыка]"
+    assert ru.week_name("неделя antojo [еда]") == "antojo [еда]"
+    assert ru.week_name("Недели города") == "Недели города", "only the standalone word is dropped"
+    assert ru.week_name("За столом") == "За столом"
+    assert ru.week_name("Неделя") == "Неделя", "a title of one word survives as it is"
+    assert ru.week_name("") == ""
+
+
+def test_the_task_of_a_week_says_its_number_once() -> None:
+    named = replace(week(3, date(2026, 9, 14), date(2026, 9, 20)), title="Неделя rola [музыка]")
+    assert "Неделя 3 · rola [музыка]" in ru.task_text(named)
+    assert "Неделя rola" not in ru.task_text(named)

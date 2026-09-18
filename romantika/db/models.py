@@ -90,6 +90,7 @@ class StampSource(StrEnum):
 class FreezeReason(StrEnum):
     WORD = "word"
     MAX = "max"
+    FACT = "fact"
     COMMENT = "comment"
     MEETUP = "meetup"
     FRIEND = "friend"
@@ -337,15 +338,15 @@ class Freeze(Base, TimestampMixin):
     __tablename__ = "freezes"
     __table_args__ = (
         enum_check("reason", FreezeReason, "reason"),
-        # `word` and `max` are granted by the bot once per season and participant (DOMAIN §3);
-        # the partial unique index is what makes that true for concurrent workers too.
+        # `word`, `max` and `fact` are granted by the bot once per season and participant
+        # (DOMAIN §3); the partial unique index makes that true for concurrent workers too.
         Index(
             "uq_freezes_auto_reason",
             "season_id",
             "user_id",
             "reason",
             unique=True,
-            postgresql_where=text("reason IN ('word', 'max')"),
+            postgresql_where=text("reason IN ('word', 'max', 'fact')"),
         ),
     )
 

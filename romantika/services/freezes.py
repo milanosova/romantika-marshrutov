@@ -17,9 +17,11 @@ from romantika.domain import rules
 from romantika.services import content
 
 #: Reasons the bot grants by itself, once per season and participant (DOMAIN §3).
-AUTO_REASONS: frozenset[models.FreezeReason] = frozenset({models.FreezeReason.WORD, models.FreezeReason.MAX})
+AUTO_REASONS: frozenset[models.FreezeReason] = frozenset(
+    {models.FreezeReason.WORD, models.FreezeReason.MAX, models.FreezeReason.FACT}
+)
 
-#: The partial unique index behind the «once per season» rule (migration 8f1c2a6d94b7).
+#: The partial unique index behind the «once per season» rule (migrations 8f1c2a6d94b7, e7f8a9b0c1d2).
 AUTO_REASON_INDEX = "uq_freezes_auto_reason"
 
 #: Advisory lock keys are `int4`; Telegram ids are wider, so they are folded into the range.

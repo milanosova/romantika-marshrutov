@@ -13,7 +13,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
-from romantika.services import content, locks
+from romantika.services import content, freezes, locks
 from romantika.services.errors import Refused
 
 
@@ -65,6 +65,47 @@ async def add(
     session.add(row)
     await session.flush()
     return row.id
+
+
+@dataclass(frozen=True, slots=True)
+class FactResult:
+    fact_id: int
+    freeze_granted: bool
+    """The first own fact of the season earns a freeze, like the first own word (DOMAIN §3)."""
+
+
+async def add_own(
+    session: AsyncSession,
+    *,
+    season_id: int,
+    week_id: int | None,
+    text: str,
+    author_id: int,
+    now: datetime,
+) -> FactResult:
+    """A participant's own fact. Mila's facts go through `add`: hers are the club's, not personal."""
+    first = await _count_of(session, season_id=season_id, author_id=author_id) == 0
+    fact_id = await add(session, season_id=season_id, week_id=week_id, text=text, author_id=author_id, now=now)
+    granted = first and await freezes.grant(
+        session,
+        season_id=season_id,
+        user_id=author_id,
+        reason=models.FreezeReason.FACT,
+        granted_by=None,
+        now=now,
+    )
+    return FactResult(fact_id=fact_id, freeze_granted=granted)
+
+
+async def _count_of(session: AsyncSession, *, season_id: int, author_id: int) -> int:
+    """How many facts this person has written this season, hidden ones included: the freeze
+    is earned once, and a fact Mila hid does not give it back."""
+    query = (
+        select(func.count())
+        .select_from(models.Fact)
+        .where(models.Fact.season_id == season_id, models.Fact.author_id == author_id)
+    )
+    return int((await session.execute(query)).scalar_one())
 
 
 async def list_active(session: AsyncSession, season_id: int, *, viewer_id: int | None = None) -> list[FactDTO]:

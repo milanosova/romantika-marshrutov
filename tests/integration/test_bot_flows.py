@@ -109,6 +109,30 @@ async def test_fact_dialog_from_participant_keeps_the_author(harness: Harness, d
     assert "Новый факт от" in harness.session.all_text(ADMIN_ID)
 
 
+async def test_the_first_own_fact_earns_a_freeze_and_the_second_does_not(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """The first own fact of a season earns a freeze, like the first own word (DOMAIN §3, 19.09)."""
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Ацтеки называли себя мешика")
+    assert "+1 заморозка" in harness.session.last_text(ALICE)
+    reasons = (await db_session.execute(select(models.Freeze.reason).where(models.Freeze.user_id == ALICE))).scalars()
+    assert list(reasons) == ["fact"]
+
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Какао было валютой")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE), "the freeze is earned once a season"
+    assert await count(db_session, models.Freeze) == 1
+    assert await count(db_session, models.Fact) == 2
+
+
+async def test_mila_own_fact_earns_her_nothing(harness: Harness, db_session: AsyncSession) -> None:
+    """Her facts are the club's, not personal: no author, no freeze (DOMAIN §6)."""
+    await harness.callback(ADMIN_ID, "addfact")
+    await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")
+    assert await count(db_session, models.Freeze) == 0
+
+
 async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
     """The duplicate refusal closes the dialog: the next message is a report, not a second fact."""
     await harness.callback(ALICE, "addfact")

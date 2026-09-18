@@ -6,6 +6,7 @@ Nothing here touches the database or Telegram.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from html import escape
 
@@ -32,6 +33,7 @@ JOURNAL_LEVEL_NAMES: dict[Level | None, str] = LEVEL_NAMES
 
 FREEZE_REASONS: dict[str, str] = {
     "word": "за своё слово в словарике",
+    "fact": "за свой факт про страну",
     "max": "за первый выполненный максимум",
     "comment": "за комментарий в канале",
     "meetup": "за приход на встречу",
@@ -91,6 +93,15 @@ def deadline_text(week: WeekDTO) -> str:
     """«воскресенье 06.09, 18:00» — the last day of the week by name, whatever day it falls on:
     the closing week of a season may end on a Wednesday (DOMAIN §1)."""
     return f"{WEEKDAYS_NOMINATIVE[week.ends_on.weekday()]} {week.ends_on:%d.%m}, 18:00"
+
+
+def week_name(title: str) -> str:
+    """The name without the «Неделя» Mila writes in it («Неделя rola [музыка]» → «rola [музыка]»).
+
+    Screens that print the number themselves («Неделя 3 · …», «3. …») would otherwise say it
+    twice; a name written any other way comes back untouched.
+    """
+    return re.sub(r"^\s*неделя\s+", "", title, flags=re.IGNORECASE) or title
 
 
 def deadline_short(week: WeekDTO) -> str:
@@ -321,6 +332,8 @@ FACT_PROMPT_ADMIN = (
     "его увидят все в «Сезоне», и он попадёт в журналы всех.</i>"
 )
 FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
+FACT_FREEZE_BONUS = WORD_FREEZE_BONUS
+"""The first own fact of a season earns a freeze too (DOMAIN §3, 19.09.2026)."""
 FACT_DUPLICATE = "такой факт у тебя уже записан"
 FACT_TOO_LONG = "факт длиннее 4000 знаков — сократи, пожалуйста"
 
@@ -361,7 +374,7 @@ def late_receipt(week: WeekDTO, *, first_of_week: bool, stamped: bool = False) -
     return LATE_RECEIPT.format(
         verb=LATE_VERB_FIRST if first_of_week else LATE_VERB_AGAIN,
         number=week.number,
-        title=escape(week.title),
+        title=escape(week_name(week.title)),
         tail=LATE_TAIL_STAMPED if stamped else LATE_TAIL_NO_STAMP,
     )
 
@@ -406,7 +419,7 @@ def word_lines(week: WeekDTO | None) -> list[str]:
 
 def task_text(week: WeekDTO) -> str:
     parts = [
-        f"<b>Неделя {week.number} · {escape(week.title)}</b>",
+        f"<b>Неделя {week.number} · {escape(week_name(week.title))}</b>",
         "",
         escape(week.intro),
         "",
@@ -473,10 +486,10 @@ def passport_text(view: PassportView, bonus_reasons: list[str]) -> str:
         if state is WeekState.STAMPED:
             level = view.stamps.get(week.number)
             mark = "⭐" if level is StampLevel.MAX else "✅"
-            lines.append(f"{mark}  {week.number}. {escape(week.title)}")  # the current title, as in the app
+            lines.append(f"{mark}  {week.number}. {escape(week_name(week.title))}")  # the current title, as in the app
             continue
         tail = {WeekState.FROZEN: " · заморозка", WeekState.BEFORE_JOIN: " · до тебя"}.get(state, "")
-        lines.append(f"{marks[state]}  {week.number}. {escape(week.title)}{tail}")
+        lines.append(f"{marks[state]}  {week.number}. {escape(week_name(week.title))}{tail}")
     if locked:
         lines.append(
             f"🔒  Дальше ещё {locked} {plural(locked, 'неделя', 'недели', 'недель')}"
@@ -514,13 +527,13 @@ def end_of_season_text(season: SeasonDTO) -> str:
         f"{date_genitive(season.ends_on)} сезон заканчивается, и каждый, кто участвовал, получит "
         "<b>журнал сезона</b> — свой собственный, не общий.\n\n"
         "Внутри будет:\n"
-        "· каждая твоя неделя — задание и твой отчёт по нему, как ты его прислала\n"
+        "· каждая твоя неделя — задание и твой отчёт по нему, слово в слово\n"
         "· фотографии из твоих отчётов\n"
         "· ачивки, которые у тебя набрались\n"
         "· словарик: слова недель и твои собственные слова\n"
         "· факты «что мы узнали» — общие на весь клуб — и твои собственные\n"
         "· несколько слов лично от меня\n\n"
-        "Это не сертификат об окончании. Это чтобы в ноябре было видно: "
+        "Это не сертификат об окончании. Это чтобы в конце было видно: "
         "три месяца прожиты, а не пролистаны."
     )
 
@@ -596,7 +609,7 @@ def journal_text(view: JournalView, level: Level | None) -> str:
             # The quote below is the chapter's last entry: say so when that entry came late.
             quoted_late = bool(week.entries) and week.entries[-1].late
             tail = f" · {LATE_MARK}" if week.late_only or quoted_late else ""
-            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
+            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week_name(week.title))}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")
     else:
@@ -630,7 +643,7 @@ def report_reply(
     goes down (DOMAIN §2), so a text sent after a photo is a minimum while the star stays —
     the receipt has to say both, or it reads as «the star is gone».
     """
-    title = escape(week.title)
+    title = escape(week_name(week.title))
     if level is StampLevel.MAX:
         text = f"⭐ Записала как <b>максимум</b> — штамп со звёздочкой за неделю «{title}»."
     elif stamp_level is StampLevel.MAX:
@@ -693,13 +706,13 @@ def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool,
     """The receipt after an edit in the Mini App; names the stamp the week actually has.
     A late report has none behind it, so the receipt speaks of the journal only."""
     if late:
-        return f"✏️ Запись в журнале недели «{escape(week.title)}» обновила. Штамп это не трогает."
+        return f"✏️ Запись в журнале недели «{escape(week_name(week.title))}» обновила. Штамп это не трогает."
     if level is StampLevel.MAX:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — штамп со звёздочкой ⭐ на месте."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила — штамп со звёздочкой ⭐ на месте."
     elif level is StampLevel.MIN:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — засчитан как <b>минимум</b> ✅."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила — засчитан как <b>минимум</b> ✅."
     else:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила."
     if freeze_granted:
         text += "\n\n❄️ И тебе +1 заморозка за первый максимум."
     return text
@@ -759,7 +772,7 @@ def clip(text: str, limit: int) -> str:
 
 def summary_text(summary: WeekSummary, names: dict[int, str], core: CoreView) -> str:
     lines = [
-        f"<b>Неделя {summary.week_number} · {escape(summary.week_title)}</b>",
+        f"<b>Неделя {summary.week_number} · {escape(week_name(summary.week_title))}</b>",
         f"В боте людей: {summary.members_total} · отчётов: {summary.reports_total}",
         "",
         f"<b>Взялись ({len(summary.took)})</b>",
@@ -857,13 +870,13 @@ def freeze_given(reason: str) -> str:
 
 def reminder_thursday(week: WeekDTO) -> str:
     return (
-        f"Впереди выходные — как раз время сделать задание недели «{escape(week.title)}».\n\n"
+        f"Впереди выходные — как раз время сделать задание недели «{escape(week_name(week.title))}».\n\n"
         f"Дедлайн — {deadline_text(week)}. Пришли сюда текст или фото, и всё."
     )
 
 
 def reminder_sunday(week: WeekDTO) -> str:
     return (
-        f"Сегодня до 18:00 — дедлайн по заданию «{escape(week.title)}».\n\n"
+        f"Сегодня до 18:00 — дедлайн по заданию «{escape(week_name(week.title))}».\n\n"
         "Даже минимум на пять минут считается. Вечером покажу общие итоги."
     )
