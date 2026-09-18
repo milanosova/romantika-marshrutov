@@ -8,6 +8,7 @@ through `services.notify`, never sent from here.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import AsyncIterator, Sequence
 
@@ -18,6 +19,7 @@ from sqlalchemy import text as sql_text
 from starlette.datastructures import UploadFile
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.formparsers import MultiPartException
+from starlette.requests import ClientDisconnect
 
 from romantika.db import models
 from romantika.domain.types import ReportKind, StampLevel
@@ -37,6 +39,8 @@ from romantika.web.deps import (
     SettingsDep,
     TodayDep,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -72,6 +76,10 @@ async def _multipart(request: Request) -> tuple[dict[str, str], dict[str, list[s
         # The parser's own ceilings sit above ours, so the answers a client can hit are ours
         # (413 «не больше 10 файлов»); what the parser itself refuses is answered in Russian too.
         form = await request.form(max_files=MAX_FORM_FILES, max_fields=64)
+    except ClientDisconnect as exc:
+        # The phone lost the network mid-upload: nobody is left to answer, and it is not our error.
+        logger.info("upload_client_disconnected", extra={"path": request.url.path})
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, ru.API_UPLOAD_CUT) from exc
     except (MultiPartException, StarletteHTTPException) as exc:
         detail = getattr(exc, "detail", None) or getattr(exc, "message", "")
         if "Too many files" in str(detail):

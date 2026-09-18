@@ -141,6 +141,8 @@ OPEN_CLUB_LINK = "Паспорт, журнал, словарь и задание
 API_TOO_LONG = "текст длиннее {limit} знаков"
 API_BAD_INPUT = "не поняла, что прислали — попробуй ещё раз"
 """What the Mini App shows when a request body fails validation (web/app.py)."""
+API_UPLOAD_CUT = "соединение оборвалось — пришли ещё раз"
+"""The phone lost the network mid-upload (routes/api.py)."""
 
 
 #: (heading, answer in the bot, answer in the Mini App or None when it is the same).

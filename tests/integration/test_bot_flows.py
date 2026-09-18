@@ -62,6 +62,18 @@ async def test_word_dialog_saves_word_clears_state_and_grants_freeze(
     assert await count(db_session, models.Report) == 0, "an answer to the bot is not a report"
 
 
+async def test_a_word_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
+    """A service's `Refused` reaches the person as text, never as a silent traceback."""
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — время за столом")
+    await harness.callback(ALICE, "addword")
+    await harness.text(ALICE, "sobremesa — снова")
+
+    assert harness.session.last_text(ALICE) == "слово «sobremesa» у тебя в словарике уже есть"
+    assert await count(db_session, models.Word) == 1
+    assert (await dialog_row(db_session, ALICE)).state == "word", "the dialog stays: the person can retry"
+
+
 async def test_letter_dialog_reaches_mila_and_is_linked_for_the_reply(
     harness: Harness, db_session: AsyncSession
 ) -> None:
