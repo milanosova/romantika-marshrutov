@@ -323,6 +323,7 @@ async def build_harness(
     *,
     now: datetime | None = None,
     telegram: FakeTelegram | None = None,
+    public_base_url: str = "https://romantika.example.test",
 ) -> Harness:
     result = await seed.import_season(db_session, SEASON_JSON)
     await content.activate_season(db_session, result.season_id, actor_id=ADMIN_ID)
@@ -333,7 +334,7 @@ async def build_harness(
     monkeypatch.setenv("ADMIN_CHAT_ID", str(ADMIN_ID))
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://unused/unused")
     monkeypatch.setenv("MEDIA_DIR", str(tmp_path / "media"))
-    monkeypatch.setenv("PUBLIC_BASE_URL", "https://romantika.example.test")
+    monkeypatch.setenv("PUBLIC_BASE_URL", public_base_url)
     settings = Settings()
 
     factory = async_sessionmaker(bind=db_session.bind, expire_on_commit=False, join_transaction_mode="create_savepoint")

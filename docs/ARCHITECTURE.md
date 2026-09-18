@@ -210,11 +210,20 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 - Long polling (`allowed_updates=["message","callback_query"]`), `drop_pending_updates=False`.
   `deleteWebhook` at start.
 - Middlewares: DB session per update (commit on success), user upsert + season membership.
-- Reply keyboard and inline flows replicate legacy (DOMAIN.md §7): Задание / Сегодня /
-  Паспорт / Словарь / Что узнали / Ещё / Помощь / Написать Миле, admin panel «⚙️».
-  Button detection by normalized word (emoji-insensitive) as in legacy.
-- Inline `web_app` buttons open the Mini Apps: journal (`{PUBLIC_BASE_URL}/app/journal`),
-  calendar (`/calendar`), admin (`/app/admin`).
+- Reply keyboard (DOMAIN.md §7, 14.09.2026): one `web_app` button «🎒 Открыть клуб»
+  (`keyboards.main_keyboard`; a plain label when `PUBLIC_BASE_URL` is not https — Telegram
+  refuses `web_app` over http — answered with a link), admin panel «⚙️» below it for admins.
+  `setMyCommands` lists `start` and `help` only and the menu button is the same door — both
+  applied by the bot at every start (`romantika.ops.telegram_setup.apply_menu` from
+  `bot/main.py`; `MenuButtonCommands` when the base URL is not https), the name and the
+  descriptions by `python -m romantika.ops.telegram_setup` by hand. The legacy labels and commands (Задание / Сегодня / Паспорт /
+  Словарь / Что узнали / Ещё / Помощь / Написать Миле, `/task` …) keep answering — cached
+  keyboards live until the next `/start`. Button detection by normalized word
+  (emoji-insensitive) as in legacy. `/help` carries «✉️ Написать Миле» (`help_buttons`):
+  inside a week a plain message is a report, so the letter needs its own entry.
+- Inline `web_app` buttons open the Mini Apps: the app (`{PUBLIC_BASE_URL}/app`, the bag tab
+  `/app/bag` under the legacy passport and journal answers), calendar (`/calendar`), admin
+  (`/app/admin`). `keyboards.app_page_url` builds every one of them.
 - Report intake accepts text, photo (largest size), video, video_note, document, voice,
   audio. Voice/audio = MIN level report with kind `voice/audio`. Stickers/other: reply
   «не поняла» text, nothing stored.
@@ -242,7 +251,7 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   text passes through it (`safe_send`).
 - `romantika.bot.keyboards.normalize_button(text) -> str` (drops emoji/variation selectors,
   collapses spaces, lower-cases) and `button_action(text) -> str | None` with actions
-  `task, today, passport, words, facts, more, help, write, admin`.
+  `app, task, today, passport, words, facts, more, help, write, admin`.
 - Callback data: `intent:<week_number>:<take|try|skip>`, `level:<week_number>:<min|max>`,
   `notreport:<report_id>`, `more:<journal|write|help>`, `addword`, `addfact`, `endofseason`,
   admin `adm:<action>...` (free format, documented in keyboards.py).
@@ -270,9 +279,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   compose healthcheck and the deploy smoke both rely on the status code.
 - Public: `GET /` season page (SSR from DB; future weeks not in HTML), `GET /calendar`
   (tzolkin Mini App; signs embedded from data/tzolkin.json).
-- Mini Apps: `GET /app` and `GET /app/{tab}` (participant: today · passport · journal · words ·
-  more), `GET /app/admin` (Mila: week · people · letters · content · more; facts from «Ещё»).
-  HTML shells; JS calls `/api`.
+- Mini Apps: `GET /app` and `GET /app/{tab}` (participant: week · bag · season; the old tab
+  names today/passport/journal/words/more are aliases, `APP_TAB_ALIASES` in `routes/public.py`
+  and `TAB_ALIASES` in `app.js` must match), `GET /app/admin` (Mila: week · people · letters ·
+  content · more; facts from «Ещё»). HTML shells; JS calls `/api`.
 - Auth: header `X-Telegram-Init-Data` validated per Telegram docs (HMAC-SHA256 with
   `WebAppData` key, `auth_date` ≤ 24h); `POST /api/session` turns it into the `rm_session`
   cookie so `<img src="/media/…">` loads. Dev bypass only when `settings.dev_auth_user_id` is

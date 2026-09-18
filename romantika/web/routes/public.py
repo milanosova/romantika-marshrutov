@@ -96,17 +96,20 @@ async def calendar_page(request: Request, session: SessionDep, settings: Setting
     return templates.TemplateResponse(request, "calendar.html", context)
 
 
-APP_TABS = ("today", "passport", "journal", "words", "more")
+# Three tabs (DOMAIN §7); the old five names keep opening the right tab — links in old
+# messages and the bot's «Открыть журнал» button point at them.
+APP_TABS = ("week", "bag", "season")
+APP_TAB_ALIASES = {"today": "week", "passport": "bag", "journal": "bag", "words": "season", "more": "season"}
 
 
 @router.get("/app", response_class=HTMLResponse)
 @router.get("/app/{tab}", response_class=HTMLResponse)
-async def participant_app(request: Request, settings: SettingsDep, tab: str = "today") -> HTMLResponse:
+async def participant_app(request: Request, settings: SettingsDep, tab: str = "week") -> HTMLResponse:
     """The participant Mini App: one shell, the tab to open comes from the path (`/app/journal`)."""
     if tab == "admin":
         return await admin_app(request, settings)
     return templates.TemplateResponse(
-        request, "app.html", {"settings": settings, "tab": tab if tab in APP_TABS else "today"}
+        request, "app.html", {"settings": settings, "tab": APP_TAB_ALIASES.get(tab, tab if tab in APP_TABS else "week")}
     )
 
 

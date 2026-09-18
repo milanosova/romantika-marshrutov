@@ -235,7 +235,10 @@ async def bot_api(token: str, method: str, request: Request) -> Response:
                 "chat": store.chat(chat_id),
             }
         message = _message(chat_id, **fields)
-        store.sent.append({"method": method, "chat_id": chat_id, "message": message, "at": time.time()})
+        sent: dict[str, Any] = {"method": method, "chat_id": chat_id, "message": message, "at": time.time()}
+        if isinstance(markup, dict) and "keyboard" in markup:
+            sent["reply_keyboard"] = markup  # kept beside the echo for the chat mock-up and the tests
+        store.sent.append(sent)
         return _ok(message)
     if method == "copyMessage":
         chat_id = int(params["chat_id"])

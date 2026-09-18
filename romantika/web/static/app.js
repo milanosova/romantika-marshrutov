@@ -1,13 +1,16 @@
-// Participant Mini App: the whole bot on one screen set — task and intent, reports with photos,
-// passport, journal with PDF, dictionary, facts, a letter to Mila, help. Rules and texts come
-// from the API (the same services and `texts/ru.py` the bot uses); this file only draws.
+// Participant Mini App — one door, three tabs (DOMAIN §7, 14.09.2026): «Неделя» is what is
+// happening now (day, task, intent, reports), «Рюкзак» is what the person has gathered
+// (passport, achievements, journal with PDF), «Сезон» is what Mila made (weeks, words, facts,
+// about). Rules and texts come from the API (the same services and `texts/ru.py` the bot
+// uses); this file only draws. Old tab names still route (links in old messages).
 (function () {
   const RM = window.RM;
   const esc = RM.escape, html = RM.html, fmt = RM.fmtDate;
   const $ = (id) => document.getElementById(id);
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
-  const state = { tab: app.dataset.tab || "today", home: null, journal: null, dictionary: null, facts: null, files: [], clientId: null, sent: null };
+  const TAB_ALIASES = { today: "week", passport: "bag", journal: "bag", words: "season", more: "season" };
+  const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, dictionary: null, facts: null, files: [], clientId: null };
 
   boot();
 
@@ -42,6 +45,7 @@
   }
 
   function go(tab) {
+    tab = TAB_ALIASES[tab] || tab;
     state.tab = tab;
     tabbar.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     window.scrollTo(0, 0);
@@ -55,18 +59,20 @@
 
   function render() {
     closeSheet();
-    ({ today: renderToday, passport: renderPassport, journal: renderJournal, words: renderWords, more: renderMore })[state.tab]();
+    ({ week: renderWeek, bag: renderBag, season: renderSeason })[state.tab]();
   }
 
-  // --- Сегодня -------------------------------------------------------------------------
+  // --- Неделя --------------------------------------------------------------------------
 
-  function renderToday() {
+  function renderWeek() {
     const h = state.home, w = h.week, t = h.today;
     const dateTitle = new Date(t.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
     // The position in the calendar, not the number: numbers may have gaps once Mila edits the season.
     const position = w ? h.weeks.findIndex((x) => x.id === w.id) + 1 : 0;
     const status = w ? `Неделя ${w.number}${position && position !== w.number ? ` · ${position} из ${h.weeks.length}` : ` из ${h.weeks.length}`} · дедлайн ${esc(w.deadline)}` : h.next_week_starts_on ? `Между неделями · следующая с ${fmt(h.next_week_starts_on)}` : "Сезон завершён";
     let out = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · ${esc(h.season.title)}</p><h1>${esc(capital(dateTitle))}</h1><p class="muted">${status}</p></header>`;
+    // The day and the word come first: a reason to open the app on a Wednesday.
+    out += dayCard(t, !w);
 
     if (w) {
       out += `<div class="card current">
@@ -83,16 +89,41 @@
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь» или «Попробую»."}</p>`}
       </div>`;
       out += `<div class="card composer" id="composer">${composerHtml(w)}</div>`;
+      if (w.reports_count) out += `<div id="week-reports">${loading()}</div>`;
     } else {
-      out += `<div class="card"><h2>Сейчас неделя не идёт</h2><p class="muted">${h.next_week_starts_on ? `Ближайшее задание откроется ${fmt(h.next_week_starts_on)}, в понедельник.` : "Сезон завершён. Спасибо тебе за него."}</p></div>`;
+      const next = h.next_week_starts_on ? h.weeks.find((x) => x.starts_on === h.next_week_starts_on) : null;
+      out += `<div class="card"><h2>Сейчас неделя не идёт</h2><p class="muted">${h.next_week_starts_on ? `Задание ${next ? `недели ${next.number} ` : ""}придёт в понедельник, ${fmt(h.next_week_starts_on)}.` : "Сезон завершён. Спасибо тебе за него."}</p></div>`;
       out += `<div class="card composer" id="composer">${composerHtml(null)}</div>`;
     }
 
-    out += dayCard(t, !w);
     screen.innerHTML = out;
 
     if (w && !w.level) bindIntent(w);
     bindComposer(w);
+    if (w && w.reports_count) renderWeekReportsInto($("week-reports"), w);
+  }
+
+  // Every report of the running week, not only the last one: the journal's cards, filtered.
+  async function renderWeekReportsInto(box, w) {
+    let j;
+    try { j = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    if (state.tab !== "week" || !box.isConnected) return;
+    const rs = j.reports.filter((r) => r.week_number === w.number);
+    if (!rs.length) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои отчёты · ${rs.length} ${RM.plural(rs.length, "отчёт", "отчёта", "отчётов")}</h3>${rs.map(reportHtml).join("")}</div>`;
+    bindReportActions(box, j, async () => { await refreshHome(); renderWeek(); });
+  }
+
+  // «Поправить» and «Это не отчёт» on a report card; `done` redraws whatever the card sits in.
+  function bindReportActions(box, j, done) {
+    box.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
+      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
+      try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await done(); } catch (e) { RM.toast(e.message); }
+    }));
+    box.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
+      const report = j.reports.find((x) => String(x.id) === b.dataset.edit);
+      if (report) openEditor(report, done);
+    }));
   }
 
   function capital(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -202,10 +233,9 @@
     try {
       const r = await RM.upload("/api/reports", form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; });
       RM.haptic("success");
-      state.sent = r;
       state.clientId = RM.uid();
       await refreshHome();
-      renderToday(); // the task card above changes too: the intent question gives way to the stamp
+      renderWeek(); // the task card above changes too: the intent question gives way to the stamp
       showResult(r);
     } catch (e) {
       RM.haptic("error");
@@ -225,62 +255,63 @@
     const canRaise = !r.out_of_week && r.stamp_level === "min";
     box.innerHTML = `<div class="row between"><h2 style="margin:0">${r.out_of_week ? "Сохранила" : "Принято"}</h2>${stampChip(w)}</div>
       <div class="result ${r.out_of_week ? "" : "ok"}"><div class="rich">${html(r.message)}</div></div>
-      <div class="row" style="margin-top:12px">
-        ${canRaise ? `<button class="btn soft small" id="fix-level">⭐ Это был максимум</button>` : ""}
-        ${!r.out_of_week ? `<button class="btn soft small" id="edit-sent">✏️ Поправить</button><button class="btn ghost small" id="not-report">Это не отчёт</button>` : ""}
-      </div>
-      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Поправить текст и фото можно до конца недели — в «Журнале» тоже."}</p>
+      ${canRaise ? `<div class="row" style="margin-top:12px"><button class="btn soft small" id="fix-level">⭐ Это был максимум</button></div>` : ""}
+      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Отчёт теперь в списке ниже: там его можно поправить, пока неделя идёт, или пометить «это не отчёт»."}</p>
       <button class="btn link" id="again" style="margin-top:4px">Отправить ещё один</button>`;
     if ($("fix-level")) $("fix-level").addEventListener("click", async () => {
       try {
         const res = await RM.api(`/api/weeks/${r.week_number}/level`, { method: "POST", body: { level: "max" } });
         RM.alert(res.message.replace(/<[^>]+>/g, ""));
-        if (res.ok) { r.stamp_level = res.stamp_level; r.level = "max"; r.message = res.message; await refreshHome(); renderToday(); showResult(r); }
-      } catch (e) { RM.toast(e.message); }
-    });
-    if ($("edit-sent")) $("edit-sent").addEventListener("click", async () => {
-      try {
-        const j = await RM.api("/api/journal");
-        const report = j.reports.find((x) => x.id === r.report_id);
-        if (report) openEditor(report, async () => { await refreshHome(); renderToday(); });
-      } catch (e) { RM.toast(e.message); }
-    });
-    if ($("not-report")) $("not-report").addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
-      try {
-        const res = await RM.api(`/api/reports/${r.report_id}/cancel`, { method: "POST", body: {} });
-        RM.alert(res.message.replace(/<[^>]+>/g, ""));
-        await refreshHome();
-        renderToday();
+        if (res.ok) { r.stamp_level = res.stamp_level; r.level = "max"; r.message = res.message; await refreshHome(); renderWeek(); showResult(r); }
       } catch (e) { RM.toast(e.message); }
     });
     $("again").addEventListener("click", () => { box.innerHTML = composerHtml(w); bindComposer(w); });
   }
 
-  // --- Паспорт -------------------------------------------------------------------------
+  // --- Рюкзак --------------------------------------------------------------------------
 
-  function renderPassport() {
+  async function renderBag() {
     const h = state.home, p = h.passport;
     const level = RM.levelLabel(p.level);
-    let out = `<header class="screen-head"><p class="eyebrow">Паспорт сезона</p><h1>${esc(h.season.title)}</h1><p class="muted">${esc(h.user.first_name || "")} · ${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)}</p></header>
+    let out = `<header class="screen-head"><p class="eyebrow">Рюкзак · ${esc(h.season.title)}</p><h1>${esc(h.user.first_name || "Паспорт")}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)}</p></header>
       <div class="tiles">
         <div class="tile"><div class="big">${p.stamps} <span class="muted">/ ${p.weeks_total}</span></div><div class="label">${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}</div></div>
         <div class="tile"><div class="big">${esc(level)}</div><div class="label">статус</div></div>
-        <div class="tile"><div class="big">${p.freezes_left} <span class="muted">/ ${p.freezes_total}</span></div><div class="label">заморозок осталось</div></div>
+        <div class="tile"><div class="big">${p.freezes_left} <span class="muted">/ ${p.freezes_total}</span></div><div class="label">заморозок · <a href="#" id="freezes-how">как заработать ещё?</a></div></div>
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>
         <p class="note" style="margin:10px 0 0">⭐ максимум · ✅ минимум · ❄️ пропуск закрыт заморозкой · 🔒 откроется в понедельник. Нажми на неделю — откроется задание.</p></div>`;
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
-    out += `<div class="card"><h3 style="margin-top:0">Заморозки</h3>
-      <p>Пропущенная неделя тратит одну заморозку, но цепочка не рвётся. Базовых две, накопить можно пять: +1 за своё слово в словарике, +1 за первый максимум, +1 от Милы за комментарий, встречу или приведённого друга.</p>
-      ${p.freeze_reasons.length ? `<p class="muted small">Заработано: ${p.freeze_reasons.map((r) => esc(RM.freezeReason[r] || r)).join(", ")}.</p>` : ""}
-      ${p.freezes_left === 0 ? `<p class="muted small">Заморозки кончились. Статус «Резидент» больше недоступен, но участие продолжается — это главное.</p>` : ""}
-    </div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
+    out += `<div id="journal-box">${loading()}</div>`;
     out += `<details class="card"><summary>Что будет в конце сезона</summary><div class="content helptext">${html(unhead(h.texts.end_of_season))}</div></details>`;
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
+    $("freezes-how").addEventListener("click", (e) => { e.preventDefault(); openFreezes(p); });
+    await renderJournalInto($("journal-box"));
+  }
+
+  // The rules of freezes and the way to tell Mila about one — under the number, on demand.
+  function openFreezes(p) {
+    const h = state.home;
+    openSheet("Заморозки", `<p>Пропущенная неделя тратит одну заморозку, но цепочка не рвётся. Базовых две, накопить можно пять: +1 за своё слово в словарике, +1 за первый максимум, +1 от Милы за комментарий, встречу или приведённого друга.</p>
+      ${p.freeze_reasons.length ? `<p class="muted small">Заработано: ${p.freeze_reasons.map((r) => esc(RM.freezeReason[r] || r)).join(", ")}.</p>` : ""}
+      ${p.freezes_left === 0 ? `<p class="muted small">Заморозки кончились. Статус «Резидент» больше недоступен, но участие продолжается — это главное.</p>` : ""}
+      <div class="divider"></div>
+      <p class="note helptext">${html(h.texts.write_prompt)}</p>
+      <textarea id="letter-text" placeholder="Это обычное сообщение, не отчёт"></textarea><button class="btn block" id="letter-send" style="margin-top:10px">Написать Миле</button>`, bindLetter);
+  }
+
+  function bindLetter() {
+    $("letter-send").addEventListener("click", async () => {
+      const text = $("letter-text").value.trim();
+      if (!text) return RM.toast("Пустое письмо не отправлю");
+      $("letter-send").disabled = true;
+      try { const r = await RM.api("/api/letters", { method: "POST", body: { text } }); RM.haptic("success"); $("letter-text").value = ""; RM.alert(r.message.replace(/<[^>]+>/g, "")); closeSheet(); }
+      catch (e) { RM.toast(e.message); }
+      $("letter-send").disabled = false;
+    });
   }
 
   function stampHtml(w) {
@@ -301,22 +332,21 @@
          ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
          ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}`;
     const title = w.title && w.title !== `Неделя ${w.number}` ? `Неделя ${w.number} · ${w.title}` : `Неделя ${w.number}`;
-    openSheet(title, body, () => { if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("today")); });
+    openSheet(title, body, () => { if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week")); });
   }
 
   // --- Журнал --------------------------------------------------------------------------
 
-  async function renderJournal() {
-    screen.innerHTML = loading();
-    try { state.journal = await RM.api("/api/journal"); } catch (e) { return (screen.innerHTML = errorBox(e)); }
-    const j = state.journal, p = j.passport;
+  async function renderJournalInto(box) {
+    try { state.journal = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    if (!box.isConnected) return; // the tab changed while the journal loaded
+    const j = state.journal;
     const live = j.reports.filter((r) => r.week_number !== null);
     const letters = j.reports.filter((r) => r.week_number === null);
     const byWeek = new Map();
     live.forEach((r) => { if (!byWeek.has(r.week_number)) byWeek.set(r.week_number, []); byWeek.get(r.week_number).push(r); });
     const weeksDone = [...byWeek.keys()].sort((a, b) => b - a);
-    let out = `<header class="screen-head"><p class="eyebrow">Мой журнал · ${esc(j.season.title)}</p><h1>${esc(j.user.first_name || "Журнал")}</h1><p class="muted">${p.stamps} ${RM.plural(p.stamps, "штамп", "штампа", "штампов")} из ${p.weeks_total} · ${esc(RM.levelLabel(p.level))}</p></header>`;
-    out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">Недели, фото, ачивки, словарь — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
+    let out = `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
     if (!weeksDone.length) out += `<div class="empty"><div class="big">📔</div><h2>Пока пусто</h2><p class="muted">Здесь появятся твои недели и твои же слова о них. К концу сезона это будет целый журнал.</p></div>`;
     weeksDone.forEach((n) => {
       const week = j.weeks.find((w) => w.number === n) || { title: "" };
@@ -325,16 +355,10 @@
       out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
-    screen.innerHTML = out;
-    screen.querySelectorAll("[data-cancel]").forEach((b) => b.addEventListener("click", async () => {
-      if (!(await RM.confirm(NOT_REPORT_CONFIRM))) return;
-      try { const res = await RM.api(`/api/reports/${b.dataset.cancel}/cancel`, { method: "POST", body: {} }); RM.toast(res.message.replace(/<[^>]+>/g, "")); await refreshHome(); renderJournal(); } catch (e) { RM.toast(e.message); }
-    }));
-    screen.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => {
-      const report = j.reports.find((x) => String(x.id) === b.dataset.edit);
-      if (report) openEditor(report, async () => { await refreshHome(); renderJournal(); });
-    }));
-    $("pdf").addEventListener("click", requestPdf);
+    if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
+    box.innerHTML = out;
+    bindReportActions(box, j, async () => { await refreshHome(); renderJournalInto(box); });
+    if ($("pdf")) $("pdf").addEventListener("click", requestPdf);
   }
 
   function reportHtml(r) {
@@ -428,20 +452,50 @@
     } catch (e) { status.textContent = "Не получилось: " + e.message; button.disabled = false; }
   }
 
-  // --- Словарь -------------------------------------------------------------------------
+  // --- Сезон ---------------------------------------------------------------------------
 
-  async function renderWords() {
+  async function renderSeason() {
     screen.innerHTML = loading();
-    try { state.dictionary = await RM.api("/api/dictionary"); } catch (e) { return (screen.innerHTML = errorBox(e)); }
-    const d = state.dictionary;
-    let out = `<header class="screen-head"><p class="eyebrow">Словарик сезона</p><h1>${esc(d.about)}</h1><p class="muted">К концу сезона соберём из этого общий словарь — твои слова будут там с твоим именем.</p></header>`;
-    out += `<div class="card composer"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой. За первое слово — ❄️ +1 заморозка.</p>
+    const [dict, facts] = await Promise.allSettled([RM.api("/api/dictionary"), RM.api("/api/facts")]);
+    if (state.tab !== "season") return; // the tab changed while the season loaded
+    if (dict.status === "rejected") return (screen.innerHTML = errorBox(dict.reason));
+    state.dictionary = dict.value;
+    state.facts = facts.status === "fulfilled" ? facts.value : null;
+    const h = state.home, d = state.dictionary, f = state.facts;
+    const released = h.weeks.filter((w) => w.state !== "locked");
+    let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1>${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
+    // Weeks as a chronicle, newest first; future weeks are not shown (DOMAIN §1).
+    out += `<h3>Недели</h3>`;
+    // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
+    const running = (w) => h.week && w.id === h.week.id;
+    out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${running(w) ? "▸" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
+    out += `<div class="card composer" style="margin-top:18px"><h2>Добавить своё слово</h2><p class="note">Слово и что оно значит, одной строкой. За первое слово — ❄️ +1 заморозка.</p>
       <input id="word-text" placeholder="слово — что оно значит"><button class="btn block" id="word-send" style="margin-top:10px">Записать</button></div>`;
     out += `<h3>Слова недели</h3>`;
     out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(w.title)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
     out += `<h3>Слова участников</h3>`;
     out += d.user_words.length ? `<ul class="list">${d.user_words.map((w) => `<li class="${w.mine ? "mine" : ""}"><span class="mark">${w.mine ? "✍️" : "💬"}</span><span class="body"><div class="title">${esc(w.word)}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">${w.mine ? "ты" : esc(w.author)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Пока пусто — добавь первое.</p>`;
+    if (f) out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>
+      ${f.facts.length ? `<ol style="padding-left:20px;margin:0 0 10px">${f.facts.map((x) => `<li${x.mine ? ' style="font-weight:600"' : ""}>${esc(x.text)}${x.author ? ` <span class="muted small">— ${esc(x.author)}</span>` : ""}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
+      <div class="row"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
+      <p class="note" style="margin:8px 0 0">Попадёт в общий список и в журнал сезона, с твоим именем.</p></div>`;
+    else out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали</h2><p class="muted">Факты не загрузились — открой вкладку ещё раз.</p></div>`;
+    out += `<details class="card"><summary>О клубе</summary><div class="content helptext">${html(h.texts.greeting)}</div></details>`;
+    out += `<details class="card"><summary>❔ Если что-то пошло не так</summary><div class="content helptext">${html(unhead(h.texts.help))}</div></details>`;
+    const links = [];
+    if (h.links.channel_url) links.push(`<a class="btn soft" href="${esc(h.links.channel_url)}">📣 Канал клуба</a>`);
+    if (h.links.admin_app) links.push(`<a class="btn" href="/app/admin${location.hash}">🛠 Админка</a>`);
+    if (links.length) out += `<div class="actions" style="margin-top:4px">${links.join("")}</div>`;
+    out += `<p class="muted small" style="margin-top:20px;text-align:center">Письмо Миле — в «Рюкзаке» у заморозок или в чате с ботом${h.links.bot_username ? ` @${esc(h.links.bot_username)}` : ""}: /help → «Написать Миле».</p>`;
     screen.innerHTML = out;
+    screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeek(+li.dataset.week)));
+    if ($("fact-send")) $("fact-send").addEventListener("click", async () => {
+      const text = $("fact-text").value.trim();
+      if (!text) return RM.toast("Напиши факт");
+      $("fact-send").disabled = true;
+      try { const r = await RM.api("/api/facts", { method: "POST", body: { text } }); RM.haptic("success"); RM.toast(r.message.replace(/<[^>]+>/g, "")); await rerenderSeasonInPlace(); }
+      catch (e) { $("fact-send").disabled = false; RM.toast(e.message); }
+    });
     $("word-send").addEventListener("click", async () => {
       const text = $("word-text").value.trim();
       if (!text) return RM.toast("Напиши слово и значение");
@@ -451,47 +505,16 @@
         RM.haptic("success");
         RM.alert(r.message.replace(/<[^>]+>/g, ""));
         await refreshHome();
-        renderWords();
+        await rerenderSeasonInPlace();
       } catch (e) { $("word-send").disabled = false; RM.toast(e.message); }
     });
   }
 
-  // --- Ещё -----------------------------------------------------------------------------
-
-  async function renderMore() {
-    screen.innerHTML = loading();
-    try { state.facts = await RM.api("/api/facts"); } catch (e) { return (screen.innerHTML = errorBox(e)); }
-    const h = state.home, f = state.facts;
-    let out = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов</p><h1>Ещё</h1></header>`;
-    out += `<div class="card"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>
-      ${f.facts.length ? `<ol style="padding-left:20px;margin:0 0 10px">${f.facts.map((x) => `<li${x.mine ? ' style="font-weight:600"' : ""}>${esc(x.text)}${x.author ? ` <span class="muted small">— ${esc(x.author)}</span>` : ""}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
-      <div class="row"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
-      <p class="note" style="margin:8px 0 0">Попадёт в общий список и в журнал сезона, с твоим именем.</p></div>`;
-    out += `<div class="card composer"><h2>✉️ Написать Миле</h2><p class="note helptext">${html(h.texts.write_prompt)}</p><textarea id="letter-text" placeholder="Это обычное сообщение, не отчёт"></textarea><button class="btn block" id="letter-send" style="margin-top:10px">Отправить</button></div>`;
-    out += `<details class="card"><summary>❔ Если что-то пошло не так</summary><div class="content helptext">${html(unhead(h.texts.help))}</div></details>`;
-    out += `<details class="card"><summary>О клубе</summary><div class="content helptext">${html(h.texts.greeting)}</div></details>`;
-    if (h.today.calendar_url) out += `<a class="card tight linkcard" href="${esc(h.today.calendar_url)}"><div class="row between"><div style="flex:1;min-width:0"><b>☀️ Календарь цолькин</b><div class="muted small">Какой сегодня день у майя и что он советует. Можно посчитать свой день рождения.</div></div><span class="muted chevron">›</span></div></a>`;
-    const links = [];
-    if (h.links.channel_url) links.push(`<a class="btn soft" href="${esc(h.links.channel_url)}">📣 Канал клуба</a>`);
-    if (h.links.admin_app) links.push(`<a class="btn" href="/app/admin${location.hash}">🛠 Админка</a>`);
-    if (links.length) out += `<div class="actions" style="margin-top:4px">${links.join("")}</div>`;
-    out += `<p class="muted small" style="margin-top:20px;text-align:center">Бот${h.links.bot_username ? ` @${esc(h.links.bot_username)}` : ""} умеет то же самое: просто пришли ему текст или фото.</p>`;
-    screen.innerHTML = out;
-    $("fact-send").addEventListener("click", async () => {
-      const text = $("fact-text").value.trim();
-      if (!text) return RM.toast("Напиши факт");
-      $("fact-send").disabled = true;
-      try { const r = await RM.api("/api/facts", { method: "POST", body: { text } }); RM.haptic("success"); RM.toast(r.message.replace(/<[^>]+>/g, "")); renderMore(); }
-      catch (e) { $("fact-send").disabled = false; RM.toast(e.message); }
-    });
-    $("letter-send").addEventListener("click", async () => {
-      const text = $("letter-text").value.trim();
-      if (!text) return RM.toast("Пустое письмо не отправлю");
-      $("letter-send").disabled = true;
-      try { const r = await RM.api("/api/letters", { method: "POST", body: { text } }); RM.haptic("success"); $("letter-text").value = ""; RM.alert(r.message); }
-      catch (e) { RM.toast(e.message); }
-      $("letter-send").disabled = false;
-    });
+  // After «Записать» the person stays where they were, not at the top of the tab.
+  async function rerenderSeasonInPlace() {
+    const y = window.scrollY;
+    await renderSeason();
+    window.scrollTo(0, y);
   }
 
   // --- helpers -------------------------------------------------------------------------
