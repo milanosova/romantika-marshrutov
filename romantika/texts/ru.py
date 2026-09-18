@@ -323,6 +323,14 @@ OUT_OF_WEEK = "Спасибо! Сейчас неделя сезона не ид�
 # --- late reports: a past week, journal only (DOMAIN §2) ---------------------------------
 LATE_SAVED = "📔 Записала в журнал недели {number} «{title}». Штамп за неё уже не ставится — а в книгу сезона попадёт."
 LATE_ADDED = "📔 Дописала в журнал недели {number} «{title}». Штамп за неделю как был — он не меняется."
+LATE_MARK = "дослано позже"
+"""The mark on a late report in the journal, the PDF and Mila's admin app."""
+EDIT_SEASON_OVER = "Сезон закончился — журнал теперь как есть, менять его уже нельзя."
+LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за неё ставит штамп, отправь его как обычно"
+LATE_WEEK_FUTURE = "эта неделя ещё не началась"
+LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
+LATE_NO_WEEK = "такой недели нет"
+"""Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
 
 
 def late_receipt(week: WeekDTO, *, first_of_week: bool) -> str:
@@ -331,21 +339,11 @@ def late_receipt(week: WeekDTO, *, first_of_week: bool) -> str:
     return template.format(number=week.number, title=escape(week.title))
 
 
-EDIT_SEASON_OVER = "Сезон закончился — журнал теперь как есть, менять его уже нельзя."
-LATE_MARK = "дослано позже"
-"""The mark on a late report in the journal, the PDF and Mila's admin app."""
-
-
 def late_photos_label(n: int) -> str:
-    """Under a stamped chapter's photos in the PDF: how many of them came late."""
+    """Under a stamped chapter's photos in the PDF: how many of the shown photos came late."""
     return f"{n} фото — {LATE_MARK}"
 
 
-LATE_WEEK_RUNNING = "эта неделя ещё идёт — отчёт за неё ставит штамп, отправь его как обычно"
-LATE_WEEK_FUTURE = "эта неделя ещё не началась"
-LATE_SEASON_OVER = "сезон закончился — дослать в журнал уже нельзя"
-LATE_NO_WEEK = "такой недели нет"
-"""Refusals of a late report (`reports.accept_late`); the app shows them as they are."""
 JOURNAL_NOW = "Так он выглядит сейчас. К {end} здесь будет весь сезон."
 NOT_REPORT_DONE = "Поняла, это не отчёт — штамп пересчитала. Сохранила как обычное сообщение, прочитаю."
 NOT_REPORT_DONE_LATE = "Поняла — убрала из журнала. Сохранила как обычное сообщение, прочитаю."
@@ -553,8 +551,8 @@ def journal_text(view: JournalView, level: Level | None) -> str:
     if view.weeks:
         lines += ["", "───", "<b>Твои недели</b>"]
         for week in view.weeks:
-            mark = "⭐" if week.level is StampLevel.MAX else "✅" if week.stamped else "📔"
-            tail = f" · {LATE_MARK}" if not week.stamped else ""
+            mark = "⭐" if week.level is StampLevel.MAX else "✅" if week.stamped else "📔" if week.late_only else "◦"
+            tail = f" · {LATE_MARK}" if week.late_only else ""
             lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")

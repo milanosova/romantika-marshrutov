@@ -470,7 +470,7 @@ async def edit(
     if week is None or not editable_until(
         week.ends_on, to_moscow(now).date(), late=report.late, season_ends_on=season.ends_on
     ):
-        return EditResult(ok=False, reason=SEASON_OVER if report.late else WEEK_OVER)
+        return EditResult(ok=False, reason=SEASON_OVER if report.late and week is not None else WEEK_OVER)
 
     body = (text or "").strip() or None
     text_changed = body != (report.text or None)

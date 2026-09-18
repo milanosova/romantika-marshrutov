@@ -92,10 +92,12 @@ class WeekCard:
         return f"Ещё {n} {ru.plural(n, 'файл остался', 'файла остались', 'файлов остались')}"
 
 
-def _photos_of(week: JournalWeek, media_root: Path | None, budget: int) -> tuple[list[str], int]:
-    """File URIs of the week's photos within the budget, and how many files stayed out."""
+def _photos_of(week: JournalWeek, media_root: Path | None, budget: int) -> tuple[list[str], int, int]:
+    """File URIs of the week's photos within the budget, how many files stayed out, and how
+    many of the shown photos came with late reports (the chapter's mark counts only those)."""
     photos: list[str] = []
     skipped = 0
+    late_shown = 0
     for item in week.media:
         if media_root is None:
             skipped += 1
@@ -109,7 +111,9 @@ def _photos_of(week: JournalWeek, media_root: Path | None, budget: int) -> tuple
             skipped += 1
             continue
         photos.append(path.as_uri())
-    return photos, skipped
+        if item.late:
+            late_shown += 1
+    return photos, skipped, late_shown
 
 
 def css_string(value: str) -> Markup:
@@ -134,7 +138,7 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
     budget = MAX_PHOTOS
     cards: list[WeekCard] = []
     for week in view.weeks:
-        photos, skipped = _photos_of(week, media_root, budget)
+        photos, skipped, late_shown = _photos_of(week, media_root, budget)
         budget -= len(photos)
         cards.append(
             WeekCard(
@@ -147,7 +151,7 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
                 files_more=skipped,
                 stamped=week.stamped,
                 late_only=week.late_only,
-                late_photos=0 if week.late_only else week.late_media,
+                late_photos=0 if week.late_only else late_shown,
             )
         )
     # The passport grid and the cover count stamps only: a journal-only chapter is not rhythm.

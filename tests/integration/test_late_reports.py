@@ -267,3 +267,22 @@ async def test_a_week_whose_stamp_mila_removed_is_not_a_late_chapter(
     assert not week.stamped and not week.late_only, "on-time text plus a late one: no stamp, but not «all late»"
     html = render_journal_html(view)
     assert "дослано позже · без штампа" not in html and "дослано позже" in html
+
+
+async def test_the_pdf_counts_only_the_late_photos_it_shows(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    early = await make_app(db_session, tmp_path, monkeypatch, moscow(2026, 9, 2, 15))
+    await early.client.post("/api/reports", data={"text": "вовремя"}, headers=early.headers(ALICE))
+    late = await make_app(db_session, tmp_path, monkeypatch, WEEK3)
+    r = await late.client.post(
+        "/api/reports",
+        data={"week_number": "1"},
+        files=[("files", ("late.mp4", b"\x00\x00\x00\x18ftypmp42" + b"x" * 200, "video/mp4"))],
+        headers=late.headers(ALICE),
+    )
+    assert r.status_code == 201 and r.json()["late"] is True
+    view = await journal.build(late.session, season_id=late.season_id, user_id=ALICE, today=late.now.date())
+    html = render_journal_html(view, media_root=late.store.root)
+    assert "фото — дослано позже" not in html, "a video is not a photo the chapter shows"
+    assert "остался в приложении" in html

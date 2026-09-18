@@ -355,6 +355,12 @@
     });
   }
 
+  // The journal under the sheet follows what the sheet changed (the passport does not: no stamp moves).
+  async function syncBag() {
+    await refreshHome();
+    if ($("journal-box")) await renderJournalInto($("journal-box"));
+  }
+
   // The chapter of a past week inside its sheet: what is already there, and the door to add more.
   async function renderLateBox(w, notice) {
     const box = $("late-box");
@@ -369,7 +375,7 @@
       <button class="btn block" id="late-open" style="margin-top:10px">${late.again ? "Дописать в журнал" : "Добавить в журнал"}</button>
       <p class="note" id="late-note" style="margin:8px 0 0">${lateNote(late)}</p>`;
     // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
-    bindReportActions(box, j, () => { if ($("late-box")) renderLateBox(w); else openWeek(w.number); });
+    bindReportActions(box, j, async () => { if ($("late-box")) await renderLateBox(w); else openWeek(w.number); await syncBag(); });
     $("late-open").addEventListener("click", () => {
       const form = document.createElement("div");
       form.className = "composer";
@@ -377,7 +383,7 @@
       form.innerHTML = composerHtml(w, late);
       $("late-note").remove();
       $("late-open").replaceWith(form);
-      bindComposer(w, { ...late, done: async (r) => { renderLateBox(w, r.message); await refreshHome(); if ($("journal-box")) renderJournalInto($("journal-box")); } });
+      bindComposer(w, { ...late, done: async (r) => { await renderLateBox(w, r.message); await syncBag(); } });
       $("report-text").focus();
     });
   }
@@ -400,7 +406,8 @@
       const rs = byWeek.get(n);
       // No stamp behind the chapter: everything in it was added after the week ended.
       const lateOnly = !week.level && rs.every((r) => r.late);
-      const level = lateOnly ? "📔" : week.level === "max" ? "⭐" : "✅";
+      // The mark follows the stamp: none → «◦» like the grid above; all late → the journal mark.
+      const level = lateOnly ? "📔" : week.level === "max" ? "⭐" : week.level ? "✅" : "◦";
       out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
