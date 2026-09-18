@@ -210,6 +210,27 @@ async def test_a_draft_week_and_odd_digits_are_refused(app: App) -> None:
     assert "Черновик" not in draft.text
     odd = await app.client.post("/api/reports", data={"text": "x", "week_number": "²"}, headers=app.headers(ALICE))
     assert odd.status_code == 422, odd.text
+    huge = await app.client.post(
+        "/api/reports", data={"text": "x", "week_number": "2147483648"}, headers=app.headers(ALICE)
+    )
+    assert huge.status_code == 422 and "такой недели нет" in huge.json()["detail"], "int32 overflow is not a 500"
+
+
+async def test_an_edit_retried_after_the_cancel_answers_409_not_500(app: App) -> None:
+    r = (
+        await app.client.post("/api/reports", data={"text": "черновик", "week_number": "1"}, headers=app.headers(ALICE))
+    ).json()
+    first = await app.client.patch(
+        f"/api/reports/{r['report_id']}", data={"text": "чистовик", "edit_key": "k1"}, headers=app.headers(ALICE)
+    )
+    assert first.status_code == 200
+    assert (
+        await app.client.post(f"/api/reports/{r['report_id']}/cancel", headers=app.headers(ALICE))
+    ).status_code == 200
+    again = await app.client.patch(
+        f"/api/reports/{r['report_id']}", data={"text": "чистовик", "edit_key": "k1"}, headers=app.headers(ALICE)
+    )
+    assert again.status_code == 409 and "уже отменён" in again.json()["detail"]
 
 
 async def test_the_bot_journal_counts_stamps_only_and_marks_the_late_chapter(app: App) -> None:

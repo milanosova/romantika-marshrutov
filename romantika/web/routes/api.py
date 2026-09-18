@@ -345,6 +345,8 @@ def _late_week_number(fields: dict[str, str]) -> int | None:
         return None
     if not (raw.isascii() and raw.isdigit()):  # `isdigit` alone accepts superscripts int() refuses
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, ru.LATE_NO_WEEK)
+    if len(raw) > 4:  # a week number is small; anything longer would overflow the column's int32
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, ru.LATE_NO_WEEK)
     return int(raw)
 
 
@@ -470,7 +472,8 @@ async def edit_report(
         await session.refresh(row)  # the winner of the race may have changed it while we waited
         if await reports.edit_applied(session, report_id=report_id, edit_key=edit_key):
             fresh = await views.report_out(session, report_id, today=today)
-            assert fresh is not None
+            if fresh is None:  # the edit was applied, then the report was taken back
+                raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
             level = await stamps.level_for_week(session, user_id=principal.user.id, week_id=row.week_id)
             week_dto = next((w for w in await content.weeks(session, season.id) if w.id == row.week_id), None)
             return schemas.ReportEditOut(
@@ -528,7 +531,8 @@ async def edit_report(
     )
     await notify.enqueue_message(session, chat_id=principal.user.id, text=message, now=now)
     fresh = await views.report_out(session, report_id, today=today)
-    assert fresh is not None
+    if fresh is None:  # «это не отчёт» won the race against this edit
+        raise HTTPException(status.HTTP_409_CONFLICT, ru.NOT_REPORT_ALREADY)
     return schemas.ReportEditOut(
         report=fresh,
         stamp_level=result.stamp_level.value if result.stamp_level else None,

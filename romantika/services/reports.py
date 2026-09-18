@@ -585,7 +585,7 @@ async def find_by_client_id(session: AsyncSession, *, user_id: int, client_id: s
 
 
 async def count_for_week(session: AsyncSession, *, user_id: int, week_id: int) -> int:
-    """Live (not cancelled) reports of one participant for one week (the running week has no late ones)."""
+    """Live (not cancelled) reports of one participant for one week, late ones included."""
     query = select(func.count(models.Report.id)).where(
         models.Report.user_id == user_id,
         models.Report.week_id == week_id,

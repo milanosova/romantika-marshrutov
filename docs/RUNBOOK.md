@@ -179,6 +179,11 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   `c4e8f1a2b9d3` (weeks.announced_at) **refuses to downgrade while draft weeks exist**: the
   previous release would show them to participants. Announce or delete the drafts in the
   admin app («Задания»), then downgrade.
+  `d5e6f7a8b9c0` (reports.late, v2.4.0) **refuses to downgrade while late reports exist**:
+  the previous release would count them for stamps at the next recomputation. Do not
+  downgrade it at all when rolling back to v2.3.0 — roll back the code only: the column
+  keeps `server_default false`, v2.3.0 neither writes nor reads it, and runs on the new
+  schema as is. The late reports stay in the journal chapters until the code comes back.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
   list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before

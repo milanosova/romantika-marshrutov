@@ -485,6 +485,7 @@
         try {
           const res = await RM.upload(`/api/reports/${r.id}`, form, (p) => { bar.querySelector("i").style.width = Math.round(p * 100) + "%"; }, "PATCH");
           RM.haptic("success");
+          state.sheetReturn = null; // `done` reopens the week sheet itself, from fresh state
           closeSheet();
           if (res.message) RM.toast(res.message.replace(/<[^>]+>/g, ""), 4000);
           if (done) await done();
