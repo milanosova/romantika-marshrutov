@@ -214,6 +214,7 @@ select count(*) from reports where created_at > now() - interval '7 days' and de
 select count(*) from letters where replied_at is null;                                           -- unanswered letters
 select count(*) from jobs where status = 'failed' and finished_at > now() - interval '24 hours'; -- failed worker jobs
 select count(*) from reports where late and deleted_at is null;                                  -- late reports (blocks a rollback below v2.4.0)
+select count(*) from facts f join users u on u.id = f.author_id where u.is_admin and f.deleted_at is null; -- Mila's facts that carry her id (v2.5.0 shows them to her only; re-add them in the admin app)
 ```
 
 Run by hand: `scripts/rc.sh exec -T db psql -U romantika -d romantika -Atc "<one of the above>"`.
