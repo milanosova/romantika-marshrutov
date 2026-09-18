@@ -115,9 +115,16 @@ async def ensure_member(session: AsyncSession, season_id: int, user_id: int, *, 
     """Join the person to the season once; returns the moment they joined it."""
     row = await session.get(models.SeasonMember, (season_id, user_id))
     if row is None:
-        row = models.SeasonMember(season_id=season_id, user_id=user_id, joined_at=now)
-        session.add(row)
-        await session.flush()
+        # The same first-contact race as in `upsert_user`: two requests join at once, the
+        # idempotent insert keeps the first one's `joined_at` and the second reads it back.
+        await session.execute(
+            pg_insert(models.SeasonMember)
+            .values(season_id=season_id, user_id=user_id, joined_at=now)
+            .on_conflict_do_nothing(index_elements=["season_id", "user_id"])
+        )
+        row = await session.get(models.SeasonMember, (season_id, user_id), populate_existing=True)
+        if row is None:  # pragma: no cover - the insert or the concurrent one has committed by now
+            raise RuntimeError(f"user {user_id} vanished from season {season_id} after an idempotent insert")
     return row.joined_at
 
 
