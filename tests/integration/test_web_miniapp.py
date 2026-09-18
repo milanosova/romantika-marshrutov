@@ -289,6 +289,10 @@ async def test_word_fact_letter_and_dictionary(app: App) -> None:
     # Bob sees Mila's fact and not Alice's — facts of participants are personal too.
     bobs = (await app.client.get("/api/facts", headers=app.headers(BOB, "Боб"))).json()
     assert [f["author"] for f in bobs["facts"]] == [None]
+    twice = await app.client.post(
+        "/api/facts", json={"text": "Ацтеки называли себя мешика"}, headers=app.headers(ALICE)
+    )
+    assert twice.status_code == 422 and "уже записан" in twice.json()["detail"], "the same fact twice is refused"
 
     r = await app.client.post(
         "/api/letters", json={"text": "Мила, я оставила комментарий!"}, headers=app.headers(ALICE)

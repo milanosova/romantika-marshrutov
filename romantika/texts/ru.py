@@ -128,7 +128,7 @@ WRITE_MILA = "✉️ Написать Миле"
 
 GREETING_CTA = (
     "\n\nВсё остальное — за кнопкой ниже 👇 Там три вкладки: «Неделя» с заданием, "
-    "«Рюкзак» с паспортом и журналом, «Сезон» со словарём."
+    "«Рюкзак» с паспортом, журналом и твоими словами, «Сезон» со словами недель."
 )
 """The bot appends this to the greeting; the Mini App shows the greeting without it."""
 
@@ -316,6 +316,7 @@ FACT_PROMPT = (
     "и попадёт в твой журнал сезона.</i>"
 )
 FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
+FACT_DUPLICATE = "такой факт у тебя уже записан"
 NOT_UNDERSTOOD = (
     "Не поняла 🙈 Отчёт — это текст, фото, видео, кружок, голосовое или файл. "
     "Пришли что-то из этого, и я поставлю штамп."
@@ -525,7 +526,10 @@ def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
         lines += ["", RULE, "", "<b>Твои слова</b>", ""]
         for entry in view.user_words:
             lines.append(escape(entry.word) + (f" — {escape(entry.meaning)}" if entry.meaning else ""))
-    lines += ["", RULE, "", "<i>Твои слова видишь только ты — и они будут в твоём журнале сезона.</i>"]
+    tail = "Твои слова видишь только ты — и они будут в твоём журнале сезона."
+    if not view.user_words:
+        tail += " За первое своё слово — ❄️ +1 заморозка."
+    lines += ["", RULE, "", f"<i>{tail}</i>"]
     return "\n".join(lines)
 
 

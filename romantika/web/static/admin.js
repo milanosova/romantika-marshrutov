@@ -249,7 +249,7 @@
   // --- Задания: тексты недель ---------------------------------------------------------
 
   function renderContent() {
-    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; прошедшие недели не редактируются — люди их уже прожили.</p></header>
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; тексты любой недели, и прошедшей тоже, правятся — у неё и у идущей заморожены только даты.</p></header>
       <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
       <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
       <p class="note">Новая неделя — только в будущее, внутри сезона и в свободные даты. Она появляется черновиком: участники её не видят, и она не считается пропуском. Когда впишешь название и минимум — нажми «Объявить».</p>`;

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from romantika.db import models
@@ -39,6 +39,18 @@ async def add(
     body = text.strip()
     if not body:
         raise Refused("факт без текста не запишу")
+    duplicate = await session.execute(
+        select(models.Fact.id).where(
+            models.Fact.season_id == season_id,
+            models.Fact.author_id.is_(author_id) if author_id is None else models.Fact.author_id == author_id,
+            models.Fact.deleted_at.is_(None),
+            func.lower(models.Fact.text) == body.lower(),
+        )
+    )
+    if duplicate.first() is not None:
+        from romantika.texts import ru  # texts import FactDTO from here: a module-level import would loop
+
+        raise Refused(ru.FACT_DUPLICATE)
     row = models.Fact(season_id=season_id, week_id=week_id, text=body, author_id=author_id, created_at=now)
     session.add(row)
     await session.flush()
