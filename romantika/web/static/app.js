@@ -355,10 +355,11 @@
     });
   }
 
-  // The journal under the sheet follows what the sheet changed (the passport does not: no stamp moves).
+  // The screen under the sheet follows what the sheet changed: «Это не отчёт» on an on-time
+  // report moves the stamp, so the bag is redrawn whole (the sheet lives outside #screen).
   async function syncBag() {
     await refreshHome();
-    if ($("journal-box")) await renderJournalInto($("journal-box"));
+    if (state.tab === "bag") await renderBag();
   }
 
   // The chapter of a past week inside its sheet: what is already there, and the door to add more.
@@ -369,13 +370,15 @@
     try { j = await RM.api("/api/journal"); } catch (e) { if (box.isConnected) box.innerHTML = errorBox(e); return; }
     if (!box.isConnected) return;
     const rs = j.reports.filter((r) => r.week_number === w.number);
-    const late = { again: rs.length > 0, stamped: !!w.level };
+    const fresh = (state.home.weeks || []).find((x) => x.number === w.number) || w;
+    const late = { again: rs.length > 0, stamped: !!fresh.level };
     box.innerHTML = `${notice ? `<div class="result ok" style="margin-bottom:12px"><div class="rich">${html(notice)}</div></div>` : ""}
       ${rs.length ? `<h3 style="margin:0 0 8px">В журнале · ${rs.length} ${RM.plural(rs.length, "запись", "записи", "записей")}</h3>${rs.map(reportHtml).join("")}` : ""}
       <button class="btn block" id="late-open" style="margin-top:10px">${late.again ? "Дописать в журнал" : "Добавить в журнал"}</button>
       <p class="note" id="late-note" style="margin:8px 0 0">${lateNote(late)}</p>`;
     // The editor opens its own sheet over this one; after it the week sheet is reopened whole.
-    bindReportActions(box, j, async () => { if ($("late-box")) await renderLateBox(w); else openWeek(w.number); await syncBag(); });
+    // After an edit or a cancel the sheet is reopened from fresh state: the week's stamp may have moved.
+    bindReportActions(box, j, async () => { await syncBag(); openWeek(w.number); });
     $("late-open").addEventListener("click", () => {
       const form = document.createElement("div");
       form.className = "composer";
