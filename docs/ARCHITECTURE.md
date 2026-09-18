@@ -261,7 +261,8 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   text passes through it (`safe_send`).
 - `romantika.bot.keyboards.normalize_button(text) -> str` (drops emoji/variation selectors,
   collapses spaces, lower-cases) and `button_action(text) -> str | None` with actions
-  `app, task, today, passport, words, facts, more, help, write, admin`.
+  `app, task, today, passport, words, facts, more, help, write, admin`; a message that starts
+  with a letter is never a button (a typed word is a report, DOMAIN §7).
 - Callback data: `intent:<week_number>:<take|try|skip>`, `level:<week_number>:<min|max>`,
   `notreport:<report_id>`, `more:<journal|write|help>`, `addword`, `addfact`, `endofseason`,
   admin `adm:<action>...` (free format, documented in keyboards.py).
@@ -306,9 +307,11 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   the report's week is open — DOMAIN §2; recomputes the stamp, hides removed files, copies the
   new version to Mila, receipts the author; 403 foreign, 409 cancelled or week over, 413 over
   10 files, 422 empty; an `edit_key` makes a retried PATCH idempotent), `POST
-  /api/reports/{id}/cancel`, `POST /api/weeks/{n}/level`, `POST /api/intent` (409 for a week
-  that has not started), `POST /api/letters`, `POST /api/words` (422 for a word the person
-  already has), `POST /api/facts`.
+  /api/reports/{id}/cancel`, `POST /api/weeks/{n}/level`, `POST /api/intent` (rules in
+  `people.choose_intent`, shared with the bot button: 409 for a week that has not started or
+  has ended and after the stamp; a repeated answer is stored but not copied to Mila), `POST
+  /api/letters`, `POST /api/words` (422 for a word the person already has), `POST /api/facts`
+  (422 for a fact the person already has).
 - Multipart limits (`routes/api.py`): the request is refused with 413 from `Content-Length`
   before parsing when it exceeds 200 MB; `request.form(max_files=11, max_fields=64)`; one file
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are
@@ -320,7 +323,11 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   is there to read it) and one `upload_client_disconnected` log line, never an ASGI error.
   One person's attempts are serialised with
   `pg_advisory_xact_lock` on `user:client_id` (POST) and `user:edit:report:edit_key` (PATCH),
-  so a retry in flight finds the first attempt's row instead of doing the work twice. A
+  so a retry in flight finds the first attempt's row instead of doing the work twice. The
+  same lock (`services/locks.py: serialise(session, key)`) guards every other «once per
+  person» write whose duplicate check is read-then-write: a word (`word:season:user`), a
+  fact (`fact:season:author`), an intent (`intent:user:week`) and the first row of a user
+  (`user:id`) — a double tap or two devices wait for each other inside Postgres. A
   service that refuses the input raises `services.errors.Refused` (a `ValueError` with a
   Russian message) and the app answers 422 `{"detail": …}` (`web/app.py`). A body that fails
   schema validation (`RequestValidationError`) answers the same shape — `detail` is always one

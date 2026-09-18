@@ -154,6 +154,26 @@ async def test_intent_is_stored_and_mila_is_told(app: App) -> None:
     ).status_code == 422
 
 
+async def test_intent_repeats_and_stamps_follow_the_bot_rules(app: App) -> None:
+    """One rule for both doors (`people.choose_intent`): a repeat of the same answer is not
+    copied to Mila again, and a week with a stamp takes no answer at all."""
+    headers = app.headers(ALICE)
+    for _ in range(3):
+        assert (
+            await app.client.post("/api/intent", json={"week_number": 1, "choice": "take"}, headers=headers)
+        ).status_code == 200
+    assert len(await app.jobs("telegram_notify")) == 1, "Mila was told the first time only"
+    r = await app.client.post("/api/intent", json={"week_number": 1, "choice": "skip"}, headers=headers)
+    assert r.status_code == 200
+    assert len(await app.jobs("telegram_notify")) == 2, "a different answer is news"
+
+    assert (await app.client.post("/api/reports", data={"text": "чимичанга"}, headers=headers)).status_code == 201
+    r = await app.client.post("/api/intent", json={"week_number": 1, "choice": "take"}, headers=headers)
+    assert r.status_code == 409 and "уже есть" in r.json()["detail"]
+    home = (await app.client.get("/api/home", headers=headers)).json()
+    assert home["week"]["intent"] == "skip", "the answer before the stamp stays as it was"
+
+
 async def test_mila_own_actions_are_not_copied_to_herself(app: App) -> None:
     r = await app.client.post(
         "/api/intent", json={"week_number": 1, "choice": "take"}, headers=app.headers(ADMIN_ID, "Мила")

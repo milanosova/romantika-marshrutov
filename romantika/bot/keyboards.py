@@ -46,10 +46,11 @@ def normalize_button(text: str | None) -> str:
 
 
 def button_action(text: str | None) -> str | None:
-    """A button press carries its emoji (whatever selector the client adds); a bare word
-    someone typed — «Паспорт» as a one-word report — is not a button (DOMAIN §7, 18.09.2026)."""
-    raw = text or ""
-    if not any(not (ch.isalpha() or ch.isspace() or ch == "-") for ch in raw):
+    """A button press starts with its emoji (whatever selector the client adds); a word
+    someone typed — «Паспорт», «Паспорт!», «Паспорт 🇲🇽» as a one-word report — starts with a
+    letter and is not a button (DOMAIN §7, 18.09.2026)."""
+    raw = (text or "").strip()
+    if not raw or raw[0].isalpha():
         return None
     return BUTTON_ACTIONS.get(normalize_button(raw))
 

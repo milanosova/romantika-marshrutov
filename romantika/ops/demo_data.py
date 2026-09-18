@@ -359,7 +359,7 @@ async def populate(session: AsyncSession, store: MediaStore, *, today: date, par
             season_id=season.id,
             week_id=week_for_fact.id if week_for_fact else None,
             text=text,
-            author_id=ADMIN_ID,
+            author_id=None,  # Mila's facts carry no author, as every real path writes them
             now=_at(today - timedelta(days=index + 1), 15),
         )
         counts["facts"] += 1

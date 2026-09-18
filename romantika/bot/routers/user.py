@@ -242,14 +242,19 @@ async def answer_dialog(
             await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboard)
             return
         week = await content.current_week(session, season.id, today=today)
-        await facts.add(
-            session,
-            season_id=season.id,
-            week_id=week.id if week else None,
-            text=text,
-            author_id=None if is_admin else user.id,
-            now=now,
-        )
+        try:
+            await facts.add(
+                session,
+                season_id=season.id,
+                week_id=week.id if week else None,
+                text=text,
+                author_id=None if is_admin else user.id,
+                now=now,
+            )
+        except Refused as exc:
+            # The dialog is already closed (the caller cleared it): the next message is a report again.
+            await safe_send(bot, chat_id, escape(str(exc)), reply_markup=keyboard)
+            return
         if is_admin:
             total = len(await facts.list_active(session, season.id))
             await safe_send(

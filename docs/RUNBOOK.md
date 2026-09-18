@@ -186,6 +186,11 @@ data requires the **same** bot (same token), otherwise all Telegram `file_id`s s
   WHERE late` (read-only, see below) is not zero, **fix forward** — do not roll back
   v2.4.0. With zero late reports the code may be rolled back without touching the
   migration: the column keeps `server_default false` and v2.3.0 runs on the new schema.
+  **v2.5.0 has no migration, and that is the trap:** it made participants' own words and
+  facts personal (seen by the author and Mila only) and the form promises it. Rolling the
+  code back to v2.4.0 shows every word and fact of every participant to everyone again —
+  the old ones included — and a look cannot be undone. Ask Mila before rolling back below
+  v2.5.0; prefer a forward fix. The data itself is untouched either way.
 - The bot is stateless apart from the DB: restarting it never loses reports (Telegram keeps
   unacknowledged updates for 24 h). The one thing it writes on Telegram's side is the command
   list and the menu button (`apply_menu` at start, v2.3.0+). Rolling back to a release before

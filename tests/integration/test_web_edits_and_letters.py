@@ -210,6 +210,22 @@ async def test_admin_week_state_survives_an_edit(app: App) -> None:
     assert r.json()["number"] == 1 and r.json()["ends_on"] == "2026-09-06"
 
 
+async def test_admin_week_texts_are_bounded_like_their_columns(app: App) -> None:
+    """A title longer than its column or a NUL byte is a 422 in Russian, not a 500 (limits, 18.09)."""
+    admin = app.headers(ADMIN_ID, "Мила")
+    first = (await app.client.get("/api/admin/weeks", headers=admin)).json()[0]
+    r = await app.client.put(f"/api/admin/weeks/{first['id']}", json={"title": "з" * 256}, headers=admin)
+    assert r.status_code == 422 and "255" in r.json()["detail"]
+    r = await app.client.put(f"/api/admin/weeks/{first['id']}", json={"word": "w" * 256}, headers=admin)
+    assert r.status_code == 422 and "255" in r.json()["detail"]
+    r = await app.client.put(f"/api/admin/weeks/{first['id']}", json={"intro": "текст\x00с нулём"}, headers=admin)
+    assert r.status_code == 422 and "недопустимые" in r.json()["detail"]
+    r = await app.client.put(f"/api/admin/weeks/{first['id']}", json={"intro": "и" * 4001}, headers=admin)
+    assert r.status_code == 422 and "4000" in r.json()["detail"]
+    r = await app.client.put(f"/api/admin/weeks/{first['id']}", json={"intro": "и" * 4000}, headers=admin)
+    assert r.status_code == 200 and len(r.json()["intro"]) == 4000
+
+
 async def test_remind_now_carries_the_week_and_refuses_unknown_or_past_weeks(app: App) -> None:
     admin = app.headers(ADMIN_ID, "Мила")
     assert (await app.client.post("/api/admin/remind", json={"week_number": 99}, headers=admin)).status_code == 404

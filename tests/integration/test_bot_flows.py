@@ -109,6 +109,22 @@ async def test_fact_dialog_from_participant_keeps_the_author(harness: Harness, d
     assert "Новый факт от" in harness.session.all_text(ADMIN_ID)
 
 
+async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
+    """The duplicate refusal closes the dialog: the next message is a report, not a second fact."""
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Ацтеки называли себя мешика")
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "ацтеки называли себя мешика")
+
+    assert "уже записан" in harness.session.last_text(ALICE)
+    assert await count(db_session, models.Fact) == 1
+    assert await dialog_row(db_session, ALICE) is None, "the dialog is closed: the next message is a report"
+
+    await harness.text(ALICE, "Мой отчёт: сделала гуакамоле на ужин.")
+    assert await count(db_session, models.Fact) == 1, "a report after a refused fact is not a fact"
+    assert await count(db_session, models.Report) == 1
+
+
 async def test_fact_dialog_from_admin_has_no_author(harness: Harness, db_session: AsyncSession) -> None:
     await harness.callback(ADMIN_ID, "addfact")
     await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")

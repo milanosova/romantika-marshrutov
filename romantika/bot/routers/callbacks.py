@@ -16,8 +16,9 @@ from romantika.bot.send import safe_send
 from romantika.config import Settings
 from romantika.db import models
 from romantika.domain.types import StampLevel
-from romantika.services import achievements, content, facts, letters, links, people, reports, stamps
+from romantika.services import achievements, content, facts, letters, links, people, reports
 from romantika.services.content import SeasonDTO
+from romantika.services.errors import Refused
 from romantika.services.gateways import TelegramGateway
 from romantika.services.media import MediaStore
 from romantika.services.people import UserDTO
@@ -118,22 +119,25 @@ async def _dispatch(
         week_number, choice = int(parts[1]), parts[2]
         week = await content.week_by_number(session, season.id, week_number)
         # A forged button must not pin a draft or a future week with an intent row (DOMAIN §2):
-        # only an announced week that has opened takes «берусь / попробую / мимо».
+        # only an announced week that has opened takes «берусь / мимо».
         if week is None or choice not in ru.INTENT_HINTS or week.is_draft or week.starts_on > today:
             await answer(query)
             return
-        if week.ends_on < today:  # a button on an old message: the week is over, nothing to take
-            await answer(query, ru.INTENT_WEEK_OVER, alert=True)
+        try:
+            outcome = await people.choose_intent(
+                session,
+                season_id=season.id,
+                user_id=user.id,
+                week=week,
+                choice=models.IntentChoice(choice),
+                today=today,
+                now=now,
+            )
+        except Refused as exc:  # a button on an old message, or the stamp is already there
+            await answer(query, str(exc), alert=True)
             return
-        if await stamps.get_level(session, user_id=user.id, week_id=week.id) is not None:
-            await answer(query, ru.INTENT_ALREADY_STAMPED, alert=True)
-            return
-        previous = await people.get_intent(session, user_id=user.id, week_id=week.id)
-        await people.set_intent(
-            session, season_id=season.id, user_id=user.id, week_id=week.id, choice=models.IntentChoice(choice), now=now
-        )
         await answer(query, ru.INTENT_HINTS[choice], alert=True)
-        if previous is not None and ru.INTENT_NAMES.get(previous) == ru.INTENT_NAMES[choice]:
+        if not outcome.changed:
             return  # the same answer again: Mila was told the first time
         await common.notify_admin(
             bot,
