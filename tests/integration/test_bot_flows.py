@@ -1270,14 +1270,20 @@ async def test_the_max_button_says_the_freeze_out_loud(harness: Harness, db_sess
 
 async def test_the_task_explains_the_two_buttons(harness: Harness) -> None:
     """The buttons live in the bot too, and there the note used to be missing entirely
-    (critic-ui, 19.09): «Берусь» promises reminders, «мимо» promises none."""
+    (critic-ui, 19.09): «Берусь» promises reminders, «мимо» promises none. The note stands
+    right above the buttons, and disappears with them once the week has a stamp."""
     await harness.text(ALICE, "📋 Задание")
     task = harness.session.last_text(ALICE)
     assert "«Берусь»" in task and "напоминание" in task
     assert "даже если не нажимать ничего" in task
+    assert task.rstrip().endswith("</i>"), "the note is the last thing before the buttons"
 
     await harness.callback(ALICE, "intent:1:skip")
     assert "передумаешь" in harness.session.alerts()[-1].lower()
+
+    await harness.text(ALICE, "Сделала")  # a stamp: the question is answered, no buttons
+    await harness.text(ALICE, "📋 Задание")
+    assert "даже если не нажимать ничего" not in harness.session.last_text(ALICE)
 
 
 async def test_the_admin_memo_does_not_promise_the_removed_draft(harness: Harness) -> None:

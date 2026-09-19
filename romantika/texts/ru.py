@@ -458,7 +458,14 @@ def word_lines(week: WeekDTO | None) -> list[str]:
     return lines
 
 
-def task_text(week: WeekDTO) -> str:
+#: Under the two buttons: what each answer does (Mila, 19.09). Printed only with the buttons.
+INTENT_NOTE = (
+    "<i>«Берусь» — в четверг и воскресенье пришлю напоминание. «В этот раз мимо» — не пришлю, "
+    "и это тоже нормально. Отчёт засчитается, даже если не нажимать ничего.</i>"
+)
+
+
+def task_text(week: WeekDTO, *, with_buttons: bool = False) -> str:
     parts = [
         f"<b>Неделя {week.number} · {escape(week_name(week.title))}</b>",
         "",
@@ -477,12 +484,11 @@ def task_text(week: WeekDTO) -> str:
         "",
         f"Дедлайн — {deadline_text(week)}.",
         "Пришли сюда текст или фото — и это засчитается.",
-        "",
-        "<i>«Берусь» — в четверг и воскресенье пришлю напоминание. «В этот раз мимо» — не пришлю, "
-        "и это тоже нормально. Отчёт засчитается, даже если не нажимать ничего.</i>",
     ]
     if week.word:
         parts += ["", "<b>Слово недели</b>", *word_lines(week)]
+    if with_buttons:  # the note is about the buttons, so it stands right above them
+        parts += ["", INTENT_NOTE]
     return "\n".join(parts)
 
 
