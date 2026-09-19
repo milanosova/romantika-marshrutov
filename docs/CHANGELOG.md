@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.7.0 — 2026-09-19 (Mila's edits of 19.09, evening: the «Карта» tab and the tidying)
+
+For participants: the third tab is **«Карта»** (it was «Сезон»), and **«О клубе» opens it** —
+the answer to «what is this» comes before the weeks. The receipt of a report no longer promises
+«покажу общие итоги» (nor does the reminder): with few people there is nothing to show, and
+with many it would not fit. The freezes tile shows **one number — how many are left** (the «из
+N» read as a ceiling). In «Рюкзак» the **«Журнал в PDF» card sits above the journal**, where
+people look for it. The week tab no longer repeats **«Мои отчёты»**: the journal holds the same
+cards, and editing and «это не отчёт» live there.
+
+For Mila: nothing to do — the names of the tab changed in every text that sends people to it.
+Under the hood: `renderWeekReportsInto` and `ru.week_end_accusative` are gone with their last
+callers; the tab's internal id stays `season`, only the label changed.
+
 ## v2.6.0 — 2026-09-19 (Mila's edits of 19.09: the day card, the names of weeks, a freeze for the first fact)
 
 For participants: the day of the Maya calendar is four lines now — the label, the day with
