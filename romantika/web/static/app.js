@@ -83,7 +83,7 @@
           <div><div class="k">Минимум ✅ · на пять минут</div><div class="v">${esc(w.task_min)}</div></div>
           ${w.task_max ? `<div><div class="k">Максимум ⭐ · на вечер</div><div class="v">${esc(w.task_max)}</div></div>` : ""}
         </div>
-        ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
+        ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted wordmeaning"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
         ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."}</p>` : `<h3>Берёшься?</h3>
         <div class="segment" id="intent">${["take", "skip"].map((c) => `<button data-choice="${c}" class="${w.intent === c || (c === "take" && w.intent === "try") ? "active" : ""}">${RM.intentName[c]}</button>`).join("")}</div>
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь»."}</p>`}
@@ -124,7 +124,7 @@
     if (!tz) return "";
     return `<div class="card day tight">
       <p class="muted daylabel">день по календарю майя</p>
-      <p class="daytitle"><b>${tz.number} ${esc(tz.sign_name)}</b> <span class="muted">· ${esc(tz.sign_symbol)}</span></p>
+      <p class="daytitle"><span class="muted">сегодня:</span> <b>${tz.number} ${esc(tz.sign_name)}</b> <span class="muted">· ${esc(tz.sign_symbol)}</span></p>
       <p class="advice">${esc(tz.day_advice)}</p>
       ${t.calendar_url ? `<a class="btn link small daylink" href="${esc(t.calendar_url)}" id="calendar-link">Узнай своё предназначение →</a>` : ""}
     </div>`;
@@ -166,8 +166,8 @@
     const note = late
       ? lateNote(late)
       : w
-      ? "Текст — минимум ✅, фото или видео — максимум ⭐. Присылать можно сколько угодно раз."
-        + (w.level ? " Отчёты этой недели — в «Рюкзаке», в журнале: там их правят." : "")
+      ? "Текст — минимум ✅<br>Фото и видео — максимум ⭐<br>Присылать можно сколько угодно раз"
+        + (w.level ? "<br>Отчёты этой недели — в «Рюкзаке», в журнале: там их правят" : "")
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
     return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
@@ -304,7 +304,6 @@
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="mine-box">${loading()}</div>`; // own words and facts (DOMAIN §6)
     out += `<div id="journal-box">${loading()}</div>`;
-    out += `<details class="card"><summary>Что будет в конце сезона</summary><div class="content richtext">${html(unhead(h.texts.end_of_season))}</div></details>`;
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
     $("freezes-how").addEventListener("click", (e) => { e.preventDefault(); openFreezes(state.home.passport); });
@@ -328,8 +327,10 @@
       ${words.length ? `<ul class="list tight">${words.map((w) => `<li><span class="mark">✍️</span><span class="body"><div class="title">${esc(w.word)}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="muted">Пока пусто — слова, которые зацепили тебя в этой стране.</p>`}
       <div class="row" style="margin-top:8px"><input id="word-text" placeholder="слово — что оно значит" style="flex:1"><button class="btn small" id="word-send">Записать</button></div>
       <p class="note" style="margin:8px 0 0">Видишь только ты; будут в твоём журнале сезона.${firstWord ? " За первое слово — ❄️ +1 заморозка." : ""}</p></div>
-      <div class="card"><h3 style="margin-top:0">${isAdmin ? "Факты клуба" : "Мои факты"}</h3>
-      ${mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
+      <div class="card"><h3 style="margin-top:0">${isAdmin ? "Записать факт клуба" : "Мои факты"}</h3>
+      ${isAdmin
+        ? `<p class="muted">Твои факты живут на «Карте» — здесь их можно только добавить.</p>`
+        : mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row" style="margin-top:8px"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
       <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все на «Карте», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — на «Карте»." + (firstFact ? " За первый факт — ❄️ +1 заморозка." : "")}</p></div>`;
     const again = async () => { const y = window.scrollY; await refreshHome(); await renderMineInto(box); window.scrollTo(0, y); };
@@ -404,7 +405,7 @@
       : `<p class="muted">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${status}</p>
          ${w.intro ? `<p>${esc(w.intro)}</p>` : ""}
          <div class="kv"><div><div class="k">Минимум ✅</div><div class="v">${esc(w.task_min)}</div></div>${w.task_max ? `<div><div class="k">Максимум ⭐</div><div class="v">${esc(w.task_max)}</div></div>` : ""}</div>
-         ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
+         ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted wordmeaning"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
          ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}
          ${w.late_open ? `<div id="late-box" style="margin-top:14px">${loading()}</div>` : ""}`;
     // The server sends «Неделя N» as the placeholder of a week that has not opened (views.py).
@@ -464,8 +465,22 @@
     const byWeek = new Map();
     live.forEach((r) => { if (!byWeek.has(r.week_number)) byWeek.set(r.week_number, []); byWeek.get(r.week_number).push(r); });
     const weeksDone = [...byWeek.keys()].sort((a, b) => b - a);
+    const h = state.home;
     let out = "";
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
+    // What the file looks like, right next to the button that makes it (Mila, 19.09).
+    out += `<details class="card"><summary>Что будет в конце сезона</summary><div class="content richtext">${html(unhead(h.texts.end_of_season))}
+      <div class="bookdemo" aria-hidden="true">
+        <div class="page">
+          <div class="ttl">${esc(h.season.title)}</div>
+          <div class="sub">${esc(h.user.first_name || "твоё имя")} · журнал сезона</div>
+          <div class="grid">${Array.from({ length: 12 }, (_, i) => `<span class="${i < weeksDone.length ? "on" : ""}">${i < weeksDone.length ? "★" : ""}</span>`).join("")}</div>
+          <div class="line long"></div><div class="line"></div>
+          <div class="photo"></div>
+          <div class="line"></div><div class="line short"></div>
+        </div>
+        <p class="muted small" style="margin:8px 0 0">Так выглядит первая страница: имя, сетка недель, дальше глава на каждую неделю с твоим текстом и фотографиями.</p>
+      </div></div></details>`;
     out += `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
     if (!weeksDone.length) out += `<div class="empty"><div class="big">📔</div><h2>Пока пусто</h2><p class="muted">Здесь появятся твои недели и твои же слова о них. К концу сезона это будет целый журнал.</p></div>`;
     weeksDone.forEach((n) => {
