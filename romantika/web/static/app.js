@@ -86,7 +86,7 @@
         ${w.word ? `<div class="divider"></div><div class="k" style="font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Слово недели</div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted wordmeaning"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
         ${w.level ? `<p class="note" style="margin-top:14px">${w.level === "max" ? "⭐ Максимум за эту неделю уже в паспорте." : "✅ Минимум за эту неделю уже в паспорте — фото поднимут его до максимума."}</p>` : `<h3>Берёшься?</h3>
         <div class="segment" id="intent">${["take", "skip"].map((c) => `<button data-choice="${c}" class="${w.intent === c || (c === "take" && w.intent === "try") ? "active" : ""}">${RM.intentName[c]}</button>`).join("")}</div>
-        <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь»."}</p>`}
+        <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "«Берусь» — в четверг и воскресенье придёт напоминание. «В этот раз мимо» — не придёт ничего, и это тоже нормально. Отчёт можно прислать и не нажимая ничего."}</p>`}
       </div>`;
       out += `<div class="card composer" id="composer">${composerHtml(w)}</div>`;
     } else {
@@ -132,7 +132,7 @@
 
   function intentNote(choice) {
     // «try» is what people pressed before 19.09: it reads as «берусь» now.
-    return { take: "Записала: берёшься 💪 Как сделаешь — пришли отчёт ниже.", try: "Записала: берёшься 💪 Как сделаешь — пришли отчёт ниже.", skip: "Хорошо, неделя может не задаться. Напоминаний не будет." }[choice];
+    return { take: "Записала: берёшься 💪 Как сделаешь — пришли отчёт ниже.", try: "Записала: берёшься 💪 Как сделаешь — пришли отчёт ниже.", skip: "Хорошо, неделя может не задаться — напоминаний не пришлю. Передумаешь — просто пришли отчёт, он засчитается." }[choice];
   }
 
   function bindIntent(w) {

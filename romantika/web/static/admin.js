@@ -9,8 +9,7 @@
   const FIELDS = [["title", "Название", "input"], ["intro", "Вступление", "textarea"], ["task_min", "Минимум", "textarea"], ["task_max", "Максимум", "textarea"], ["word", "Слово недели", "input"], ["word_ru", "Произношение", "input"], ["word_meaning", "Значение слова", "textarea"]];
   const FREEZE_REASONS = [["comment", "💬 За комментарий в канале"], ["meetup", "🤝 За приход на встречу"], ["friend", "🧭 За приведённого друга"], ["manual", "❄️ Просто от меня"]];
   const SOURCE = { bot: "из бота", app: "из приложения", out_of_week: "между неделями", not_report: "«это не отчёт»" };
-  const PEOPLE_FILTERS = [["all", "Все"], ["nostamp", "Без штампа на неделе"], ["silent", "Взялись и молчат"]];
-  const state = { tab: "week", me: null, season: null, weeks: [], catalogue: [], participants: [], week: null, filter: "all", unanswered: 0, personChanged: false, onSheetClose: null };
+  const state = { tab: "week", me: null, season: null, weeks: [], catalogue: [], participants: [], week: null, unanswered: 0, personChanged: false, onSheetClose: null };
 
   boot();
 
@@ -54,7 +53,7 @@
     tabbar.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === lit));
     window.scrollTo(0, 0);
     closeSheet();
-    const render = { week: renderWeek, people: renderPeople, letters: renderLetters, content: renderContent, facts: renderFacts, more: renderMore }[tab];
+    const render = { week: renderWeek, people: renderPeople, letters: renderLetters, content: renderContent, facts: renderFacts, words: renderWords, more: renderMore }[tab];
     guarded(render, () => go(tab));
   }
   // A request that failed inside a screen: the message and a retry, in place.
@@ -80,7 +79,8 @@
     const cur = currentWeek();
     const firstReal = state.weeks.find((w) => !isDraft(w));
     const pick = number || (state.week && state.week.week_number) || (cur ? cur.number : firstReal && firstReal.number);
-    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Сводка недели</p><h1>Неделя</h1></header><label>Какая неделя<select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
+    // One heading, then the week itself — «Неделя» above «Какая неделя» read as noise (Mila, 19.09).
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · админка</p><h1>Сводка недели</h1></header><label><select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
     $("week-pick").addEventListener("change", () => { const n = +$("week-pick").value; guarded(() => renderWeek(n), () => renderWeek(n)); });
     const picked = state.weeks.find((w) => w.number === pick);
     if (pick == null || !picked) {
@@ -89,8 +89,8 @@
       return;
     }
     if (isDraft(picked)) {
-      // Nobody has seen a draft: there is nothing to sum up and no «Привал» to draft.
-      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели — сводки и черновика «Привала» у неё нет. Объявить её можно в «Заданиях».</p></div>`;
+      // Nobody has seen a draft: there is nothing to sum up yet.
+      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели, сводки у неё нет. Объявить её можно в «Заданиях».</p></div>`;
       return;
     }
     let s;
@@ -107,12 +107,8 @@
         <h3>Сдали (${s.submitted.length})</h3>${s.submitted.length ? `<div class="chips">${s.submitted.map((x) => `<span class="chip ${x.level === "max" ? "star" : "ok"}">${x.level === "max" ? "⭐" : "✅"} ${esc(x.name)}</span>`).join("")}</div>` : `<p class="muted">Пока никто.</p>`}
         <h3>Взялись, но не прислали (${s.took_not_submitted.length})</h3>${s.took_not_submitted_names.length ? `<div class="chips">${s.took_not_submitted_names.map((n) => `<span class="chip">${esc(n)}</span>`).join("")}</div>${s.week_ended ? `<p class="note" style="margin-top:8px">Неделя прошла — напоминать уже не о чем.</p>` : `<button class="btn soft small" id="remind" style="margin-top:10px">⏰ Напомнить им сейчас</button>`}` : `<p class="muted">Таких нет.</p>`}
       </div>
-      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(RM.weekName(s.week_title))} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
+      `;
     if ($("remind")) $("remind").addEventListener("click", () => remindNow(s.week_number, s.week_title));
-    if ($("copy")) $("copy").addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(s.draft_post); RM.toast("Скопировала"); }
-      catch (e) { const r = document.createRange(); r.selectNodeContents($("draft")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); RM.toast("Выдели и скопируй текст"); }
-    });
   }
 
   async function remindNow(weekNumber, weekTitle) {
@@ -127,10 +123,8 @@
   async function renderPeople() {
     const cur = currentWeek();
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Участники</p><h1>Люди</h1></header><input id="people-q" placeholder="Найти по имени или нику">
-      ${cur ? `<div class="tabs filters" id="people-filters">${PEOPLE_FILTERS.map(([v, l]) => `<button data-f="${v}" class="${state.filter === v ? "active" : ""}">${l}</button>`).join("")}</div>` : ""}
       <div id="people-list">${loading()}</div>`;
     try { state.participants = await RM.api("/api/admin/participants"); } catch (e) { failed($("people-list"), e, renderPeople); return; }
-    if (!cur) state.filter = "all"; // the week filters make no sense between weeks, and there is no UI to reset them
     if (!state.participants.length) { $("people-list").innerHTML = `<div class="empty"><div class="big">👋</div><h2>Пока никого</h2><p class="muted">Люди появятся здесь после первого /start в боте.</p></div>`; return; }
     const weekMark = (p) => {
       if (!cur) return "";
@@ -143,16 +137,11 @@
       const q = $("people-q").value.trim().toLowerCase();
       const rows = state.participants.filter((p) => (!q || name(p).toLowerCase().includes(q)) && passes(p));
       const total = state.participants.length;
-      $("people-list").innerHTML = rows.length ? `<p class="muted small">${rows.length === total ? `${total} ${RM.plural(total, "человек", "человека", "человек")}` : `${rows.length} из ${total}`} · нажми, чтобы открыть</p><ul class="list">${rows.map((p) => `<li data-id="${p.id}" style="cursor:pointer"><span class="body"><div class="person-row"><div class="avatar">${esc(initials(p))}</div><div><div class="name">${esc(name(p))}</div><div class="sub">${esc(RM.levelLabel(p.level))} · заморозок ${p.freezes_left}/${p.freezes_total}</div>${weekMark(p)}</div><div class="stats">${p.stamps} ${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}<br>цепочка ${p.current_streak} / ${p.best_streak}</div></div></span></li>`).join("")}</ul>` : `<p class="muted">${q ? "Никого не нашла." : state.filter === "silent" ? "Все, кто взялся, уже прислали отчёт." : "У всех есть штамп — редкая неделя."}</p>`;
+      $("people-list").innerHTML = rows.length ? `<p class="muted small">${rows.length === total ? `${total} ${RM.plural(total, "человек", "человека", "человек")}` : `${rows.length} из ${total}`} · нажми, чтобы открыть</p><ul class="list">${rows.map((p) => `<li data-id="${p.id}" style="cursor:pointer"><span class="body"><div class="person-row"><div class="avatar">${esc(initials(p))}</div><div><div class="name">${esc(name(p))}</div><div class="sub">${esc(RM.levelLabel(p.level))} · заморозок ${p.freezes_left}/${p.freezes_total}</div>${weekMark(p)}</div><div class="stats">${p.stamps} ${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}<br>цепочка ${p.current_streak} / ${p.best_streak}</div></div></span></li>`).join("")}</ul>` : `<p class="muted">${q ? "Никого не нашла." : "Пока никого."}</p>`;
       $("people-list").querySelectorAll("li[data-id]").forEach((li) => li.addEventListener("click", () => openPerson(+li.dataset.id)));
     };
-    const passes = (p) => state.filter === "nostamp" ? !p.week_level : state.filter === "silent" ? (p.week_intent === "take" || p.week_intent === "try") && !p.week_level : true;
+    const passes = () => true; // everyone in one list; the week's mark is on every row
     $("people-q").addEventListener("input", draw);
-    if ($("people-filters")) $("people-filters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      state.filter = b.dataset.f;
-      $("people-filters").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      draw();
-    }));
     draw();
   }
   function name(p) { return ([p.first_name, p.last_name].filter(Boolean).join(" ") + (p.username ? " (@" + p.username + ")" : "")) || String(p.id); }
@@ -390,6 +379,36 @@
     $("facts-list").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (!(await RM.confirm("Убрать факт из списка? Он скрывается, не удаляется."))) return; try { await RM.api(`/api/admin/facts/${b.dataset.del}`, { method: "DELETE" }); renderFacts(); } catch (e) { RM.toast(e.message); } }));
   }
 
+  // --- Слова сезона: слово каждой недели в одном списке -------------------------------
+
+  async function renderWords() {
+    const weeks = state.weeks;
+    const withWord = weeks.filter((w) => w.word);
+    const free = weeks.filter((w) => !w.word);
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Словарик сезона</p><h1>Слова</h1>
+      <p class="muted">Слово недели видят все: в задании, в «Карте» и в журнале. Значение можно писать в две строки — пример встанет со своей.</p></header>
+      ${withWord.length ? `<ul class="list">${withWord.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="wordmeaning">${esc(w.word_meaning)}</div>` : `<div class="muted">значение не вписано</div>`}<div class="sub">неделя ${w.number} · ${esc(RM.weekName(w.title)) || "без названия"}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слов пока нет — впиши первое ниже.</p>`}
+      ${free.length ? `<div class="card" style="margin-top:16px"><h3 style="margin-top:0">Вписать слово</h3>
+        <label class="k">Неделя</label>
+        <select id="word-week" style="width:100%;margin-bottom:8px">${free.map((w) => `<option value="${w.id}">${w.number}. ${esc(RM.weekName(w.title)) || "без названия"}</option>`).join("")}</select>
+        <input id="word-text" placeholder="слово на языке страны" style="width:100%;margin-bottom:8px">
+        <input id="word-ru" placeholder="как читается" style="width:100%;margin-bottom:8px">
+        <textarea id="word-meaning" placeholder="что значит; со второй строки — пример"></textarea>
+        <button class="btn block" id="word-save" style="margin-top:10px">Сохранить</button></div>`
+        : `<p class="note" style="margin-top:16px">У каждой недели сезона слово уже вписано. Чтобы поменять — нажми на слово в списке.</p>`}`;
+    screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));
+    if ($("word-save")) $("word-save").addEventListener("click", async () => {
+      const id = +$("word-week").value, word = $("word-text").value.trim();
+      if (!word) return RM.toast("Напиши само слово");
+      $("word-save").disabled = true;
+      try {
+        await RM.api(`/api/admin/weeks/${id}`, { method: "PUT", body: { word, word_ru: $("word-ru").value.trim(), word_meaning: $("word-meaning").value.trim() } });
+        state.weeks = await RM.api("/api/admin/weeks");
+        renderWords();
+      } catch (e) { $("word-save").disabled = false; RM.toast(e.message); }
+    });
+  }
+
   // --- Ещё: напоминания, изменения, как это работает ---------------------------------
 
   async function renderMore() {
@@ -397,13 +416,14 @@
       <div class="card"><div class="row between"><h2 style="margin:0">Автонапоминания</h2><label class="toggle"><input type="checkbox" id="rem-toggle"> <span id="rem-state">…</span></label></div>
         <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
         <button class="btn soft small" id="remind-now">⏰ Напомнить сейчас</button></div>
+      <a class="card tight linkcard" href="#" id="open-words"><div class="row between"><div style="flex:1;min-width:0"><b>📖 Слова сезона</b><div class="muted small">Слово каждой недели — списком; здесь же можно вписать новое.</div></div><span class="muted chevron">›</span></div></a>
       <a class="card tight linkcard" href="#" id="open-facts"><div class="row between"><div style="flex:1;min-width:0"><b>💡 Факты про страну</b><div class="muted small">Что мы узнали за сезон — общий список для журналов.</div></div><span class="muted chevron">›</span></div></a>
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
         <b>Отчёты</b> Человек присылает боту текст или фото — или отправляет их из приложения. Текст = минимум ✅, фото или видео = максимум ⭐. Копия приходит тебе в чат с шапкой «📨 Отчёт за неделю N от…»; ответь на неё реплаем — бот передаст автору.
         <b>Штампы</b> Ставятся сами по первому отчёту недели и никогда не понижаются (кроме «это не отчёт»). Ручной штамп ставишь во вкладке «Люди»; он важнее автоматического.
         <b>Заморозки</b> Две базовые, до шести. Пропущенная неделя тратит одну сама. За слово в словарике, за свой факт про страну и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
         <b>Задания</b> Тексты любой недели — и прошедшей тоже — правятся во вкладке «Задания» и появляются в боте сразу. У прошедшей и идущей недели заморожены только даты.
-        <b>Сводка</b> Вкладка «Неделя»: кто взялся, кто сдал, ядро (две недели подряд) и черновик «Привала».
+        <b>Сводка</b> Вкладка «Неделя»: кто взялся, кто сдал, ядро (две недели подряд).
         <b>Письма</b> Вкладка «Письма»: всё, что пришло не отчётом. Ответ отсюда или реплаем в чате — одно и то же, письмо помечается отвеченным.
         <b>Правки</b> Пока неделя идёт, человек может поправить свой отчёт в приложении: текст и файлы. Тебе приходит копия с шапкой «✏️ Правка отчёта», штамп пересчитывается по правилам отчётов.
         <b>Журналы</b> Каждый может собрать свой PDF в приложении в любой момент; на следующий день после конца сезона бот сам разошлёт журналы всем, у кого есть хоть один штамп. Пожелание в журнал пишется во вкладке «Люди».
@@ -422,6 +442,7 @@
     });
     $("remind-now").addEventListener("click", () => { const cur = currentWeek(); remindNow(cur && cur.number, cur && cur.title); });
     $("open-facts").addEventListener("click", (e) => { e.preventDefault(); go("facts"); });
+    $("open-words").addEventListener("click", (e) => { e.preventDefault(); go("words"); });
     $("audit-box").addEventListener("toggle", loadAudit, { once: true });
   }
 
