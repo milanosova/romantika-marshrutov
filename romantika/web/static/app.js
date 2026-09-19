@@ -303,9 +303,6 @@
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="mine-box">${loading()}</div>`; // own words and facts (DOMAIN §6)
-    // What the file looks like, right next to the button that makes it (Mila, 19.09). Drawn
-    // from the passport, so a failed /api/journal cannot take the block away.
-    out += endOfSeasonHtml(h);
     out += `<div id="journal-box">${loading()}</div>`;
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
@@ -324,7 +321,7 @@
     }).join("");
     return `<details class="card"><summary>Что будет в конце сезона</summary><div class="content richtext">${html(unhead(h.texts.end_of_season))}
       <div class="bookdemo">
-        <div class="sheet" aria-hidden="true">
+        <div class="bookpage" aria-hidden="true">
           <div class="ttl">${esc(h.season.title)}</div>
           <div class="sub">${esc(h.user.first_name || "твоё имя")} · журнал сезона</div>
           <div class="grid">${cells}</div>
@@ -482,7 +479,9 @@
   // --- Журнал --------------------------------------------------------------------------
 
   async function renderJournalInto(box) {
-    try { state.journal = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
+    // The sketch is drawn from the passport, so it survives a journal that failed to load.
+    try { state.journal = await RM.api("/api/journal"); }
+    catch (e) { box.innerHTML = endOfSeasonHtml(state.home) + errorBox(e); return; }
     if (!box.isConnected) return; // the tab changed while the journal loaded
     const j = state.journal;
     const live = j.reports.filter((r) => r.week_number !== null);
@@ -493,6 +492,8 @@
     let out = "";
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
 
+    // What the file looks like, right under the button that makes it (Mila, 19.09).
+    out += endOfSeasonHtml(state.home);
     out += `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
     if (!weeksDone.length) out += `<div class="empty"><div class="big">📔</div><h2>Пока пусто</h2><p class="muted">Здесь появятся твои недели и твои же слова о них. К концу сезона это будет целый журнал.</p></div>`;
     weeksDone.forEach((n) => {
@@ -621,7 +622,7 @@
     const chronicleMark = (w) => running(w) ? "▸" : w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : RM.stateMark[w.state] || "◦";
     out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${chronicleMark(w)}</span><span class="body"><div class="title">${w.number}. ${esc(RM.weekName(w.title))}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
     out += `<h3>Слова недели</h3>`;
-    out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(RM.weekName(w.title))}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
+    out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div class="wordmeaning">${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(RM.weekName(w.title))}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
     // Facts here are Mila's — the club's shared ones. A person's own facts and words live in the bag (DOMAIN §6).
     const shared = f ? f.facts.filter((x) => !x.mine && !x.author) : [];
     if (f) out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>

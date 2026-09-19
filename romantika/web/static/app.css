@@ -283,7 +283,7 @@ table.grid td, table.grid th { padding: 8px 4px; border-bottom: 1px solid var(--
 
 /* A sketch of the journal page, shown next to the «Собрать» button: what the file looks like. */
 .bookdemo { margin-top: 12px; }
-.bookdemo .sheet {
+.bookdemo .bookpage {
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 14px 14px 16px; box-shadow: 0 1px 0 var(--line);
 }
