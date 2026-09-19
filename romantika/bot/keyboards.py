@@ -184,7 +184,6 @@ def calendar_button(public_base_url: str) -> InlineKeyboardMarkup | None:
 def panel(*, reminders_enabled: bool, public_base_url: str) -> InlineKeyboardMarkup:
     rows = [
         [
-            InlineKeyboardButton(text="📝 Черновик Привала", callback_data="adm:draft"),
             InlineKeyboardButton(text="✏️ Задание недели", callback_data="adm:edit"),
         ],
         [

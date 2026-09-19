@@ -280,31 +280,6 @@ async def test_week_summary_counts_the_core_both_ways(db_session: AsyncSession, 
     assert core.best == [ALICE] and core.current == [ALICE]
 
 
-async def test_draft_post_mentions_quotes_word_and_the_silent_ones(db_session: AsyncSession, season: int) -> None:
-    week = await _week(db_session, season, 1)
-    await people.set_intent(
-        db_session,
-        season_id=season,
-        user_id=BOB,
-        week_id=week.id,
-        choice=models.IntentChoice.TAKE,
-        now=moscow(2026, 9, 1),
-    )
-    await reports.accept(
-        db_session, season_id=season, user_id=ALICE, message=photo(caption="тако удались"), now=moscow(2026, 9, 2)
-    )
-    post = await summary.draft_post(db_session, season_id=season, week_number=1, today=date(2026, 9, 7))
-    assert "Черновик «Привала» · неделя 1 · За столом" in post.as_message()
-    post = post.as_message()
-    assert "⭐ Алиса — тако удались" in post
-    assert "Слово недели: antojo" in post
-    assert "#маршрут_итоги #мексика" in post
-    assert "взялись и не прислали — Боб" in post
-
-
-# --- jobs -------------------------------------------------------------------------
-
-
 async def test_job_fails_after_five_attempts(db_session: AsyncSession) -> None:
     now = moscow(2026, 9, 3)
     job_id = await jobs.enqueue(db_session, "media_download", {"media_id": "x"}, now=now)

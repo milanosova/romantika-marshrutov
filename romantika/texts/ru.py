@@ -313,7 +313,6 @@ ADMIN_MEMO = (
     "фото = максимум со звёздочкой\n"
     "Письмо тебе — /help → «✉️ Написать Миле» (внутри недели сообщение — это отчёт)\n\n"
     "<b>Смотреть</b>\n"
-    "📝 Черновик Привала — готовый текст воскресного поста\n"
     "/results — сводка за неделю\n"
     "/results 2 — то же по любой неделе\n"
     "/core — ядро: кто сдаёт две недели подряд. Главная цифра\n"
@@ -459,7 +458,14 @@ def word_lines(week: WeekDTO | None) -> list[str]:
     return lines
 
 
-def task_text(week: WeekDTO) -> str:
+#: Under the two buttons: what each answer does (Mila, 19.09). Printed only with the buttons.
+INTENT_NOTE = (
+    "<i>«Берусь» — в четверг и воскресенье пришлю напоминание. «В этот раз мимо» — не пришлю, "
+    "и это тоже нормально. Отчёт засчитается, даже если не нажимать ничего.</i>"
+)
+
+
+def task_text(week: WeekDTO, *, with_buttons: bool = False) -> str:
     parts = [
         f"<b>Неделя {week.number} · {escape(week_name(week.title))}</b>",
         "",
@@ -481,6 +487,8 @@ def task_text(week: WeekDTO) -> str:
     ]
     if week.word:
         parts += ["", "<b>Слово недели</b>", *word_lines(week)]
+    if with_buttons:  # the note is about the buttons, so it stands right above them
+        parts += ["", INTENT_NOTE]
     return "\n".join(parts)
 
 
@@ -707,7 +715,10 @@ def level_name(level: StampLevel) -> str:
 INTENT_HINTS = {
     "take": "Записала: берёшься 💪\n\nКак сделаешь — пришли сюда текст или фото, и я поставлю штамп в паспорт.",
     "try": "Записала: берёшься 💪\n\nКак сделаешь — пришли сюда текст или фото, и я поставлю штамп в паспорт.",
-    "skip": "Хорошо, неделя может не задаться.\n\nНапоминаний не пришлю. Реакция под постом — тоже участие.",
+    "skip": (
+        "Хорошо, неделя может не задаться.\n\nНапоминаний не пришлю. Передумаешь — просто пришли "
+        "отчёт, он засчитается. Реакция под постом — тоже участие."
+    ),
 }
 INTENT_NAMES = {"take": "берусь", "try": "берусь", "skip": "мимо"}  # «try» is what old messages send
 INTENT_NOT_OPEN = "Эта неделя ещё не открылась — ответить можно будет, когда она начнётся."

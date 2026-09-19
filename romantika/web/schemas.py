@@ -294,9 +294,6 @@ class SummaryOut(BaseModel):
     took_not_submitted_names: list[str]
     core_best: int
     core_current: int
-    draft_post: str
-    draft_notes: list[str] = []
-    """Service remarks next to the draft (who went silent, the week is still running) — not part of the post."""
     week_ended: bool = False
     """True once the week's last day is behind: no reminder can be sent about it (D1)."""
 

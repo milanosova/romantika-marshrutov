@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.9.0 — 2026-09-19 (Mila's edits of 19.09, evening: the admin app without the draft)
+
+For Mila: **the draft of the Sunday post is gone** — she writes «Привал» by hand and will not
+publish a list of who did what, «neither with zero people nor with a hundred»; the card, its
+button in «⚙️ Мила» and the service notes went with it. The week summary has one heading and
+the week picker right under it. **«Люди» is one list** without the week groupings. **«Ещё» →
+«Слова сезона»**: the word of every week in one place, and a form that writes a word into a
+week that has none. The «Хранитель памяти» achievement is about the club, not about a Mexican
+altar, so it survives the change of country.
+
+For participants: under «Берусь / В этот раз мимо» — in the app and now in the bot too — it
+says what each answer does, and that a report counts even without pressing anything; «мимо»
+adds that one can change their mind and just send a report.
+
 ## v2.8.0 — 2026-09-19 (Mila's edits of 19.09, night: the week's form, the journal's sketch)
 
 For participants: the report form's note reads as four lines instead of one paragraph, and the

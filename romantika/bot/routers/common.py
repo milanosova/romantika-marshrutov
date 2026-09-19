@@ -37,7 +37,7 @@ async def send_task(
     # With a stamp already in the passport the question «берёшься?» is answered: no buttons.
     stamped = user_id is not None and await stamps.get_level(session, user_id=user_id, week_id=week.id) is not None
     markup = None if stamped else keyboards.task_buttons(week.number)
-    await safe_send(bot, chat_id, ru.task_text(week), reply_markup=markup)
+    await safe_send(bot, chat_id, ru.task_text(week, with_buttons=markup is not None), reply_markup=markup)
 
 
 async def send_today(

@@ -268,20 +268,6 @@ async def handle_admin(
 
     if action == "panel":
         await admin.show_panel(bot, chat_id, session, settings)
-    elif action == "draft":
-        from romantika.services import summary
-
-        current = await content.current_week(session, season.id, today=today)
-        if current is None:
-            await safe_send(bot, chat_id, "Сейчас неделя сезона не идёт.")
-            return
-        await safe_send(
-            bot,
-            chat_id,
-            (
-                await summary.draft_post(session, season_id=season.id, week_number=current.number, today=today)
-            ).as_message(),
-        )
     elif action == "summary":
         await admin.send_summary(bot, chat_id, session, season, None, today)
     elif action == "core":

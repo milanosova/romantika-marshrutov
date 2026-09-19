@@ -419,7 +419,6 @@ async def test_panel_opens_with_every_action(harness: Harness) -> None:
     await harness.text(ADMIN_ID, "⚙️ Мила")
     data = {d for _, d in harness.session.buttons(ADMIN_ID) if d}
     assert {
-        "adm:draft",
         "adm:edit",
         "adm:summary",
         "adm:core",
@@ -434,12 +433,9 @@ async def test_panel_opens_with_every_action(harness: Harness) -> None:
     } <= data
 
 
-async def test_panel_draft_summary_core_and_who(harness: Harness) -> None:
+async def test_panel_summary_core_and_who(harness: Harness) -> None:
     await harness.photo(ALICE, caption="тако удались")
     harness.session.reset()
-
-    await harness.callback(ADMIN_ID, "adm:draft")
-    assert "#мексика" in harness.session.last_text(ADMIN_ID) or "[" in harness.session.last_text(ADMIN_ID)
 
     await harness.callback(ADMIN_ID, "adm:summary")
     summary_text = harness.session.last_text(ADMIN_ID)
@@ -452,7 +448,7 @@ async def test_panel_draft_summary_core_and_who(harness: Harness) -> None:
     assert "Алиса" in harness.session.last_text(ADMIN_ID)
 
     await harness.callback(ADMIN_ID, "adm:panel")
-    assert "adm:draft" in [d for _, d in harness.session.buttons(ADMIN_ID)]
+    assert "adm:summary" in [d for _, d in harness.session.buttons(ADMIN_ID)]
 
 
 async def test_panel_remind_sends_to_whoever_took_the_week(harness: Harness) -> None:
@@ -1270,3 +1266,26 @@ async def test_the_max_button_says_the_freeze_out_loud(harness: Harness, db_sess
     await harness.callback(BOB, "level:1:max")
     await harness.callback(BOB, "level:1:max")
     assert await count(db_session, models.Freeze) == 2, "the freeze is granted once a season"
+
+
+async def test_the_task_explains_the_two_buttons(harness: Harness) -> None:
+    """The buttons live in the bot too, and there the note used to be missing entirely
+    (critic-ui, 19.09): «Берусь» promises reminders, «мимо» promises none. The note stands
+    right above the buttons, and disappears with them once the week has a stamp."""
+    await harness.text(ALICE, "📋 Задание")
+    task = harness.session.last_text(ALICE)
+    assert "«Берусь»" in task and "напоминание" in task
+    assert "даже если не нажимать ничего" in task
+    assert task.rstrip().endswith("</i>"), "the note is the last thing before the buttons"
+
+    await harness.callback(ALICE, "intent:1:skip")
+    assert "передумаешь" in harness.session.alerts()[-1].lower()
+
+    await harness.text(ALICE, "Сделала")  # a stamp: the question is answered, no buttons
+    await harness.text(ALICE, "📋 Задание")
+    assert "даже если не нажимать ничего" not in harness.session.last_text(ALICE)
+
+
+async def test_the_admin_memo_does_not_promise_the_removed_draft(harness: Harness) -> None:
+    await harness.text(ADMIN_ID, "/help")
+    assert "Привал" not in harness.session.all_text(ADMIN_ID), "the draft is gone from the product"
