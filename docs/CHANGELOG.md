@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.8.0 — 2026-09-19 (Mila's edits of 19.09, night: the week's form, the journal's sketch)
+
+For participants: the report form's note reads as four lines instead of one paragraph, and the
+last of them says where the reports live. The day of the Maya calendar is labelled «сегодня:».
+The meaning of a week's word may be written in two lines, so the example stands on its own
+(`white-space: pre-line`). **«Что будет в конце сезона» moved next to the «Собрать» button**
+and now carries a sketch of the journal's first page — the name, the grid of weeks with the
+same marks the real cover uses (⭐ for a maximum, ✅ for a minimum), the place of a photo.
+
+For Mila: her own facts are no longer listed twice — «Рюкзак» only adds them, they live on
+«Карта». Under the hood: the sketch is drawn from the passport, so a failed `/api/journal`
+cannot take the block away with it.
+
 ## v2.7.0 — 2026-09-19 (Mila's edits of 19.09, evening: the «Карта» tab and the tidying)
 
 For participants: the third tab is **«Карта»** (it was «Сезон»), and **«О клубе» opens it** —

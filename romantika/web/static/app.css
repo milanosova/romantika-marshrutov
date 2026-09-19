@@ -280,3 +280,25 @@ table.grid td, table.grid th { padding: 8px 4px; border-bottom: 1px solid var(--
 .toggle input { width: auto; }
 .audit-row { font-size: 13px; }
 .audit-row .diff { color: var(--muted); white-space: pre-wrap; word-break: break-word; }
+
+/* A sketch of the journal page, shown next to the «Собрать» button: what the file looks like. */
+.bookdemo { margin-top: 12px; }
+.bookdemo .bookpage {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 14px 16px; box-shadow: 0 1px 0 var(--line);
+}
+.bookdemo .ttl { font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-weight: 700; }
+.bookdemo .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.bookdemo .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 10px 0 12px; }
+.bookdemo .grid span {
+  aspect-ratio: 1; border: 1px dashed var(--line); border-radius: 3px;
+  display: grid; place-items: center; font-size: 10px; color: var(--accent);
+}
+.bookdemo .grid span.on { border-style: solid; background: var(--accent-soft); }
+.bookdemo .line { height: 6px; border-radius: 3px; background: var(--line); margin: 5px 0; }
+.bookdemo .line.long { width: 70%; }
+.bookdemo .line.short { width: 45%; }
+.bookdemo .photo { height: 54px; border-radius: 6px; background: var(--accent-soft); margin: 8px 0; }
+
+/* The meaning of the week's word may be written in two lines — the example on its own. */
+.wordmeaning { white-space: pre-line; }
