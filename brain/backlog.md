@@ -10,12 +10,6 @@
 |---|---|---|---|---|---|
 | 01 | [Харнес для работы Милы через Claude Code](tasks/01-harness/status.md) | фича | `harness` | 7/7 | 2026-09-16 · [план](specs/2026-09-16-harness.html) · [отчёт](tasks/01-harness/report.html) |
 
-## Готово к выкатке
-
-| № | Задача | Маршрут | Ветка | Приёмка | Обновлено |
-|---|---|---|---|---|---|
-| 05 | [Правки 19 сентября — имена недель как в канале, карточка дня, заморозка за первый факт](tasks/05-week-names-and-day-card/status.md) | фича | `feature/05-week-names-and-day-card` | 8/8 | 2026-09-19 · план: обещан, файла нет · [отчёт](tasks/05-week-names-and-day-card/report.html) |
-
 ## На проде
 
 | № | Задача | Маршрут | Ветка | Приёмка | Обновлено |
@@ -23,6 +17,7 @@
 | 02 | [Одна дверь в клуб — кнопка в чате и три вкладки в приложении](tasks/02-app-shell/status.md) | фича | `feature/02-app-shell` | 8/8 | 2026-09-18 · [план](tasks/02-app-shell/plan.html) · [отчёт](tasks/02-app-shell/report.html) |
 | 03 | [Поздние отчёты в журнал — дослать за прошедшую неделю до конца сезона](tasks/03-late-reports/status.md) | фича | `feature/03-late-reports` | 9/9 | 2026-09-18 · [план](tasks/03-late-reports/plan.html) · [отчёт](tasks/03-late-reports/report.html) |
 | 04 | [Правки Милы 18.09 — вид «Недели», заморозки, тексты прошедших недель, личные слова и факты](tasks/04-week-look-and-rules/status.md) | фича | `feature/04-week-look-and-rules` | 8/8 | 2026-09-18 |
+| 05 | [Правки 19 сентября — имена недель как в канале, карточка дня, заморозка за первый факт](tasks/05-week-names-and-day-card/status.md) | фича | `feature/05-week-names-and-day-card` | 8/8 | 2026-09-19 · план: обещан, файла нет · [отчёт](tasks/05-week-names-and-day-card/report.html) |
 
 ## Открытые баги
 
