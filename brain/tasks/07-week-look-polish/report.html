@@ -1,0 +1,97 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Вёрстка недели: отчёт</title>
+<style>
+:root{--bg:#F5F4F0;--surface:#FFFFFF;--ink:#1C1F26;--ink2:#4B5060;--muted:#7B8090;--line:#DDDCD5;
+  --ok:#1F7A4C;--ok-soft:rgba(31,122,76,.09);--warn:#A85410;--warn-soft:rgba(168,84,16,.10);--bad:#B3261E;--bad-soft:rgba(179,38,30,.09);
+  --accent:#0E6E7A;--accent-soft:rgba(14,110,122,.08);--accent-ink:#FFFFFF;
+  --body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}}
+:root[data-theme="dark"]{--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body);padding:0 20px 80px}
+.wrap{max-width:760px;margin:0 auto}
+.crumbs{font:12.5px/1.4 var(--mono);color:var(--muted);padding:28px 0 6px}
+h1{font-size:34px;line-height:1.15;margin:6px 0 10px;text-wrap:balance}
+.lede{font-size:17px;color:var(--ink2);margin:0 0 24px;max-width:62ch}
+h2{font-size:23px;line-height:1.25;margin:44px 0 8px;text-wrap:balance}
+h3{font-size:17px;margin:26px 0 6px}
+p{margin:0 0 12px;max-width:68ch} ul{margin:0 0 12px;padding-left:20px} li{margin:0 0 6px}
+.tldr{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;padding:18px 22px 10px;margin:0 0 8px}
+.tldr h2{margin:0 0 10px;font-size:20px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 8px}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+.pair figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px}
+.pair figure.after{border-color:var(--accent)}
+.pair img{display:block;width:100%;height:auto;border-radius:4px;border:1px solid var(--line)}
+.pair figcaption{font-size:13.5px;color:var(--ink2);margin-top:8px}
+.pair .tag{font:11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+figure.wide{margin:14px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px}
+figure.wide img{display:block;max-width:100%;height:auto}
+figcaption{font-size:14px;color:var(--ink2);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface);border:1px solid var(--line);margin:14px 0 8px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-top:1px solid var(--line)}
+th{font-size:13px;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em;border-top:0}
+.check li{list-style:none;margin-left:-20px} .check li::before{content:"☐ ";color:var(--muted)} .check li.done::before{content:"☑ ";color:var(--ok)}
+.callout{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:6px;padding:14px 18px;margin:16px 0}
+.callout.ok{border-left-color:var(--ok)}
+.verdict{margin:48px 0 0;padding:22px 24px;background:var(--accent-soft);border-radius:8px}
+.verdict h2{margin:0 0 10px}
+code{font:13px var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.shell{font:13.5px/1.5 var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 18px;margin:14px 0 8px;white-space:pre-wrap;overflow-x:auto;color:var(--ink)}
+.mock{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:14px 16px;margin:0}
+.mock .tag{font:11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.mock .row{padding:8px 0;border-top:1px dashed var(--line)} .mock .row:first-of-type{border-top:0}
+.mock b{display:block;font-size:14px} .mock span{font-size:13.5px;color:var(--ink2)}
+.mock .btn{display:inline-block;margin-top:6px;padding:6px 14px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:14px;font-weight:600}
+</style>
+<div class="wrap">
+<nav class="crumbs">романтика маршрутов → задача 07 → отчёт</nav>
+<h1>Вёрстка «Недели» и макет журнала</h1>
+<p class="lede">Третий список правок за 19 сентября — то, что ты надиктовала ночью, глядя на выкаченную версию. Ниже, что изменилось, и одна вещь, которую я отложила в отдельную задачу.</p>
+
+<aside class="tldr"><h2>Коротко</h2>
+<ul>
+  <li><b>Где что сейчас:</b> вступление недели «Неделя rola» уже заменено в боте у людей — я вписала его через админку. Остальное на стенде, выкачу сегодня, как закончится проверка.</li>
+  <li>Форма «Сдать отчёт» читается строками, а не абзацем. День майя подписан «сегодня:».</li>
+  <li>Значение слова недели можно писать в две строки — пример встанет со своей.</li>
+  <li>У тебя в «Рюкзаке» больше нет второго списка твоих фактов: только форма «Записать факт клуба», сами факты живут на «Карте».</li>
+  <li><b>«Что будет в конце сезона» переехало вплотную к кнопке «Собрать»</b> — и внутри теперь макет первой страницы журнала.</li>
+</ul></aside>
+
+<h2>Что увидят люди: было → стало</h2>
+
+<h3>Форма «Сдать отчёт»</h3>
+<div class="pair">
+  <figure><div class="tag">было</div><img src="before/form-1001.png" alt="Форма до"><figcaption>Одно предложение в три строки подряд: «Текст — минимум ✅, фото или видео — максимум ⭐. Присылать можно сколько угодно раз. Отчёты этой недели…» — глаз не цепляется.</figcaption></figure>
+  <figure class="after"><div class="tag">стало</div><img src="after/form-1001.png" alt="Форма после"><figcaption>Четыре строки: «Текст — минимум ✅» / «Фото и видео — максимум ⭐» / «Присылать можно сколько угодно раз» / «Отчёты этой недели — в «Рюкзаке», в журнале: там их правят». Последняя строка появляется у тех, кто уже сдал.</figcaption></figure>
+</div>
+
+<h3>Журнал: кнопка, что получится, и сам журнал</h3>
+<figure class="wide"><img src="after/end-of-season.png" alt="Что будет в конце сезона"><figcaption>Порядок такой, как ты просила: «Журнал в PDF» с кнопкой «Собрать» → «Что будет в конце сезона» → сам журнал. Внутри блока — макет первой страницы: название сезона, имя, сетка недель (⭐ за максимум, ✅ за минимум — те же значки, что в настоящем файле), полоски текста и место фотографии.</figcaption></figure>
+
+<h3>Мелочи, которые ты назвала</h3>
+<ul>
+  <li><b>День майя:</b> «день по календарю майя» / «<b>сегодня:</b> 6 Ахау · владыка» / толкование / «Узнай своё предназначение →».</li>
+  <li><b>Значение слова недели</b> теперь можно писать в две строки: первая — перевод, вторая — пример. Работает в задании, в листе недели, на «Карте» и в боте.</li>
+  <li><b>Твои «Факты клуба» в «Рюкзаке»</b> больше не дублируют «Карту»: там только форма и строка «Твои факты живут на «Карте» — здесь их можно только добавить».</li>
+  <li><b>Вступление недели 3</b> — вместо служебной заметки («Это обещание из приветственного поста…») теперь: «Мексика звучит не только мариачи. Есть кумбия, есть corridos tumbados, есть мексиканское инди — и это слушают сейчас, а не в кино про Мексику». Уже в боте.</li>
+</ul>
+
+<h2>Что проверено и как</h2>
+<table>
+<tr><th>Кто</th><th>Что делал</th><th>Итог</th></tr>
+<tr><td>Автоматические проверки</td><td>Стиль кода и 541 тест</td><td>зелёное</td></tr>
+<tr><td>Помощник по коду</td><td>Читал каждую строку правок</td><td>проходит; нашёл пять вещей в моём макете — от конфликта имён в вёрстке до звёздочек, которые ставились не по тем правилам, что в настоящем журнале. Закрыто</td></tr>
+<tr><td>Помощник по экранам</td><td>Щёлкает приложение и бота</td><td>нашёл мою грубую ошибку: макет разворачивался на весь экран поверх вкладок, и выйти было нельзя. Починено; перепроверяет</td></tr>
+</table>
+
+<section class="verdict"><h2>Что дальше</h2>
+<p>Выкачу, как только придёт подтверждение — ты сказала не ждать отдельного слова.</p>
+<p><b>Отложено в отдельную задачу.</b> Ты выбрала оставить у второй недели оба слова — и arte, и alebrije. Сейчас бот держит ровно одно слово на неделю: это поле в базе, редактор в админке, текст задания, словарик и журнал. Сделаю следующей задачей, отдельно от этой выкатки, чтобы не тащить в один заход большую переделку.</p>
+<p>После выкатки посмотри: «Неделя» — форма строками и «сегодня:» в дне майя; «Рюкзак» — кнопка «Собрать», под ней «Что будет в конце сезона» с макетом, ниже журнал. Если что-то не так — скажи словами, верну.</p></section>
+</div>
