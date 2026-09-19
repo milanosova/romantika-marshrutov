@@ -53,7 +53,7 @@
     tabbar.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b.dataset.tab === lit));
     window.scrollTo(0, 0);
     closeSheet();
-    const render = { week: renderWeek, people: renderPeople, letters: renderLetters, content: renderContent, facts: renderFacts, more: renderMore }[tab];
+    const render = { week: renderWeek, people: renderPeople, letters: renderLetters, content: renderContent, facts: renderFacts, words: renderWords, more: renderMore }[tab];
     guarded(render, () => go(tab));
   }
   // A request that failed inside a screen: the message and a retry, in place.
@@ -79,7 +79,8 @@
     const cur = currentWeek();
     const firstReal = state.weeks.find((w) => !isDraft(w));
     const pick = number || (state.week && state.week.week_number) || (cur ? cur.number : firstReal && firstReal.number);
-    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Сводка недели</p><h1>Неделя</h1></header><label>Какая неделя<select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
+    // One heading, then the week itself — «Неделя» above «Какая неделя» read as noise (Mila, 19.09).
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов · админка</p><h1>Сводка недели</h1></header><label><select id="week-pick">${weekOptions(pick)}</select></label><div id="week-body">${loading()}</div>`;
     $("week-pick").addEventListener("change", () => { const n = +$("week-pick").value; guarded(() => renderWeek(n), () => renderWeek(n)); });
     const picked = state.weeks.find((w) => w.number === pick);
     if (pick == null || !picked) {
@@ -378,6 +379,36 @@
     $("facts-list").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (!(await RM.confirm("Убрать факт из списка? Он скрывается, не удаляется."))) return; try { await RM.api(`/api/admin/facts/${b.dataset.del}`, { method: "DELETE" }); renderFacts(); } catch (e) { RM.toast(e.message); } }));
   }
 
+  // --- Слова сезона: слово каждой недели в одном списке -------------------------------
+
+  async function renderWords() {
+    const weeks = state.weeks;
+    const withWord = weeks.filter((w) => w.word);
+    const free = weeks.filter((w) => !w.word);
+    screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Словарик сезона</p><h1>Слова</h1>
+      <p class="muted">Слово недели видят все: в задании, в «Карте» и в журнале. Значение можно писать в две строки — пример встанет со своей.</p></header>
+      ${withWord.length ? `<ul class="list">${withWord.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="wordmeaning">${esc(w.word_meaning)}</div>` : `<div class="muted">значение не вписано</div>`}<div class="sub">неделя ${w.number} · ${esc(RM.weekName(w.title)) || "без названия"}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слов пока нет — впиши первое ниже.</p>`}
+      ${free.length ? `<div class="card" style="margin-top:16px"><h3 style="margin-top:0">Вписать слово</h3>
+        <label class="k">Неделя</label>
+        <select id="word-week" style="width:100%;margin-bottom:8px">${free.map((w) => `<option value="${w.id}">${w.number}. ${esc(RM.weekName(w.title)) || "без названия"}</option>`).join("")}</select>
+        <input id="word-text" placeholder="слово на языке страны" style="width:100%;margin-bottom:8px">
+        <input id="word-ru" placeholder="как читается" style="width:100%;margin-bottom:8px">
+        <textarea id="word-meaning" placeholder="что значит; со второй строки — пример"></textarea>
+        <button class="btn block" id="word-save" style="margin-top:10px">Сохранить</button></div>`
+        : `<p class="note" style="margin-top:16px">У каждой недели сезона слово уже вписано. Чтобы поменять — нажми на слово в списке.</p>`}`;
+    screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));
+    if ($("word-save")) $("word-save").addEventListener("click", async () => {
+      const id = +$("word-week").value, word = $("word-text").value.trim();
+      if (!word) return RM.toast("Напиши само слово");
+      $("word-save").disabled = true;
+      try {
+        await RM.api(`/api/admin/weeks/${id}`, { method: "PUT", body: { word, word_ru: $("word-ru").value.trim(), word_meaning: $("word-meaning").value.trim() } });
+        state.weeks = await RM.api("/api/admin/weeks");
+        renderWords();
+      } catch (e) { $("word-save").disabled = false; RM.toast(e.message); }
+    });
+  }
+
   // --- Ещё: напоминания, изменения, как это работает ---------------------------------
 
   async function renderMore() {
@@ -385,6 +416,7 @@
       <div class="card"><div class="row between"><h2 style="margin:0">Автонапоминания</h2><label class="toggle"><input type="checkbox" id="rem-toggle"> <span id="rem-state">…</span></label></div>
         <p class="note">Четверг 19:00 («впереди выходные») и воскресенье 12:00 («сегодня до 18:00»). Уходят только тем, кто нажал «Берусь» и ещё не прислал отчёт. Нажавшим «В этот раз мимо» — ничего.</p>
         <button class="btn soft small" id="remind-now">⏰ Напомнить сейчас</button></div>
+      <a class="card tight linkcard" href="#" id="open-words"><div class="row between"><div style="flex:1;min-width:0"><b>📖 Слова сезона</b><div class="muted small">Слово каждой недели — списком; здесь же можно вписать новое.</div></div><span class="muted chevron">›</span></div></a>
       <a class="card tight linkcard" href="#" id="open-facts"><div class="row between"><div style="flex:1;min-width:0"><b>💡 Факты про страну</b><div class="muted small">Что мы узнали за сезон — общий список для журналов.</div></div><span class="muted chevron">›</span></div></a>
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
         <b>Отчёты</b> Человек присылает боту текст или фото — или отправляет их из приложения. Текст = минимум ✅, фото или видео = максимум ⭐. Копия приходит тебе в чат с шапкой «📨 Отчёт за неделю N от…»; ответь на неё реплаем — бот передаст автору.
@@ -410,6 +442,7 @@
     });
     $("remind-now").addEventListener("click", () => { const cur = currentWeek(); remindNow(cur && cur.number, cur && cur.title); });
     $("open-facts").addEventListener("click", (e) => { e.preventDefault(); go("facts"); });
+    $("open-words").addEventListener("click", (e) => { e.preventDefault(); go("words"); });
     $("audit-box").addEventListener("toggle", loadAudit, { once: true });
   }
 
