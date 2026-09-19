@@ -81,6 +81,8 @@ class FixResult:
     ok: bool
     stamp_level: StampLevel | None
     reason: str | None = None
+    freeze_granted: bool = False
+    """The first maximum of the season earns a freeze — the answer says so (DOMAIN §3)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,8 +305,9 @@ async def fix_level(
         level=level,
         now=now,
     )
+    granted = False
     if stamp.upgraded_to_max:
-        await freezes.grant(
+        granted = await freezes.grant(
             session,
             season_id=season_id,
             user_id=user_id,
@@ -312,7 +315,7 @@ async def fix_level(
             granted_by=None,
             now=now,
         )
-    return FixResult(ok=True, stamp_level=stamp.level, reason=None)
+    return FixResult(ok=True, stamp_level=stamp.level, reason=None, freeze_granted=granted)
 
 
 async def cancel(session: AsyncSession, *, user_id: int, report_id: int, now: datetime) -> CancelResult:

@@ -68,6 +68,8 @@ class PassportOut(BaseModel):
     freezes_used: int
     freezes_left: int
     freezes_total: int
+    freezes_max: int
+    """The season's ceiling, not what the person has: the sheet promises «накопить можно до N»."""
     best_streak: int
     current_streak: int
     level: str | None

@@ -1254,3 +1254,19 @@ async def test_the_screens_stop_promising_a_freeze_at_the_ceiling(harness: Harne
     assert "+1 заморозка" not in harness.session.last_text(ALICE)
     await harness.text(ALICE, "💡 Что узнали")
     assert "+1 заморозка" not in harness.session.last_text(ALICE)
+
+
+async def test_the_max_button_says_the_freeze_out_loud(harness: Harness, db_session: AsyncSession) -> None:
+    """«⭐ Это был максимум» grants the first-maximum freeze, and the answer says so — the
+    receipt of a photo report already did (critic-ui, 19.09)."""
+    await harness.text(ALICE, "Сделала, рассказываю словами")
+    await harness.callback(ALICE, "level:1:max")
+
+    assert "+1 заморозка" in harness.session.last_text(ALICE)
+    reasons = (await db_session.execute(select(models.Freeze.reason).where(models.Freeze.user_id == ALICE))).scalars()
+    assert list(reasons) == ["max"]
+
+    await harness.text(BOB, "И я сделала")
+    await harness.callback(BOB, "level:1:max")
+    await harness.callback(BOB, "level:1:max")
+    assert await count(db_session, models.Freeze) == 2, "the freeze is granted once a season"

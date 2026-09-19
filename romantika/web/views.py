@@ -43,6 +43,7 @@ def passport_out(view: PassportView, reasons: list[str]) -> schemas.PassportOut:
         freezes_used=b.freezes_used,
         freezes_left=b.freezes_left,
         freezes_total=b.freezes_total,
+        freezes_max=view.season.max_freezes,
         best_streak=b.best_streak,
         current_streak=b.current_streak,
         level=view.level.value if view.level else None,

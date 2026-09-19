@@ -167,6 +167,7 @@
       ? lateNote(late)
       : w
       ? "Текст — минимум ✅, фото или видео — максимум ⭐. Присылать можно сколько угодно раз."
+        + (w.level ? " Отчёты этой недели — в «Рюкзаке», в журнале: там их правят." : "")
       : "Неделя не идёт, штамп не ставится. Сообщение сохранится, и я его прочитаю.";
     return `<div class="row between"><h2 style="margin:0">${title}</h2>${late ? "" : stampChip(w)}</div>
       <p class="note">${note}</p>
@@ -362,7 +363,7 @@
   function openFreezes(p) {
     const h = state.home;
     openSheet("Заморозки", `<p><b>Пропустила неделю — тратится одна заморозка.</b></p>
-      <p style="margin-bottom:6px"><b>Накопить можно до ${p.freezes_total > 2 ? p.freezes_total : 6} за сезон:</b></p>
+      <p style="margin-bottom:6px"><b>Накопить можно до ${p.freezes_max} за сезон:</b></p>
       <ul class="plain">
         <li>+1 — за своё слово в словарике</li>
         <li>+1 — за свой факт про страну</li>
@@ -370,6 +371,7 @@
         <li>+1 — от Милы: за комментарий в канале, встречу или приведённого друга</li>
       </ul>
       ${p.freeze_reasons.length ? `<p class="muted small">Уже заработано: ${p.freeze_reasons.map((r) => esc(RM.freezeReason[r] || r)).join(", ")}.</p>` : ""}
+      ${p.freezes_total >= p.freezes_max ? `<p class="muted small">Это потолок за сезон — больше не накопится.</p>` : ""}
       ${p.freezes_left === 0 ? `<p class="muted small">Заморозки кончились. Статус «Резидент» больше недоступен, но участие продолжается — это главное.</p>` : ""}
       <div class="card" style="margin-top:14px"><h3 style="margin:0 0 6px">Написать Миле про заморозку</h3>
       <p class="note richtext">${html(h.texts.write_prompt)}</p>

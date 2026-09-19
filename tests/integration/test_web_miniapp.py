@@ -414,3 +414,10 @@ async def test_the_third_tab_is_labelled_karta(app: App) -> None:
         r = await app.client.get(path, headers=app.headers(ALICE))
         # The tab bar carries `data-tab="season"` on every page: the chosen tab is the app div.
         assert r.status_code == 200 and 'id="app" class="app" data-tab="season"' in r.text, path
+
+
+async def test_the_passport_carries_the_season_ceiling(app: App) -> None:
+    """The freezes sheet promises «накопить можно до N»: N is the season's ceiling, not what
+    the person already has (critic-ui, 19.09)."""
+    body = (await app.client.get("/api/home", headers=app.headers(ALICE))).json()["passport"]
+    assert body["freezes_max"] == 6 and body["freezes_total"] == 2, "two base, ceiling six"
