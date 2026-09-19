@@ -43,6 +43,7 @@ def passport_out(view: PassportView, reasons: list[str]) -> schemas.PassportOut:
         freezes_used=b.freezes_used,
         freezes_left=b.freezes_left,
         freezes_total=b.freezes_total,
+        freezes_max=view.season.max_freezes,
         best_streak=b.best_streak,
         current_streak=b.current_streak,
         level=view.level.value if view.level else None,
@@ -213,7 +214,6 @@ async def home_out(
         week_out_ = schemas.CurrentWeekOut(
             **base.model_dump(),
             intent=choice.value if choice else None,
-            reports_count=await reports.count_for_week(session, user_id=user_id, week_id=current.id),
             deadline=ru.deadline_short(current),
         )
     upcoming = next((w for w in weeks if w.starts_on > today), None)

@@ -102,7 +102,14 @@ async def calendar_page(request: Request, session: SessionDep, settings: Setting
 # Three tabs (DOMAIN §7); the old five names keep opening the right tab — links in old
 # messages and the bot's «Открыть журнал» button point at them.
 APP_TABS = ("week", "bag", "season")
-APP_TAB_ALIASES = {"today": "week", "passport": "bag", "journal": "bag", "words": "season", "more": "season"}
+APP_TAB_ALIASES = {
+    "today": "week",
+    "passport": "bag",
+    "journal": "bag",
+    "words": "season",
+    "more": "season",
+    "map": "season",  # the tab is labelled «Карта» since 19.09.2026; its id stays `season`
+}
 
 
 @router.get("/app", response_class=HTMLResponse)

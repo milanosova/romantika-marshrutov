@@ -156,7 +156,8 @@ async def _dispatch(
         )
         if result.ok:
             await answer(query, f"Поправила: теперь {ru.level_name(level)}", alert=True)
-            await safe_send(bot, chat_id, f"Поправила — засчитано как <b>{ru.level_name(level)}</b>.")
+            fixed = f"Поправила — засчитано как <b>{ru.level_name(level)}</b>."
+            await safe_send(bot, chat_id, fixed + (ru.MAX_FREEZE_BONUS if result.freeze_granted else ""))
         elif result.reason == reports.NO_DOWNGRADE:
             await answer(query, "Максимум не понижаю — звёздочка остаётся ⭐", alert=True)
         else:

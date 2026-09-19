@@ -1,0 +1,123 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Карта и уборка: отчёт</title>
+<style>
+:root{--bg:#F5F4F0;--surface:#FFFFFF;--ink:#1C1F26;--ink2:#4B5060;--muted:#7B8090;--line:#DDDCD5;
+  --ok:#1F7A4C;--ok-soft:rgba(31,122,76,.09);--warn:#A85410;--warn-soft:rgba(168,84,16,.10);--bad:#B3261E;--bad-soft:rgba(179,38,30,.09);
+  --accent:#0E6E7A;--accent-soft:rgba(14,110,122,.08);--accent-ink:#FFFFFF;
+  --body:"Golos Text",-apple-system,"Segoe UI",Roboto,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}}
+:root[data-theme="dark"]{--bg:#14161B;--surface:#1B1E25;--ink:#E8E9EE;--ink2:#B7BAC6;--muted:#858B9B;--line:#2C2F38;
+  --ok:#4CC38A;--ok-soft:rgba(76,195,138,.12);--warn:#E0A93E;--warn-soft:rgba(224,169,62,.12);--bad:#F2857C;--bad-soft:rgba(242,133,124,.12);
+  --accent:#5FD0DE;--accent-soft:rgba(95,208,222,.12);--accent-ink:#0F1220}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--body);padding:0 20px 80px}
+.wrap{max-width:760px;margin:0 auto}
+.crumbs{font:12.5px/1.4 var(--mono);color:var(--muted);padding:28px 0 6px}
+h1{font-size:34px;line-height:1.15;margin:6px 0 10px;text-wrap:balance}
+.lede{font-size:17px;color:var(--ink2);margin:0 0 24px;max-width:62ch}
+h2{font-size:23px;line-height:1.25;margin:44px 0 8px;text-wrap:balance}
+h3{font-size:17px;margin:26px 0 6px}
+p{margin:0 0 12px;max-width:68ch} ul{margin:0 0 12px;padding-left:20px} li{margin:0 0 6px}
+.tldr{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;padding:18px 22px 10px;margin:0 0 8px}
+.tldr h2{margin:0 0 10px;font-size:20px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0 8px}
+@media (max-width:640px){.pair{grid-template-columns:1fr}}
+.pair figure{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px}
+.pair figure.after{border-color:var(--accent)}
+.pair img{display:block;width:100%;height:auto;border-radius:4px;border:1px solid var(--line)}
+.pair figcaption{font-size:13.5px;color:var(--ink2);margin-top:8px}
+.pair .tag{font:11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+figure.wide{margin:14px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px}
+figure.wide img{display:block;max-width:100%;height:auto}
+figcaption{font-size:14px;color:var(--ink2);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:14.5px;background:var(--surface);border:1px solid var(--line);margin:14px 0 8px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-top:1px solid var(--line)}
+th{font-size:13px;color:var(--ink2);text-transform:uppercase;letter-spacing:.03em;border-top:0}
+.check li{list-style:none;margin-left:-20px} .check li::before{content:"☐ ";color:var(--muted)} .check li.done::before{content:"☑ ";color:var(--ok)}
+.callout{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:6px;padding:14px 18px;margin:16px 0}
+.callout.ok{border-left-color:var(--ok)}
+.verdict{margin:48px 0 0;padding:22px 24px;background:var(--accent-soft);border-radius:8px}
+.verdict h2{margin:0 0 10px}
+code{font:13px var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.shell{font:13.5px/1.5 var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 18px;margin:14px 0 8px;white-space:pre-wrap;overflow-x:auto;color:var(--ink)}
+.mock{background:var(--surface);border:1px solid var(--accent);border-radius:6px;padding:14px 16px;margin:0}
+.mock .tag{font:11px/1 var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px}
+.mock .row{padding:8px 0;border-top:1px dashed var(--line)} .mock .row:first-of-type{border-top:0}
+.mock b{display:block;font-size:14px} .mock span{font-size:13.5px;color:var(--ink2)}
+.mock .btn{display:inline-block;margin-top:6px;padding:6px 14px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:14px;font-weight:600}
+</style>
+<div class="wrap">
+<nav class="crumbs">романтика маршрутов → задача 06 → отчёт</nav>
+<h1>«Карта» и уборка — что изменилось</h1>
+<p class="lede">Второй список правок за 19 сентября — тот, что ты надиктовала вечером, посмотрев выкаченную версию. Здесь всё, что сделано, и один вопрос, который я отложила.</p>
+
+<aside class="tldr"><h2>Коротко</h2>
+<ul>
+  <li><b>Где что сейчас:</b> шесть фактов про Мексику уже в боте у людей, их можно открыть прямо сейчас. Всё остальное пока на стенде — тренировочной копии; выкачу сегодня, как закончится последняя проверка.</li>
+  <li>Третья вкладка теперь называется <b>«Карта»</b>, и <b>«О клубе» открывает её</b> — ответ на «что это вообще» стоит до недель.</li>
+  <li>Ответ бота на отчёт больше не обещает «покажу общие итоги в воскресенье». Напоминание — тоже.</li>
+  <li>Заморозки показаны <b>одним числом</b> — сколько осталось. Второе число («из 3») читалось как потолок.</li>
+  <li><b>«Журнал в PDF» переехал наверх</b>, перед главами. <b>«Мои отчёты»</b> с вкладки «Неделя» убраны — то же самое есть в журнале, и правится там.</li>
+  <li>Проверено: 541 автоматический тест из 541. Оба помощника — «проходит»: по коду после двух кругов, по экранам после двух.</li>
+</ul></aside>
+
+<h2>Что увидят люди: было → стало</h2>
+
+<h3>Ответ бота на отчёт</h3>
+<table>
+<tr><th></th><th>Что приходило и что приходит</th></tr>
+<tr><td><b>было</b></td><td>✅ Записала как <b>минимум</b> — штамп за неделю «rola [музыка]».<br><br>В воскресенье покажу общие итоги.</td></tr>
+<tr><td><b>стало</b></td><td>✅ Записала как <b>минимум</b> — штамп за неделю «rola [музыка]».</td></tr>
+<tr><td><b>было</b> (напоминание в четверг)</td><td>…Даже минимум на пять минут считается. Вечером покажу общие итоги.</td></tr>
+<tr><td><b>стало</b></td><td>…Даже минимум на пять минут считается.</td></tr>
+</table>
+<p>Ты сказала: сейчас показывать почти нечего, а если людей станет много — всех всё равно не покажешь. Обещания больше нет нигде.</p>
+
+<h3>Третья вкладка</h3>
+<div class="pair">
+  <figure><div class="tag">было · «Сезон»</div><img src="before/app-season-1006.png" alt="Сезон до"><figcaption>Называлась «Сезон». «О клубе» лежало внизу, после недель, слов и фактов — его находили последним.</figcaption></figure>
+  <figure class="after"><div class="tag">стало · «Карта»</div><img src="after/app-season-1006.png" alt="Карта после"><figcaption>«Карта» — и первым блоком «О клубе». Дальше как было: недели, слова недель, «Что мы узнали», внизу «Если что-то пошло не так» и канал. Снимки сделаны на стенде в разные моменты, поэтому состав слов и фактов на них разный — смотри на устройство экрана.</figcaption></figure>
+</div>
+
+<h3>Заморозки и журнал в «Рюкзаке»</h3>
+<div class="pair">
+  <figure class="after"><div class="tag">стало · плитки</div><img src="after/bag-top-1006.png" alt="Плитки Рюкзака"><figcaption>«4 · заморозки · как заработать ещё?» — одно число. Раньше было «4 / 6», и второе число читалось как «больше нельзя». Сколько всего можно накопить — по ссылке, в листе. У штампов рядом два числа оставила: там «2 / 12» — это недели сезона, и второе число понятно само.</figcaption></figure>
+  <figure class="after"><div class="tag">стало · журнал</div><img src="after/bag-pdf-1006.png" alt="PDF над журналом"><figcaption>«Журнал в PDF» стоит над главами — видно, что сразу под ним начинается «ЖУРНАЛ · 3 НЕДЕЛИ». За кнопкой приходят чаще, чем листают записи; в самих главах — правка и «это не отчёт».</figcaption></figure>
+</div>
+
+<h3>Вкладка «Неделя» без «Моих отчётов»</h3>
+<div class="pair">
+  <figure><div class="tag">было</div><img src="before/week-reports-1001.png" alt="Мои отчёты до"><figcaption>Так вкладка кончалась раньше: под кнопкой «Отправить» — заголовок «МОИ ОТЧЁТЫ · 1 ОТЧЁТ» и карточка с «Поправить» и «Это не отчёт». Ровно то же самое лежит в журнале «Рюкзака».</figcaption></figure>
+  <figure class="after"><div class="tag">стало</div><img src="after/app-1001.png" alt="Неделя после"><figcaption>Теперь вкладка заканчивается формой, и в самой форме сказано, где отчёты: «Отчёты этой недели — в «Рюкзаке», в журнале: там их правят». Эта строка появляется у всех, кто уже сдал, — в том числе если отчёт был прислан в чат боту.</figcaption></figure>
+</div>
+
+<h3>Факты про Мексику — уже в боте</h3>
+<p>Ты сказала добавить самой — взяла из твоего Notion, из строк, помеченных как вышедшие постами, и вписала через «⚙️ Мила» → команду «факт». Сейчас в клубе шесть:</p>
+<ol>
+  <li>Ацтеки называли себя мешика — отсюда «Мексика».</li>
+  <li>Испанский в Мексике принесли учительницы, а не конкистадоры.</li>
+  <li>На гербе — орёл со змеёй на кактусе: так ацтеки нашли место для Теночтитлана.</li>
+  <li>Испанский — не единственный: в Мексике живы 68 индейских языков.</li>
+  <li>Миру Мексика дала кукурузу, какао, чили, ваниль и помидоры — а ещё цветное ТВ.</li>
+  <li>Шоколад здесь пили горьким и с перцем, а не сладким.</li>
+</ol>
+<p>Любой можно убрать: «⚙️ Мила» → «🗑 Убрать факт», или в панели «⚙️ Мила» на телефоне → «Ещё» → «Факты». На снимке «Карты» выше видны другие факты — он сделан на стенде, где живут придуманные участницы и придуманные факты; у людей в клубе — те шесть, что в списке.</p>
+
+<h2>Что проверено и как</h2>
+<table>
+<tr><th>Кто</th><th>Что делал</th><th>Итог</th></tr>
+<tr><td>Автоматические проверки</td><td>Стиль кода и 539 автоматических тестов (было 538)</td><td>зелёное</td></tr>
+<tr><td>Помощник по коду</td><td>Два круга по каждой изменённой строке</td><td>проходит; нашёл мою ошибку — бот после отчёта звал «в список ниже», а списка на экране уже нет. Исправила. Ещё пять таких мест — тоже</td></tr>
+<tr><td>Помощник по экранам</td><td>Два круга: шесть правок по именам, оба пути отправки отчёта, заморозки на пяти состояниях, сборка PDF и чтение файла, правка и отмена отчёта, злые сценарии, чтение служебных записей</td><td>проходит; нашёл две важные вещи — лист «как заработать ещё» врал про потолок (у того, кто заработал одну-две, писал «до 3» вместо «до 6»), и человек, сдавший отчёт в чат, нигде не видел, где отчёт. Обе закрыты</td></tr>
+</table>
+
+<section class="verdict"><h2>Что дальше</h2>
+<p>Выкатываю — обе проверки прошли, ты сказала не ждать отдельного слова.</p>
+<p><b>Что нашли по дороге и отложили.</b> Две вещи, которые были и раньше, но теперь заметнее, потому что правка отчётов живёт только в журнале: отчёт длиннее 4000 знаков, присланный в чат, не сохраняется при правке в приложении; а если поправить текст у отчёта, которому ты нажала «⭐ Это был максимум», звёздочка молча становится галочкой. Обе записаны, чиним отдельно — это не про сегодняшние правки.</p>
+<p><b>Отложенный вопрос — архив сезонов.</b> Ты говорила про «папки»: чтобы можно было зайти в Мексику, а потом в следующую страну. Это заметная работа, и решать надо не на бегу: где живут прошлые сезоны (в приложении или отдельной ссылкой), видно ли чужие страны тому, кто пришёл позже, что делать с журналами прошлых сезонов и как всё это не превратить в склад. Заведу отдельной задачей — обсудим, когда будет время.</p>
+<p>Если что-то не понравится — напиши, верну как было за десять минут.</p>
+<p>После выкатки посмотри с телефона: «🎒 Открыть клуб» → третья вкладка «Карта» (сверху «О клубе»), «Рюкзак» (кнопка PDF сверху, заморозки одним числом), и пришли боту любой текст — в ответе больше нет обещания итогов.</p></section>
+</div>
