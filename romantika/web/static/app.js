@@ -1,6 +1,6 @@
 // Participant Mini App — one door, three tabs (DOMAIN §7, 14.09.2026): «Неделя» is what is
 // happening now (day, task, intent, reports), «Рюкзак» is what the person has gathered
-// (passport, achievements, journal with PDF), «Сезон» is what Mila made (weeks, words, facts,
+// (passport, achievements, journal with PDF), «Карта» is what Mila made (weeks, words, facts,
 // about). Rules and texts come from the API (the same services and `texts/ru.py` the bot
 // uses); this file only draws. Old tab names still route (links in old messages).
 (function () {
@@ -89,7 +89,6 @@
         <p class="note" id="intent-note">${w.intent ? intentNote(w.intent) : "Напоминания приходят только тем, кто нажал «Берусь»."}</p>`}
       </div>`;
       out += `<div class="card composer" id="composer">${composerHtml(w)}</div>`;
-      if (w.reports_count) out += `<div id="week-reports">${loading()}</div>`;
     } else {
       const next = h.next_week_starts_on ? h.weeks.find((x) => x.starts_on === h.next_week_starts_on) : null;
       out += `<div class="card"><h2>Сейчас неделя не идёт</h2><p class="muted">${h.next_week_starts_on ? `Задание ${next ? `недели ${next.number} ` : ""}придёт в понедельник, ${fmt(h.next_week_starts_on)}.` : "Сезон завершён. Спасибо тебе за него."}</p></div>`;
@@ -100,18 +99,6 @@
 
     if (w && !w.level) bindIntent(w);
     bindComposer(w);
-    if (w && w.reports_count) renderWeekReportsInto($("week-reports"), w);
-  }
-
-  // Every report of the running week, not only the last one: the journal's cards, filtered.
-  async function renderWeekReportsInto(box, w) {
-    let j;
-    try { j = await RM.api("/api/journal"); } catch (e) { box.innerHTML = errorBox(e); return; }
-    if (state.tab !== "week" || !box.isConnected) return;
-    const rs = j.reports.filter((r) => r.week_number === w.number);
-    if (!rs.length) { box.innerHTML = ""; return; }
-    box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои отчёты · ${rs.length} ${RM.plural(rs.length, "отчёт", "отчёта", "отчётов")}</h3>${rs.map(reportHtml).join("")}</div>`;
-    bindReportActions(box, j, async () => { await refreshHome(); renderWeek(); });
   }
 
   // «Поправить» and «Это не отчёт» on a report card; `done` redraws whatever the card sits in.
@@ -301,7 +288,7 @@
       <div class="tiles">
         <div class="tile"><div class="big">${p.stamps} <span class="muted">/ ${p.weeks_total}</span></div><div class="label">${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}</div></div>
         <div class="tile"><div class="big">${esc(level)}</div><div class="label">статус</div></div>
-        <div class="tile"><div class="big">${p.freezes_left} <span class="muted">/ ${p.freezes_total}</span></div><div class="label">${RM.plural(p.freezes_left, "заморозка", "заморозки", "заморозок")} · <a href="#" id="freezes-how">как заработать ещё?</a></div></div>
+        <div class="tile"><div class="big">${p.freezes_left}</div><div class="label">${RM.plural(p.freezes_left, "заморозка", "заморозки", "заморозок")} · <a href="#" id="freezes-how">как заработать ещё?</a></div></div>
         <div class="tile"><div class="big">${p.current_streak}</div><div class="label">${RM.plural(p.current_streak, "неделя", "недели", "недель")} подряд · лучшая ${p.best_streak}</div></div>
       </div>
       <div class="card"><h3 style="margin-top:0">Недели</h3><div class="stamps">${h.weeks.map(stampHtml).join("")}</div>
@@ -345,7 +332,7 @@
       <div class="card"><h3 style="margin-top:0">${isAdmin ? "Факты клуба" : "Мои факты"}</h3>
       ${mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row" style="margin-top:8px"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
-      <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все в «Сезоне», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — в «Сезоне»." + (firstFact ? " За первый факт — ❄️ +1 заморозка." : "")}</p></div>`;
+      <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все на «Карте», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — на «Карте»." + (firstFact ? " За первый факт — ❄️ +1 заморозка." : "")}</p></div>`;
     const again = async () => { const y = window.scrollY; await refreshHome(); await renderMineInto(box); window.scrollTo(0, y); };
     $("word-send").addEventListener("click", async () => {
       const text = $("word-text").value.trim();
@@ -477,7 +464,9 @@
     const byWeek = new Map();
     live.forEach((r) => { if (!byWeek.has(r.week_number)) byWeek.set(r.week_number, []); byWeek.get(r.week_number).push(r); });
     const weeksDone = [...byWeek.keys()].sort((a, b) => b - a);
-    let out = `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
+    let out = "";
+    if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
+    out += `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
     if (!weeksDone.length) out += `<div class="empty"><div class="big">📔</div><h2>Пока пусто</h2><p class="muted">Здесь появятся твои недели и твои же слова о них. К концу сезона это будет целый журнал.</p></div>`;
     weeksDone.forEach((n) => {
       const week = j.weeks.find((w) => w.number === n) || { title: "" };
@@ -489,7 +478,6 @@
       out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(RM.weekName(week.title))}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
-    if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
     box.innerHTML = out;
     // The passport tiles and the week grid above the journal change with the stamp: redraw the tab.
     bindReportActions(box, j, async () => { const y = window.scrollY; await refreshHome(); await render(); window.scrollTo(0, y); });
@@ -586,7 +574,7 @@
     } catch (e) { status.textContent = "Не получилось: " + e.message; button.disabled = false; }
   }
 
-  // --- Сезон ---------------------------------------------------------------------------
+  // --- Карта ---------------------------------------------------------------------------
 
   async function renderSeason() {
     screen.innerHTML = loading();
@@ -595,7 +583,9 @@
     if (dict.status === "rejected") return (screen.innerHTML = errorBox(dict.reason));
     const h = state.home, d = dict.value, f = facts.status === "fulfilled" ? facts.value : null;
     const released = h.weeks.filter((w) => w.state !== "locked");
-    let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1 class="season-title">${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
+    let out = `<header class="screen-head"><p class="eyebrow">Карта</p><h1 class="season-title">${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
+    // «О клубе» opens the tab: it is the answer to «что это вообще» (Mila, 19.09).
+    out += `<details class="card"><summary>О клубе</summary><div class="content richtext">${html(h.texts.greeting)}</div></details>`;
     // Weeks as a chronicle, newest first; future weeks are not shown (DOMAIN §1).
     out += `<h3>Недели</h3>`;
     // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
@@ -611,7 +601,6 @@
       ${shared.length ? `<ol style="padding-left:20px;margin:0">${shared.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — Мила добавит после постов.</p>`}
       <p class="note" style="margin:8px 0 0">Свои факты и слова — в «Рюкзаке»: их видишь только ты, и они будут в твоём журнале сезона.</p></div>`;
     else out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали</h2><p class="muted">Факты не загрузились — открой вкладку ещё раз.</p></div>`;
-    out += `<details class="card"><summary>О клубе</summary><div class="content richtext">${html(h.texts.greeting)}</div></details>`;
     out += `<details class="card"><summary>❔ Если что-то пошло не так</summary><div class="content helptext">${html(unhead(h.texts.help))}</div></details>`;
     const links = [];
     if (h.links.channel_url) links.push(`<a class="btn soft" href="${esc(h.links.channel_url)}">📣 Канал клуба</a>`);

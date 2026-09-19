@@ -382,8 +382,8 @@
     const row = (f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`;
     const shared = facts.filter((f) => !f.author_name), personal = facts.filter((f) => f.author_name);
     $("facts-list").innerHTML =
-      `<h3>Общие · ${shared.length}</h3><p class="note">Их видят все в «Сезоне», и они попадут в журналы всех.</p>` +
-      (shared.length ? `<ul class="list">${shared.map(row).join("")}</ul>` : `<p class="muted">Пока пусто — у людей в «Сезоне» тоже пусто.</p>`) +
+      `<h3>Общие · ${shared.length}</h3><p class="note">Их видят все на «Карте», и они попадут в журналы всех.</p>` +
+      (shared.length ? `<ul class="list">${shared.map(row).join("")}</ul>` : `<p class="muted">Пока пусто — у людей на «Карте» тоже пусто.</p>`) +
       `<h3 style="margin-top:18px">Личные · ${personal.length}</h3><p class="note">Их видит только автор — и ты здесь и в карточке человека.</p>` +
       (personal.length ? `<ul class="list">${personal.map(row).join("")}</ul>` : `<p class="muted">Пока никто не добавил.</p>`);
     $("fact-add").addEventListener("click", async () => { const text = $("fact-text").value.trim(); if (!text) return; try { await RM.api("/api/admin/facts", { method: "POST", body: { text } }); renderFacts(); } catch (e) { RM.toast(e.message); } });

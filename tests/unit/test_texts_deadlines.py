@@ -21,15 +21,15 @@ def week(number: int, starts: date, ends: date) -> WeekDTO:
 def test_regular_week_ends_on_sunday() -> None:
     first = week(1, date(2026, 8, 31), date(2026, 9, 6))
     assert ru.deadline_text(first) == "воскресенье 06.09, 18:00"
-    assert ru.week_end_accusative(first) == "в воскресенье"
     assert "воскресенье 06.09" in ru.task_text(first)
 
 
 def test_closing_week_ends_on_wednesday() -> None:
     last = week(12, date(2026, 11, 16), date(2026, 11, 18))
     assert ru.deadline_text(last) == "среда 18.11, 18:00"
-    assert ru.week_end_accusative(last) == "в среду"
-    assert "В среду покажу общие итоги" in ru.report_reply(last, StampLevel.MIN, freeze_granted=False)
+    # The receipt no longer promises a public summary (Mila, 19.09): too few people to show it
+    # with, and with many it would not fit either.
+    assert "итоги" not in ru.report_reply(last, StampLevel.MIN, freeze_granted=False)
 
 
 def test_the_journal_file_is_named_after_the_season_and_the_person() -> None:
