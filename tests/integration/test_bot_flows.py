@@ -109,6 +109,46 @@ async def test_fact_dialog_from_participant_keeps_the_author(harness: Harness, d
     assert "Новый факт от" in harness.session.all_text(ADMIN_ID)
 
 
+async def test_the_first_own_fact_earns_a_freeze_and_the_second_does_not(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    """The first own fact of a season earns a freeze, like the first own word (DOMAIN §3, 19.09)."""
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Ацтеки называли себя мешика")
+    assert "+1 заморозка" in harness.session.last_text(ALICE)
+    reasons = (await db_session.execute(select(models.Freeze.reason).where(models.Freeze.user_id == ALICE))).scalars()
+    assert list(reasons) == ["fact"]
+
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Какао было валютой")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE), "the freeze is earned once a season"
+    assert await count(db_session, models.Freeze) == 1
+    assert await count(db_session, models.Fact) == 2
+
+
+async def test_mila_own_fact_earns_her_nothing(harness: Harness, db_session: AsyncSession) -> None:
+    """Her facts are the club's, not personal: no author, no freeze (DOMAIN §6) — and the
+    screen must not promise her one either (critic-code, 19.09)."""
+    await harness.callback(ADMIN_ID, "addfact")
+    await harness.text(ADMIN_ID, "Чиле-эн-ногада — блюдо цветов флага")
+    assert await count(db_session, models.Freeze) == 0
+
+    await harness.text(ADMIN_ID, "💡 Что узнали")
+    assert "+1 заморозка" not in harness.session.last_text(ADMIN_ID), "she can never earn it"
+
+
+async def test_the_facts_screen_offers_the_freeze_until_it_is_earned(
+    harness: Harness, db_session: AsyncSession
+) -> None:
+    await harness.text(ALICE, "💡 Что узнали")
+    assert "За первый свой факт" in harness.session.last_text(ALICE)
+
+    await harness.callback(ALICE, "addfact")
+    await harness.text(ALICE, "Какао было валютой")
+    await harness.text(ALICE, "💡 Что узнали")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE), "the freeze is in the passport now"
+
+
 async def test_a_fact_the_person_already_has_is_refused_aloud(harness: Harness, db_session: AsyncSession) -> None:
     """The duplicate refusal closes the dialog: the next message is a report, not a second fact."""
     await harness.callback(ALICE, "addfact")
@@ -498,15 +538,15 @@ async def test_panel_freeze_reasons(harness: Harness, db_session: AsyncSession, 
     assert "заморозка" in harness.session.all_text(ALICE).lower()
 
 
-async def test_panel_freeze_stops_at_the_ceiling_of_five(harness: Harness, db_session: AsyncSession) -> None:
+async def test_panel_freeze_stops_at_the_ceiling(harness: Harness, db_session: AsyncSession) -> None:
     await harness.text(ALICE, "привет")
-    for reason in ("comment", "meetup", "friend"):
+    for reason in ("comment", "meetup", "friend", "manual"):
         await harness.callback(ADMIN_ID, f"adm:frz:{ALICE}:{reason}")
     harness.session.reset()
 
     await harness.callback(ADMIN_ID, f"adm:frz:{ALICE}:comment")
-    assert await count(db_session, models.Freeze) == 3, "2 base + 3 earned is the ceiling (DOMAIN §3)"
-    assert "потолок — 5" in harness.session.last_text(ADMIN_ID)
+    assert await count(db_session, models.Freeze) == 4, "2 base + 4 earned is the ceiling (DOMAIN §3)"
+    assert "потолок — 6" in harness.session.last_text(ADMIN_ID)
 
 
 async def test_panel_delfact_lists_and_removes(harness: Harness, db_session: AsyncSession) -> None:
@@ -1198,3 +1238,19 @@ async def test_two_commands_are_advertised_and_old_ones_still_answer(harness: Ha
     assert [c for c, _ in COMMANDS] == ["start", "help"]
     await harness.text(ALICE, "/passport")
     assert any("Паспорт" in t for t in harness.session.sent_texts(ALICE)), "/passport keeps answering"
+
+
+async def test_the_screens_stop_promising_a_freeze_at_the_ceiling(harness: Harness, db_session: AsyncSession) -> None:
+    """A promise has to be true: at the ceiling no freeze is granted, so none is offered
+    (DOMAIN §3; `freezes.pending` answers for both screens)."""
+    await harness.text(ALICE, "/start")  # the person has to exist before a freeze points at them
+    season = (await db_session.execute(select(models.Season))).scalars().first()
+    assert season is not None
+    for reason in ("comment", "meetup", "friend", "manual"):
+        db_session.add(models.Freeze(season_id=season.id, user_id=ALICE, reason=reason))
+    await db_session.flush()
+
+    await harness.text(ALICE, "📖 Словарь")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE)
+    await harness.text(ALICE, "💡 Что узнали")
+    assert "+1 заморозка" not in harness.session.last_text(ALICE)

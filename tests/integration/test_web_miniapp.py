@@ -174,6 +174,26 @@ async def test_intent_repeats_and_stamps_follow_the_bot_rules(app: App) -> None:
     assert home["week"]["intent"] == "skip", "the answer before the stamp stays as it was"
 
 
+async def test_the_first_own_fact_earns_a_freeze_in_the_app_too(app: App) -> None:
+    """The answer carries `freeze_granted`, so the tile above redraws (DOMAIN §3, 19.09)."""
+    headers = app.headers(ALICE)
+    before = (await app.client.get("/api/home", headers=headers)).json()["passport"]["freezes_left"]
+    r = await app.client.post("/api/facts", json={"text": "Какао было валютой"}, headers=headers)
+    assert r.status_code == 201 and r.json()["freeze_granted"] is True
+    assert "+1 заморозка" in r.json()["message"]
+    home = (await app.client.get("/api/home", headers=headers)).json()
+    assert home["passport"]["freezes_left"] == before + 1
+    assert "fact" in home["passport"]["freeze_reasons"]
+
+    again = await app.client.post("/api/facts", json={"text": "Мехико стоит на дне озера"}, headers=headers)
+    assert again.status_code == 201 and again.json()["freeze_granted"] is False, "once a season"
+
+    mila = await app.client.post(
+        "/api/facts", json={"text": "Агава растёт восемь лет"}, headers=app.headers(ADMIN_ID, "Мила")
+    )
+    assert mila.status_code == 201 and mila.json()["freeze_granted"] is False, "her facts are the club's"
+
+
 async def test_mila_own_actions_are_not_copied_to_herself(app: App) -> None:
     r = await app.client.post(
         "/api/intent", json={"week_number": 1, "choice": "take"}, headers=app.headers(ADMIN_ID, "Мила")

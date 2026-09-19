@@ -102,7 +102,9 @@ class DraftPost:
 
     def as_message(self) -> str:
         """One bot message: the post between rules, the remarks under it."""
-        head = f"Черновик «Привала» · неделя {self.week_number} · {self.week_title}"
+        from romantika.texts import ru  # texts import WeekSummary from here: a module-level import would loop
+
+        head = f"Черновик «Привала» · неделя {self.week_number} · {ru.week_name(self.week_title)}"
         parts = [head, "", RULE, "", self.text, "", RULE]
         if self.notes:
             parts += [""] + [f"Не для поста: {note}" for note in self.notes]
@@ -122,12 +124,14 @@ async def draft_post(session: AsyncSession, *, season_id: int, week_number: int,
     if today < target.starts_on:
         note = f"неделя ещё не началась, откроется {target.starts_on:%d.%m} — черновик появится вместе с ней"
         return DraftPost(week_number=target.number, week_title=target.title, text="", notes=[note])
+    from romantika.texts import ru  # texts import WeekSummary from here: a module-level import would loop
+
     submitted = await stamps.for_week(session, season_id=season_id, week_id=target.id)
     quotes = await _quotes(session, season_id=season_id, week_id=target.id)
     names = await _names(session, season_id)
 
     lines = [
-        f"Привал. Неделя «{target.title}» закончилась.",
+        f"Привал. Неделя «{ru.week_name(target.title)}» закончилась.",
         "",
         "[ЗДЕСЬ ТВОЁ: фото своего результата и что не получилось. Обязательно, даже если не прислал никто]",
         "",

@@ -741,7 +741,7 @@ async def list_facts(principal: PrincipalDep, session: SessionDep, season: Seaso
     )
 
 
-@router.post("/facts", response_model=schemas.MessageOut, status_code=status.HTTP_201_CREATED)
+@router.post("/facts", response_model=schemas.FactAdded, status_code=status.HTTP_201_CREATED)
 async def add_fact(
     body: schemas.TextIn,
     principal: PrincipalDep,
@@ -750,20 +750,28 @@ async def add_fact(
     settings: SettingsDep,
     today: TodayDep,
     now: NowDep,
-) -> schemas.MessageOut:
+) -> schemas.FactAdded:
     """«Добавить свой факт»; Mila's own facts carry no author, like in the bot."""
     week = await content.current_week(session, season.id, today=today)
-    await facts.add(
+    if principal.is_admin:
+        await facts.add(
+            session,
+            season_id=season.id,
+            week_id=week.id if week else None,
+            text=body.text.strip(),
+            author_id=None,
+            now=now,
+        )
+        total = len(await facts.list_active(session, season.id))
+        return schemas.FactAdded(freeze_granted=False, message=f"Записала. Фактов за сезон: <b>{total}</b>")
+    result = await facts.add_own(
         session,
         season_id=season.id,
         week_id=week.id if week else None,
         text=body.text.strip(),
-        author_id=None if principal.is_admin else principal.user.id,
+        author_id=principal.user.id,
         now=now,
     )
-    if principal.is_admin:
-        total = len(await facts.list_active(session, season.id))
-        return schemas.MessageOut(message=f"Записала. Фактов за сезон: <b>{total}</b>")
     await _notify_admin(
         session,
         settings,
@@ -773,7 +781,10 @@ async def add_fact(
         ),
         now=now,
     )
-    return schemas.MessageOut(message=ru.FACT_SAVED)
+    return schemas.FactAdded(
+        freeze_granted=result.freeze_granted,
+        message=ru.FACT_SAVED + (ru.FACT_FREEZE_BONUS if result.freeze_granted else ""),
+    )
 
 
 # --- journal and PDF ---------------------------------------------------------------

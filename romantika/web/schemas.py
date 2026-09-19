@@ -30,11 +30,16 @@ def _utc_iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _week_field(value: str) -> str:
+    """Spaces around a week's text are never meant: Mila types into a form, not a code editor."""
+    return _no_nul(value).strip()
+
+
 NonBlank = Annotated[str, AfterValidator(_non_blank)]
 #: A one-line field of a week (title, word): the columns are 255 characters wide.
-WeekLine = Annotated[str, Field(max_length=255), AfterValidator(_no_nul)]
+WeekLine = Annotated[str, Field(max_length=255), AfterValidator(_week_field)]
 #: A paragraph of a week: it travels in one Telegram message, so it is bounded like a report.
-WeekText = Annotated[str, Field(max_length=4000), AfterValidator(_no_nul)]
+WeekText = Annotated[str, Field(max_length=4000), AfterValidator(_week_field)]
 UtcDateTime = Annotated[datetime, PlainSerializer(_utc_iso, return_type=str)]
 
 
@@ -443,6 +448,13 @@ class WordAdded(BaseModel):
     word: str
     meaning: str
     freeze_granted: bool
+    message: str
+
+
+class FactAdded(BaseModel):
+    freeze_granted: bool
+    """The first own fact of a season earns a freeze (DOMAIN §3); the tile above has to redraw."""
+
     message: str
 
 

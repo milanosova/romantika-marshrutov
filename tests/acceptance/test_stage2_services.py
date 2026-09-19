@@ -210,8 +210,9 @@ async def test_freeze_grant_rules(db_session: AsyncSession, season: int) -> None
     assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.WORD, granted_by=None, now=now) is False
     assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.COMMENT, granted_by=ADMIN_ID, now=now) is True
     assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.MEETUP, granted_by=ADMIN_ID, now=now) is True
-    assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.FRIEND, granted_by=ADMIN_ID, now=now) is False, "2 base + 3 bonus = cap 5"
-    assert await freezes.bonus_count(db_session, season, ALICE) == 3
+    assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.FRIEND, granted_by=ADMIN_ID, now=now) is True
+    assert await freezes.grant(db_session, season_id=season, user_id=ALICE, reason=models.FreezeReason.MANUAL, granted_by=ADMIN_ID, now=now) is False, "2 base + 4 bonus = cap 6"
+    assert await freezes.bonus_count(db_session, season, ALICE) == 4
 
 
 # --- media -----------------------------------------------------------------------

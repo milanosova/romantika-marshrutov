@@ -174,7 +174,7 @@ def facts_buttons(*, is_admin: bool, has_facts: bool) -> InlineKeyboardMarkup:
 
 
 def calendar_button(public_base_url: str) -> InlineKeyboardMarkup | None:
-    button = _web_app_button("☀️ Узнать свой день", app_page_url(public_base_url, "/calendar"))
+    button = _web_app_button("☀️ Узнай своё предназначение", app_page_url(public_base_url, "/calendar"))
     return InlineKeyboardMarkup(inline_keyboard=[[button]]) if button else None
 
 
@@ -258,7 +258,7 @@ def week_choices(weeks: list[WeekDTO], *, today: date) -> InlineKeyboardMarkup:
     for week in weeks:
         prefix = "✏️ " if week.is_draft else "✓ " if week.ends_on < today else "▶ " if week.starts_on <= today else "🔒 "
         title = week.title or ru.WEEK_UNTITLED
-        label = f"{prefix}{week.number} · {title}"[:60]
+        label = f"{prefix}{week.number} · {ru.week_name(title)}"[:60]
         rows.append([InlineKeyboardButton(text=label, callback_data=f"adm:week:{week.number}")])
     rows.append([InlineKeyboardButton(text="‹ назад", callback_data="adm:panel")])
     return InlineKeyboardMarkup(inline_keyboard=rows)

@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.6.0 — 2026-09-19 (Mila's edits of 19.09: the day card, the names of weeks, a freeze for the first fact)
+
+For participants: the day of the Maya calendar is four lines now — the label, the day with
+its sign, what it means, and «Узнай своё предназначение →» where the calendar link used to
+sit — the same words now name the calendar everywhere (the public season page, the button on
+the calendar itself, the bot's button). The status line says what the deadline is for («дедлайн задания до воскресенья, 18:00»).
+The task card carries the week's name as Mila wrote it, with no number in front; every screen
+that prints the number itself («Неделя 3 · …», «3. …») drops the word «Неделя» from the name
+when a latin word follows it, so a week named as the channel names it («Неделя rola [музыка]»)
+never says it twice, while a Russian name («Неделя памяти») stays whole. The
+season's name on the «Сезон» tab is in the accent colour, like on «Неделя». **The first own
+fact of a season earns a freeze**, like the first own word: the form promises it, the sheet
+lists it, the answer carries it and the tile above redraws; the bot promises a freeze only
+while `freezes.pending` says it can still be earned — never to Mila, whose facts are the
+club's, and never above the ceiling. The end-of-season list no longer
+guesses the reader's gender and no longer names the month.
+
+**A season now holds six freezes instead of five** (two base, four earned): with three
+automatic reasons the old ceiling left no room for the ones Mila gives by hand. Copies to
+Mila decline the name — «📨 Отчёт … от Юли», not «от Юля» — for the endings that are safe
+(-а, -я, -й, and a surname in -ова/-ина); anything else stays as it is.
+
+For Mila: name the weeks as the channel does — the guide says what the screens then show.
+Under the hood: `ru.week_name` / `RM.weekName` (one helper, used by the bot, the app, the
+admin app and the PDF), `facts.add_own` with the `fact` freeze reason (migration
+`e7f8a9b0c1d2`: the CHECK constraint and the «once per season» partial unique index),
+`f8a9b0c1d2e3` (the ceiling, rewriting `seasons.max_freezes` — a fresh backup first),
+`ru.name_genitive`,
+`POST /api/facts` answers `FactAdded` with `freeze_granted`.
+
 ## v2.5.0 — 2026-09-18 (Mila's edits of 18.09: the week tab, freezes, personal words and facts)
 
 For participants: the «Неделя» tab opens with the club name small, the season name large in

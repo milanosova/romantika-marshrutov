@@ -62,7 +62,7 @@ async def test_edit_changes_text_adds_a_photo_and_earns_the_star(app: App) -> No
     assert app.store.full_path(photo.path).read_bytes() == JPEG
     jobs = await app.jobs("telegram_notify")
     copy = [j for j in jobs if j.payload["chat_id"] == ADMIN_ID][-1]
-    assert "Правка отчёта за неделю 1 от Алиса" in copy.payload["text"] and "+1 файл" in copy.payload["text"]
+    assert "Правка отчёта за неделю 1 от Алисы" in copy.payload["text"] and "+1 файл" in copy.payload["text"]
     assert copy.payload["media_ids"] == [str(photo.id)] and copy.payload["link"]["report_id"] == report_id
     receipt = [j for j in jobs if j.payload["chat_id"] == ALICE][-1]
     assert "обновила" in receipt.payload["text"]

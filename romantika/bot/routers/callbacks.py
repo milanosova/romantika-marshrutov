@@ -357,7 +357,7 @@ async def handle_admin(
         week = await content.week_by_number(session, season.id, int(parts[1]))
         if week is None:
             return
-        lines = [f"<b>Неделя {week.number} · {ru.escape(week.title)}</b>", ""]
+        lines = [f"<b>Неделя {week.number} · {ru.escape(ru.week_name(week.title))}</b>", ""]
         for field, label in ru.WEEK_FIELDS.items():
             value = getattr(week, field) or "—"
             lines.append(f"<b>{label}:</b> {ru.escape(value[:160])}")
