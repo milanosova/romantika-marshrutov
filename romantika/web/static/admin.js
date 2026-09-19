@@ -377,7 +377,15 @@
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Что мы узнали</p><h1>Факты</h1></header><div class="card"><div class="row"><input id="fact-text" placeholder="Новый факт про страну" style="flex:1"><button class="btn small" id="fact-add">Записать</button></div><p class="note">Твои факты — общие: их видят все и они попадут в журналы всех. Факты участников — личные: видит автор, ты в его карточке и его журнал.</p></div><div id="facts-list">${loading()}</div>`;
     let facts;
     try { facts = await RM.api("/api/admin/facts"); } catch (e) { $("facts-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
-    $("facts-list").innerHTML = facts.length ? `<ul class="list">${facts.map((f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`).join("")}</ul>` : `<p class="muted">Фактов пока нет.</p>`;
+    // Hers are the club's, the participants' are personal: one list would say the season has
+    // facts when the shared one is empty (critic-ui, 19.09).
+    const row = (f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`;
+    const shared = facts.filter((f) => !f.author_name), personal = facts.filter((f) => f.author_name);
+    $("facts-list").innerHTML =
+      `<h3>Общие · ${shared.length}</h3><p class="note">Их видят все в «Сезоне», и они попадут в журналы всех.</p>` +
+      (shared.length ? `<ul class="list">${shared.map(row).join("")}</ul>` : `<p class="muted">Пока пусто — у людей в «Сезоне» тоже пусто.</p>`) +
+      `<h3 style="margin-top:18px">Личные · ${personal.length}</h3><p class="note">Их видит только автор — и ты здесь и в карточке человека.</p>` +
+      (personal.length ? `<ul class="list">${personal.map(row).join("")}</ul>` : `<p class="muted">Пока никто не добавил.</p>`);
     $("fact-add").addEventListener("click", async () => { const text = $("fact-text").value.trim(); if (!text) return; try { await RM.api("/api/admin/facts", { method: "POST", body: { text } }); renderFacts(); } catch (e) { RM.toast(e.message); } });
     $("facts-list").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (!(await RM.confirm("Убрать факт из списка? Он скрывается, не удаляется."))) return; try { await RM.api(`/api/admin/facts/${b.dataset.del}`, { method: "DELETE" }); renderFacts(); } catch (e) { RM.toast(e.message); } }));
   }

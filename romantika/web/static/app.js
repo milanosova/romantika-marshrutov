@@ -377,7 +377,7 @@
   function openFreezes(p) {
     const h = state.home;
     openSheet("Заморозки", `<p><b>Пропустила неделю — тратится одна заморозка.</b></p>
-      <p style="margin-bottom:6px"><b>Накопить можно:</b></p>
+      <p style="margin-bottom:6px"><b>Накопить можно до ${p.freezes_total > 2 ? p.freezes_total : 6} за сезон:</b></p>
       <ul class="plain">
         <li>+1 — за своё слово в словарике</li>
         <li>+1 — за свой факт про страну</li>
