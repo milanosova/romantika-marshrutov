@@ -419,7 +419,6 @@ async def test_panel_opens_with_every_action(harness: Harness) -> None:
     await harness.text(ADMIN_ID, "⚙️ Мила")
     data = {d for _, d in harness.session.buttons(ADMIN_ID) if d}
     assert {
-        "adm:draft",
         "adm:edit",
         "adm:summary",
         "adm:core",
@@ -434,12 +433,9 @@ async def test_panel_opens_with_every_action(harness: Harness) -> None:
     } <= data
 
 
-async def test_panel_draft_summary_core_and_who(harness: Harness) -> None:
+async def test_panel_summary_core_and_who(harness: Harness) -> None:
     await harness.photo(ALICE, caption="тако удались")
     harness.session.reset()
-
-    await harness.callback(ADMIN_ID, "adm:draft")
-    assert "#мексика" in harness.session.last_text(ADMIN_ID) or "[" in harness.session.last_text(ADMIN_ID)
 
     await harness.callback(ADMIN_ID, "adm:summary")
     summary_text = harness.session.last_text(ADMIN_ID)
@@ -452,7 +448,7 @@ async def test_panel_draft_summary_core_and_who(harness: Harness) -> None:
     assert "Алиса" in harness.session.last_text(ADMIN_ID)
 
     await harness.callback(ADMIN_ID, "adm:panel")
-    assert "adm:draft" in [d for _, d in harness.session.buttons(ADMIN_ID)]
+    assert "adm:summary" in [d for _, d in harness.session.buttons(ADMIN_ID)]
 
 
 async def test_panel_remind_sends_to_whoever_took_the_week(harness: Harness) -> None:

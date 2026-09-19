@@ -383,15 +383,6 @@ async def test_the_audit_log_names_who_did_it(app: App) -> None:
     assert rows[0]["actor_name"] == "Мила"
 
 
-async def test_a_future_week_has_no_draft_yet(app: App) -> None:
-    s = (await app.client.get("/api/admin/summary?week=5", headers=app.headers(ADMIN_ID, "Мила"))).json()
-    assert s["draft_post"] == ""
-    assert any("ещё не началась" in note for note in s["draft_notes"])
-
-
-# --- round three: what the API critic found ------------------------------------------------------
-
-
 async def test_a_stamp_mila_removed_stays_removed_even_after_a_later_report_is_cancelled(app: App) -> None:
     """Once a later report has earned the week again, cancelling it must not fall back on the
     reports Mila had in front of her when she took the stamp away (the critic's B-1)."""
@@ -450,12 +441,6 @@ async def test_an_overlong_attempt_key_is_refused_not_cut(app: App) -> None:
 async def test_editing_an_unknown_report_is_a_404(app: App) -> None:
     r = await app.client.patch("/api/reports/999999", data={"text": "x"}, headers=app.headers(ALICE))
     assert r.status_code == 404
-
-
-async def test_the_draft_quotes_one_line_per_person(app: App) -> None:
-    await app.client.post("/api/reports", data={"text": "Строка 1\nСтрока 2\n\nконец"}, headers=app.headers(ALICE))
-    s = (await app.client.get("/api/admin/summary?week=1", headers=app.headers(ADMIN_ID, "Мила"))).json()
-    assert "Строка 1" in s["draft_post"] and "Строка 2" not in s["draft_post"]
 
 
 async def test_a_fact_for_an_unknown_week_is_a_404(app: App) -> None:

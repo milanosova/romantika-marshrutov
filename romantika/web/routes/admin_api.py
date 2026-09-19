@@ -371,7 +371,6 @@ async def week_summary(
         week = current.number
     try:
         report = await summary.week(session, season_id=season.id, week_number=week, today=today)
-        draft = await summary.draft_post(session, season_id=season.id, week_number=week, today=today)
     except content.ContentError as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     names = await people.display_names(session, report.took + list(report.submitted))
@@ -392,8 +391,6 @@ async def week_summary(
         took_not_submitted_names=[names.get(u, str(u)) for u in report.took_not_submitted],
         core_best=report.core_best,
         core_current=report.core_current,
-        draft_post=draft.text,
-        draft_notes=draft.notes,
     )
 
 

@@ -660,7 +660,7 @@ def sa_update_week_dates(week_id: int, starts_on: date, ends_on: date):  # type:
 # --- a draft has no summary and no reminders -------------------------------------------
 
 
-async def test_a_draft_has_no_summary_no_draft_post_and_no_reminder(app: App) -> None:
+async def test_a_draft_has_no_summary_and_no_reminder(app: App) -> None:
     """Release check, 17.09: «Напомнить сейчас» and the week summary took a draft by number
     and would have reminded people about a week they had never seen."""
     from romantika.services import reminders, summary
@@ -683,7 +683,7 @@ async def test_a_draft_has_no_summary_no_draft_post_and_no_reminder(app: App) ->
 
     assert (await app.client.get("/api/admin/summary?week=13", headers=admin)).status_code == 404
     with pytest.raises(content.ContentError):
-        await summary.draft_post(app.session, season_id=app.season_id, week_number=13, today=date(2026, 11, 19))
+        await summary.week(app.session, season_id=app.season_id, week_number=13, today=date(2026, 11, 19))
     assert (await app.client.post("/api/admin/remind", json={"week_number": 13}, headers=admin)).status_code == 404
 
     sent: list[tuple[int, str]] = []

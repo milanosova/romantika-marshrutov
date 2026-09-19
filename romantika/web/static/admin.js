@@ -9,8 +9,7 @@
   const FIELDS = [["title", "Название", "input"], ["intro", "Вступление", "textarea"], ["task_min", "Минимум", "textarea"], ["task_max", "Максимум", "textarea"], ["word", "Слово недели", "input"], ["word_ru", "Произношение", "input"], ["word_meaning", "Значение слова", "textarea"]];
   const FREEZE_REASONS = [["comment", "💬 За комментарий в канале"], ["meetup", "🤝 За приход на встречу"], ["friend", "🧭 За приведённого друга"], ["manual", "❄️ Просто от меня"]];
   const SOURCE = { bot: "из бота", app: "из приложения", out_of_week: "между неделями", not_report: "«это не отчёт»" };
-  const PEOPLE_FILTERS = [["all", "Все"], ["nostamp", "Без штампа на неделе"], ["silent", "Взялись и молчат"]];
-  const state = { tab: "week", me: null, season: null, weeks: [], catalogue: [], participants: [], week: null, filter: "all", unanswered: 0, personChanged: false, onSheetClose: null };
+  const state = { tab: "week", me: null, season: null, weeks: [], catalogue: [], participants: [], week: null, unanswered: 0, personChanged: false, onSheetClose: null };
 
   boot();
 
@@ -89,8 +88,8 @@
       return;
     }
     if (isDraft(picked)) {
-      // Nobody has seen a draft: there is nothing to sum up and no «Привал» to draft.
-      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели — сводки и черновика «Привала» у неё нет. Объявить её можно в «Заданиях».</p></div>`;
+      // Nobody has seen a draft: there is nothing to sum up yet.
+      $("week-body").innerHTML = `<div class="empty"><div class="big">✏️</div><h2>Черновик</h2><p class="muted">Участники эту неделю ещё не видели, сводки у неё нет. Объявить её можно в «Заданиях».</p></div>`;
       return;
     }
     let s;
@@ -107,12 +106,8 @@
         <h3>Сдали (${s.submitted.length})</h3>${s.submitted.length ? `<div class="chips">${s.submitted.map((x) => `<span class="chip ${x.level === "max" ? "star" : "ok"}">${x.level === "max" ? "⭐" : "✅"} ${esc(x.name)}</span>`).join("")}</div>` : `<p class="muted">Пока никто.</p>`}
         <h3>Взялись, но не прислали (${s.took_not_submitted.length})</h3>${s.took_not_submitted_names.length ? `<div class="chips">${s.took_not_submitted_names.map((n) => `<span class="chip">${esc(n)}</span>`).join("")}</div>${s.week_ended ? `<p class="note" style="margin-top:8px">Неделя прошла — напоминать уже не о чем.</p>` : `<button class="btn soft small" id="remind" style="margin-top:10px">⏰ Напомнить им сейчас</button>`}` : `<p class="muted">Таких нет.</p>`}
       </div>
-      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(RM.weekName(s.week_title))} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
+      `;
     if ($("remind")) $("remind").addEventListener("click", () => remindNow(s.week_number, s.week_title));
-    if ($("copy")) $("copy").addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(s.draft_post); RM.toast("Скопировала"); }
-      catch (e) { const r = document.createRange(); r.selectNodeContents($("draft")); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); RM.toast("Выдели и скопируй текст"); }
-    });
   }
 
   async function remindNow(weekNumber, weekTitle) {
@@ -127,10 +122,8 @@
   async function renderPeople() {
     const cur = currentWeek();
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Участники</p><h1>Люди</h1></header><input id="people-q" placeholder="Найти по имени или нику">
-      ${cur ? `<div class="tabs filters" id="people-filters">${PEOPLE_FILTERS.map(([v, l]) => `<button data-f="${v}" class="${state.filter === v ? "active" : ""}">${l}</button>`).join("")}</div>` : ""}
       <div id="people-list">${loading()}</div>`;
     try { state.participants = await RM.api("/api/admin/participants"); } catch (e) { failed($("people-list"), e, renderPeople); return; }
-    if (!cur) state.filter = "all"; // the week filters make no sense between weeks, and there is no UI to reset them
     if (!state.participants.length) { $("people-list").innerHTML = `<div class="empty"><div class="big">👋</div><h2>Пока никого</h2><p class="muted">Люди появятся здесь после первого /start в боте.</p></div>`; return; }
     const weekMark = (p) => {
       if (!cur) return "";
@@ -143,16 +136,11 @@
       const q = $("people-q").value.trim().toLowerCase();
       const rows = state.participants.filter((p) => (!q || name(p).toLowerCase().includes(q)) && passes(p));
       const total = state.participants.length;
-      $("people-list").innerHTML = rows.length ? `<p class="muted small">${rows.length === total ? `${total} ${RM.plural(total, "человек", "человека", "человек")}` : `${rows.length} из ${total}`} · нажми, чтобы открыть</p><ul class="list">${rows.map((p) => `<li data-id="${p.id}" style="cursor:pointer"><span class="body"><div class="person-row"><div class="avatar">${esc(initials(p))}</div><div><div class="name">${esc(name(p))}</div><div class="sub">${esc(RM.levelLabel(p.level))} · заморозок ${p.freezes_left}/${p.freezes_total}</div>${weekMark(p)}</div><div class="stats">${p.stamps} ${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}<br>цепочка ${p.current_streak} / ${p.best_streak}</div></div></span></li>`).join("")}</ul>` : `<p class="muted">${q ? "Никого не нашла." : state.filter === "silent" ? "Все, кто взялся, уже прислали отчёт." : "У всех есть штамп — редкая неделя."}</p>`;
+      $("people-list").innerHTML = rows.length ? `<p class="muted small">${rows.length === total ? `${total} ${RM.plural(total, "человек", "человека", "человек")}` : `${rows.length} из ${total}`} · нажми, чтобы открыть</p><ul class="list">${rows.map((p) => `<li data-id="${p.id}" style="cursor:pointer"><span class="body"><div class="person-row"><div class="avatar">${esc(initials(p))}</div><div><div class="name">${esc(name(p))}</div><div class="sub">${esc(RM.levelLabel(p.level))} · заморозок ${p.freezes_left}/${p.freezes_total}</div>${weekMark(p)}</div><div class="stats">${p.stamps} ${RM.plural(p.stamps, "штамп", "штампа", "штампов")}${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}<br>цепочка ${p.current_streak} / ${p.best_streak}</div></div></span></li>`).join("")}</ul>` : `<p class="muted">${q ? "Никого не нашла." : "Пока никого."}</p>`;
       $("people-list").querySelectorAll("li[data-id]").forEach((li) => li.addEventListener("click", () => openPerson(+li.dataset.id)));
     };
-    const passes = (p) => state.filter === "nostamp" ? !p.week_level : state.filter === "silent" ? (p.week_intent === "take" || p.week_intent === "try") && !p.week_level : true;
+    const passes = () => true; // everyone in one list; the week's mark is on every row
     $("people-q").addEventListener("input", draw);
-    if ($("people-filters")) $("people-filters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-      state.filter = b.dataset.f;
-      $("people-filters").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
-      draw();
-    }));
     draw();
   }
   function name(p) { return ([p.first_name, p.last_name].filter(Boolean).join(" ") + (p.username ? " (@" + p.username + ")" : "")) || String(p.id); }
