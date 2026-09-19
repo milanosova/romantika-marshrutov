@@ -1266,3 +1266,20 @@ async def test_the_max_button_says_the_freeze_out_loud(harness: Harness, db_sess
     await harness.callback(BOB, "level:1:max")
     await harness.callback(BOB, "level:1:max")
     assert await count(db_session, models.Freeze) == 2, "the freeze is granted once a season"
+
+
+async def test_the_task_explains_the_two_buttons(harness: Harness) -> None:
+    """The buttons live in the bot too, and there the note used to be missing entirely
+    (critic-ui, 19.09): «Берусь» promises reminders, «мимо» promises none."""
+    await harness.text(ALICE, "📋 Задание")
+    task = harness.session.last_text(ALICE)
+    assert "«Берусь»" in task and "напоминание" in task
+    assert "даже если не нажимать ничего" in task
+
+    await harness.callback(ALICE, "intent:1:skip")
+    assert "передумаешь" in harness.session.alerts()[-1].lower()
+
+
+async def test_the_admin_memo_does_not_promise_the_removed_draft(harness: Harness) -> None:
+    await harness.text(ADMIN_ID, "/help")
+    assert "Привал" not in harness.session.all_text(ADMIN_ID), "the draft is gone from the product"
