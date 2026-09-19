@@ -246,15 +246,22 @@ async def answer_dialog(
             await safe_send(bot, chat_id, ru.NO_SEASON, reply_markup=keyboard)
             return
         week = await content.current_week(session, season.id, today=today)
+        granted = False
         try:
-            await facts.add(
-                session,
-                season_id=season.id,
-                week_id=week.id if week else None,
-                text=text,
-                author_id=None if is_admin else user.id,
-                now=now,
-            )
+            if is_admin:
+                await facts.add(
+                    session, season_id=season.id, week_id=week.id if week else None, text=text, author_id=None, now=now
+                )
+            else:
+                fact = await facts.add_own(
+                    session,
+                    season_id=season.id,
+                    week_id=week.id if week else None,
+                    text=text,
+                    author_id=user.id,
+                    now=now,
+                )
+                granted = fact.freeze_granted
         except Refused as exc:
             # The dialog is already closed (the caller cleared it): the next message is a report again.
             logger.info("refused", extra={"chat_id": chat_id, "reason": str(exc)})
@@ -274,7 +281,9 @@ async def answer_dialog(
                 reply_markup=keyboards.facts_buttons(is_admin=True, has_facts=True),
             )
         else:
-            await safe_send(bot, chat_id, ru.FACT_SAVED, reply_markup=keyboard)
+            await safe_send(
+                bot, chat_id, ru.FACT_SAVED + (ru.FACT_FREEZE_BONUS if granted else ""), reply_markup=keyboard
+            )
             await common.notify_admin(
                 bot, admin_chat, user, ru.admin_fact_added(author, text, week.number if week else None)
             )

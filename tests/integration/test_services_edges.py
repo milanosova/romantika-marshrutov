@@ -162,7 +162,7 @@ async def test_fix_level_of_an_unknown_week(db_session: AsyncSession, season: in
 
 
 async def test_manual_freezes_repeat_but_stop_at_the_ceiling(db_session: AsyncSession, season: int) -> None:
-    """Only `word` and `max` are once-per-season; the ceiling is 2 base + 3 earned."""
+    """Only the automatic reasons are once-per-season; the ceiling is 2 base + 4 earned."""
     now = moscow(2026, 9, 3)
     granted = [
         await freezes.grant(
@@ -174,11 +174,11 @@ async def test_manual_freezes_repeat_but_stop_at_the_ceiling(db_session: AsyncSe
             now=now,
             note=f"#{index}",
         )
-        for index in range(4)
+        for index in range(5)
     ]
-    assert granted == [True, True, True, False]
-    assert await freezes.bonus_count(db_session, season, BOB) == 3
-    assert await freezes.total(db_session, season, BOB) == 5
+    assert granted == [True, True, True, True, False]
+    assert await freezes.bonus_count(db_session, season, BOB) == 4
+    assert await freezes.total(db_session, season, BOB) == 6
 
 
 async def test_first_word_freeze_is_granted_once(db_session: AsyncSession, season: int) -> None:

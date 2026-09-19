@@ -38,7 +38,7 @@ async def test_import_fills_the_season_fields(db_session: AsyncSession) -> None:
     assert season.daily_kind == "tzolkin"
     assert season.daily_title
     assert season.daily_note
-    assert (season.base_freezes, season.max_freezes) == (2, 5)
+    assert (season.base_freezes, season.max_freezes) == (2, 6)
     assert (season.level_tourist, season.level_traveler, season.level_resident) == (1, 4, 9)
     assert season.status == models.SeasonStatus.DRAFT.value
 

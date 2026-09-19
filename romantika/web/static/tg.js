@@ -101,10 +101,13 @@
 
   RM.levelName = { tourist: "Турист", traveler: "Путешественник", resident: "Резидент", "": "Ещё в пути" };
   RM.stateMark = { stamped: "✅", current: "▸", frozen: "❄️", missed: "◦", before_join: "◦", locked: "🔒" };
+  // «Неделя rola [музыка]» → «rola [музыка]»: screens that print the number say it once.
+  // Only a latin word is trimmed, so a Russian name like «Неделя памяти» stays whole.
+  RM.weekName = (title) => String(title || "").replace(/^\s*неделя\s+(?=[a-z])/i, "") || String(title || "");
   RM.kindName = function (kind) {
     return { text: "текст", photo: "фото", video: "видео", video_note: "кружок", voice: "голосовое", audio: "аудио", document: "файл", other: "сообщение" }[kind] || kind;
   };
-  RM.freezeReason = { word: "за своё слово в словарике", max: "за первый выполненный максимум", comment: "за комментарий в канале", meetup: "за приход на встречу", friend: "за приведённого друга", manual: "от Милы" };
+  RM.freezeReason = { word: "за своё слово в словарике", fact: "за свой факт про страну", max: "за первый выполненный максимум", comment: "за комментарий в канале", meetup: "за приход на встречу", friend: "за приведённого друга", manual: "от Милы" };
   // The bot's dictionary wins when the API sends it (`texts.level_names`, `texts.freeze_reasons`).
   RM.adoptTexts = function (texts) {
     if (!texts) return;

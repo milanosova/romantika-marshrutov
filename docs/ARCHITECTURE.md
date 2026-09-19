@@ -259,6 +259,12 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
 - `romantika.bot.send.split_text(text: str, limit: int = 4096) -> list[str]` splits on
   paragraph, then line, then space boundaries; never returns an empty piece; every outgoing
   text passes through it (`safe_send`).
+- `romantika.texts.ru.week_name(title) -> str` (mirrored by `RM.weekName` in `static/tg.js` and
+  exposed to the public page as the `week_name` Jinja filter) drops the
+  leading «Неделя » Mila writes in a week's name — but only before a latin word, so a Russian
+  name («Неделя памяти») and the placeholder of an unopened week («Неделя 7») survive whole.
+  A screen that prints the number itself («Неделя N ·», «N. ») then never says the word twice
+  (DOMAIN §7). The name is stored as she typed it; only the printing side trims.
 - `romantika.bot.keyboards.normalize_button(text) -> str` (drops emoji/variation selectors,
   collapses spaces, lower-cases) and `button_action(text) -> str | None` with actions
   `app, task, today, passport, words, facts, more, help, write, admin`; a message that starts
@@ -311,7 +317,10 @@ destination: Path)`, later stages add `send_message(chat_id, text)` and
   `people.choose_intent`, shared with the bot button: 409 for a week that has not started or
   has ended and after the stamp; a repeated answer is stored but not copied to Mila), `POST
   /api/letters`, `POST /api/words` (422 for a word the person already has), `POST /api/facts`
-  (422 for a fact the person already has).
+  (422 for a fact the person already has; answers `FactAdded` with `freeze_granted` — the
+  first own fact of a season earns a freeze, DOMAIN §3). Whether a screen may still promise
+  that freeze is one service call, `freezes.pending(session, season_id=, user_id=, reason=)`:
+  once a season, never above the ceiling.
 - Multipart limits (`routes/api.py`): the request is refused with 413 from `Content-Length`
   before parsing when it exceeds 200 MB; `request.form(max_files=11, max_fields=64)`; one file
   ≤ 50 MB, 10 files per report, text ≤ 4000 characters (422); only parts named `files` are

@@ -69,7 +69,7 @@
     const dateTitle = new Date(t.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", weekday: "long" });
     // The position in the calendar, not the number: numbers may have gaps once Mila edits the season.
     const position = w ? h.weeks.findIndex((x) => x.id === w.id) + 1 : 0;
-    const status = w ? `Неделя ${w.number}${position && position !== w.number ? ` · ${position} из ${h.weeks.length}` : ` из ${h.weeks.length}`} · дедлайн ${esc(w.deadline)}` : h.next_week_starts_on ? `Между неделями · следующая с ${fmt(h.next_week_starts_on)}` : "Сезон завершён";
+    const status = w ? `Неделя ${w.number}${position && position !== w.number ? ` · ${position} из ${h.weeks.length}` : ` из ${h.weeks.length}`} · дедлайн задания ${esc(w.deadline)}` : h.next_week_starts_on ? `Между неделями · следующая с ${fmt(h.next_week_starts_on)}` : "Сезон завершён";
     let out = `<header class="screen-head"><p class="eyebrow">Романтика маршрутов</p><h1 class="season-title">${esc(h.season.title)}</h1><p class="date-line">${esc(capital(dateTitle))}</p><p class="muted">${status}</p></header>`;
     // The day comes first: a reason to open the app on a Wednesday. The week's word lives in the task card.
     out += dayCard(t);
@@ -77,7 +77,7 @@
     if (w) {
       out += `<div class="card current">
         <p class="eyebrow">Задание недели</p>
-        <h2>${w.number}. ${esc(w.title)}</h2>
+        <h2>${esc(w.title)}</h2>
         ${w.intro ? `<p>${esc(w.intro)}</p>` : ""}
         <div class="kv">
           <div><div class="k">Минимум ✅ · на пять минут</div><div class="v">${esc(w.task_min)}</div></div>
@@ -136,8 +136,10 @@
     const tz = t.tzolkin;
     if (!tz) return "";
     return `<div class="card day tight">
-      <div class="row between"><span class="daytitle"><span class="muted">по календарю майя:</span> <b>${tz.number} ${esc(tz.sign_name)}</b> <span class="muted">· ${esc(tz.sign_symbol)}</span></span>${t.calendar_url ? `<a class="btn link small" href="${esc(t.calendar_url)}" id="calendar-link">Календарь →</a>` : ""}</div>
+      <p class="muted daylabel">день по календарю майя</p>
+      <p class="daytitle"><b>${tz.number} ${esc(tz.sign_name)}</b> <span class="muted">· ${esc(tz.sign_symbol)}</span></p>
       <p class="advice">${esc(tz.day_advice)}</p>
+      ${t.calendar_url ? `<a class="btn link small daylink" href="${esc(t.calendar_url)}" id="calendar-link">Узнай своё предназначение →</a>` : ""}
     </div>`;
   }
 
@@ -334,7 +336,8 @@
     // Mila's own facts carry no author and are the club's shared ones (DOMAIN §6): her card says so.
     const isAdmin = !!state.home.user.is_admin;
     const mine = facts.value.facts.filter((x) => isAdmin ? !x.author : x.mine);
-    const firstWord = !(state.home.passport.freeze_reasons || []).includes("word");
+    const earned = state.home.passport.freeze_reasons || [];
+    const firstWord = !earned.includes("word"), firstFact = !earned.includes("fact");
     box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои слова</h3>
       ${words.length ? `<ul class="list tight">${words.map((w) => `<li><span class="mark">✍️</span><span class="body"><div class="title">${esc(w.word)}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}</span></li>`).join("")}</ul>` : `<p class="muted">Пока пусто — слова, которые зацепили тебя в этой стране.</p>`}
       <div class="row" style="margin-top:8px"><input id="word-text" placeholder="слово — что оно значит" style="flex:1"><button class="btn small" id="word-send">Записать</button></div>
@@ -342,7 +345,7 @@
       <div class="card"><h3 style="margin-top:0">${isAdmin ? "Факты клуба" : "Мои факты"}</h3>
       ${mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row" style="margin-top:8px"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
-      <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все в «Сезоне», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — в «Сезоне»."}</p></div>`;
+      <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все в «Сезоне», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — в «Сезоне»." + (firstFact ? " За первый факт — ❄️ +1 заморозка." : "")}</p></div>`;
     const again = async () => { const y = window.scrollY; await refreshHome(); await renderMineInto(box); window.scrollTo(0, y); };
     $("word-send").addEventListener("click", async () => {
       const text = $("word-text").value.trim();
@@ -360,7 +363,12 @@
       const text = $("fact-text").value.trim();
       if (!text) return RM.toast("Напиши факт");
       $("fact-send").disabled = true;
-      try { const r = await RM.api("/api/facts", { method: "POST", body: { text } }); RM.haptic("success"); RM.toast(r.message.replace(/<[^>]+>/g, "")); await again(); }
+      try {
+        const r = await RM.api("/api/facts", { method: "POST", body: { text } });
+        RM.haptic("success");
+        if (r.freeze_granted) { RM.alert(r.message.replace(/<[^>]+>/g, "")); const y = window.scrollY; await refreshHome(); await renderBag(); window.scrollTo(0, y); }
+        else { RM.toast(r.message.replace(/<[^>]+>/g, "")); await again(); }
+      }
       catch (e) { $("fact-send").disabled = false; RM.toast(e.message); }
     });
   }
@@ -369,9 +377,10 @@
   function openFreezes(p) {
     const h = state.home;
     openSheet("Заморозки", `<p><b>Пропустила неделю — тратится одна заморозка.</b></p>
-      <p style="margin-bottom:6px"><b>Накопить можно:</b></p>
+      <p style="margin-bottom:6px"><b>Накопить можно до ${p.freezes_total > 2 ? p.freezes_total : 6} за сезон:</b></p>
       <ul class="plain">
         <li>+1 — за своё слово в словарике</li>
+        <li>+1 — за свой факт про страну</li>
         <li>+1 — за первый максимум (задание сделано по максимуму)</li>
         <li>+1 — от Милы: за комментарий в канале, встречу или приведённого друга</li>
       </ul>
@@ -396,7 +405,7 @@
   function stampHtml(w) {
     const cls = w.state === "stamped" ? w.level : w.state;
     const mark = w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : w.state === "current" ? "▸" : RM.stateMark[w.state] || "·";
-    return `<button class="stamp ${cls}" data-n="${w.number}"><span class="n">${w.number}</span><span class="m">${mark}</span><span class="t">${esc(w.state === "locked" ? fmt(w.starts_on) : w.title)}</span></button>`;
+    return `<button class="stamp ${cls}" data-n="${w.number}"><span class="n">${w.number}</span><span class="m">${mark}</span><span class="t">${esc(w.state === "locked" ? fmt(w.starts_on) : RM.weekName(w.title))}</span></button>`;
   }
 
   function openWeek(n) {
@@ -411,7 +420,9 @@
          ${w.word ? `<div class="divider"></div><div class="wordline">${esc(w.word)}${w.word_ru ? ` <span class="ru">· ${esc(w.word_ru)}</span>` : ""}</div>${w.word_meaning ? `<div class="muted"><i>${esc(w.word_meaning)}</i></div>` : ""}` : ""}
          ${w.state === "current" ? `<button class="btn block" id="sheet-report" style="margin-top:14px">Сдать отчёт</button>` : ""}
          ${w.late_open ? `<div id="late-box" style="margin-top:14px">${loading()}</div>` : ""}`;
-    const title = w.title && w.title !== `Неделя ${w.number}` ? `Неделя ${w.number} · ${w.title}` : `Неделя ${w.number}`;
+    // The server sends «Неделя N» as the placeholder of a week that has not opened (views.py).
+    const named = w.title && w.title !== `Неделя ${w.number}`;
+    const title = named ? `Неделя ${w.number} · ${RM.weekName(w.title)}` : `Неделя ${w.number}`;
     openSheet(title, body, () => {
       if ($("sheet-report")) $("sheet-report").addEventListener("click", () => go("week"));
       if (w.late_open) renderLateBox(w);
@@ -475,7 +486,7 @@
       const lateOnly = !week.level && rs.every((r) => r.late);
       // The mark follows the stamp: none → «◦» like the grid above; all late → the journal mark.
       const level = lateOnly ? "📔" : week.level === "max" ? "⭐" : week.level ? "✅" : "◦";
-      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(week.title)}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
+      out += `<div class="card"><h2>${level} Неделя ${n} · ${esc(RM.weekName(week.title))}${lateOnly ? ` <span class="muted small" style="font-weight:400">· дослано позже</span>` : ""}</h2>${rs.map(reportHtml).join("")}</div>`;
     });
     if (letters.length) out += `<details class="card"><summary>Сообщения вне недель (${letters.length})</summary><div class="content">${letters.map(reportHtml).join("")}</div></details>`;
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
@@ -508,7 +519,7 @@
   function openEditor(r, done) {
     const week = (state.home.weeks || []).find((w) => w.number === r.week_number);
     const added = [], removed = new Set();
-    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(week.title)} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
+    const body = `<p class="muted small">${week ? `Неделя ${week.number} · ${esc(RM.weekName(week.title))} · ` : ""}${r.late ? "дослано позже: менять можно до конца сезона — я увижу новую версию." : "пока неделя идёт, отчёт можно менять — я увижу новую версию."}</p>
       <textarea id="edit-text" placeholder="Что было на этой неделе?">${esc(r.text || "")}</textarea>
       ${r.media.length ? `<p class="note" style="margin:10px 0 4px">Файлы в отчёте — нажми, чтобы убрать</p><div class="previews" id="edit-existing">${r.media.map((m) => `<button class="pv keep" data-id="${m.id}" title="${esc(m.mime || "")}">${m.mime && m.mime.startsWith("image/") && m.downloaded ? `<img src="${m.url}" alt="">` : `<span>${kindName(m.mime && m.mime.startsWith("video/") ? "video" : "document")}</span>`}<span class="x" aria-hidden="true">✕</span></button>`).join("")}</div>` : ""}
       <div class="attach" style="margin-top:10px"><label class="btn soft small" for="edit-files">📷 Загрузить фото или видео</label><input id="edit-files" type="file" accept="image/*,video/*" multiple><span class="muted small" id="edit-count"></span></div>
@@ -584,16 +595,16 @@
     if (dict.status === "rejected") return (screen.innerHTML = errorBox(dict.reason));
     const h = state.home, d = dict.value, f = facts.status === "fulfilled" ? facts.value : null;
     const released = h.weeks.filter((w) => w.state !== "locked");
-    let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1>${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
+    let out = `<header class="screen-head"><p class="eyebrow">Сезон</p><h1 class="season-title">${esc(h.season.title)}</h1><p class="muted">${fmt(h.season.starts_on)} — ${fmt(h.season.ends_on)} · ${h.weeks.length} ${RM.plural(h.weeks.length, "неделя", "недели", "недель")}</p></header>`;
     // Weeks as a chronicle, newest first; future weeks are not shown (DOMAIN §1).
     out += `<h3>Недели</h3>`;
     // The running week is «идёт» whatever its stamp: `state` says "stamped" once the person has one.
     const running = (w) => h.week && w.id === h.week.id;
     // The mark is the week's own — a stamp, a freeze, a miss — the same as in the bag's grid.
     const chronicleMark = (w) => running(w) ? "▸" : w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : RM.stateMark[w.state] || "◦";
-    out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${chronicleMark(w)}</span><span class="body"><div class="title">${w.number}. ${esc(w.title)}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
+    out += released.length ? `<ul class="list">${released.slice().reverse().map((w) => `<li data-week="${w.number}" style="cursor:pointer"><span class="mark">${chronicleMark(w)}</span><span class="body"><div class="title">${w.number}. ${esc(RM.weekName(w.title))}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)}${running(w) ? " · идёт" : ""}${w.word ? ` · ${esc(w.word)}` : ""}</div></span></li>`).join("")}</ul>` : `<p class="muted">Первая неделя ещё не началась.</p>`;
     out += `<h3>Слова недели</h3>`;
-    out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(w.title)}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
+    out += d.week_words.length ? `<ul class="list">${d.week_words.map((w) => `<li><span class="mark">📖</span><span class="body"><div class="title">${esc(w.word)}${w.word_ru ? ` <span class="muted" style="font-weight:400">· ${esc(w.word_ru)}</span>` : ""}</div>${w.meaning ? `<div>${esc(w.meaning)}</div>` : ""}<div class="sub">неделя ${w.week_number} · ${esc(RM.weekName(w.title))}</div></span></li>`).join("")}</ul>` : `<p class="muted">Слова недели появятся вместе с заданиями.</p>`;
     // Facts here are Mila's — the club's shared ones. A person's own facts and words live in the bag (DOMAIN §6).
     const shared = f ? f.facts.filter((x) => !x.mine && !x.author) : [];
     if (f) out += `<div class="card" style="margin-top:18px"><h2>💡 Что мы узнали про ${esc(f.about)}</h2>

@@ -17,10 +17,16 @@ from romantika.domain import rules
 from romantika.services import content
 
 #: Reasons the bot grants by itself, once per season and participant (DOMAIN §3).
-AUTO_REASONS: frozenset[models.FreezeReason] = frozenset({models.FreezeReason.WORD, models.FreezeReason.MAX})
+AUTO_REASONS: frozenset[models.FreezeReason] = frozenset(
+    {models.FreezeReason.WORD, models.FreezeReason.MAX, models.FreezeReason.FACT}
+)
 
-#: The partial unique index behind the «once per season» rule (migration 8f1c2a6d94b7).
+#: The partial unique index behind the «once per season» rule (migrations 8f1c2a6d94b7, e7f8a9b0c1d2).
 AUTO_REASON_INDEX = "uq_freezes_auto_reason"
+
+#: Its predicate, written exactly as the migration writes it: `ON CONFLICT` has to name the
+#: same one, or Postgres stops finding the index the moment the two drift apart.
+AUTO_REASON_WHERE = "reason IN ('word', 'max', 'fact')"
 
 #: Advisory lock keys are `int4`; Telegram ids are wider, so they are folded into the range.
 _LOCK_MODULUS = 2**31 - 1
@@ -75,7 +81,7 @@ async def grant(
         )
         .on_conflict_do_nothing(
             index_elements=[models.Freeze.season_id, models.Freeze.user_id, models.Freeze.reason],
-            index_where=text("reason IN ('word', 'max')"),
+            index_where=text(AUTO_REASON_WHERE),
         )
         .returning(models.Freeze.id)
     )
@@ -115,6 +121,20 @@ async def total(session: AsyncSession, season_id: int, user_id: int) -> int:
         base_freezes=season.base_freezes,
         max_freezes=season.max_freezes,
     )
+
+
+async def pending(session: AsyncSession, *, season_id: int, user_id: int, reason: models.FreezeReason) -> bool:
+    """Can this person still earn the freeze given for `reason`?
+
+    The screens promise the bonus in words, and the promise has to be true: the freeze is
+    granted once a season, and never above the ceiling (DOMAIN §3).
+    """
+    if reason not in AUTO_REASONS:
+        return False
+    season = await content.require_season(session, season_id)
+    if season.base_freezes + await bonus_count(session, season_id, user_id) >= season.max_freezes:
+        return False
+    return reason.value not in await reasons(session, season_id, user_id)
 
 
 async def reasons(session: AsyncSession, season_id: int, user_id: int) -> list[str]:

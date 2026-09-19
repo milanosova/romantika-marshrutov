@@ -143,7 +143,7 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
         cards.append(
             WeekCard(
                 number=week.number,
-                title=week.title,
+                title=ru.week_name(week.title),  # the chapter prints «Неделя N ·» itself
                 star=week.level is StampLevel.MAX,
                 dates=span_words(week.starts_on, week.ends_on),
                 entries=[CardEntry(text=clip(entry.text), late=entry.late) for entry in week.entries],
@@ -166,7 +166,8 @@ def render_journal_html(view: JournalView, *, media_root: Path | None = None, le
             mark, state = "❄", "frozen"
         else:
             mark, state = "", "empty"
-        grid.append({"number": number, "mark": mark, "title": entry.title if entry else "", "state": state})
+        title = ru.week_name(entry.title) if entry else ""
+        grid.append({"number": number, "mark": mark, "title": title, "state": state})
     name = view.user.display_name if view.user else ""
     weeks_done = len(stamped)
     stars = sum(1 for week in view.weeks if week.level is StampLevel.MAX)

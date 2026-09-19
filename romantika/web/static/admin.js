@@ -71,7 +71,7 @@
     });
   }
   const currentWeek = () => state.weeks.find((w) => w.state === "current");
-  const weekOptions = (selected) => state.weeks.map((w) => `<option value="${w.number}" ${w.number === selected ? "selected" : ""}>${w.number}. ${esc(w.title) || "без названия"}${!w.announced_at ? " · черновик" : w.state === "current" ? " · идёт" : w.state === "locked" ? " · 🔒" : ""}</option>`).join("");
+  const weekOptions = (selected) => state.weeks.map((w) => `<option value="${w.number}" ${w.number === selected ? "selected" : ""}>${w.number}. ${esc(RM.weekName(w.title)) || "без названия"}${!w.announced_at ? " · черновик" : w.state === "current" ? " · идёт" : w.state === "locked" ? " · 🔒" : ""}</option>`).join("");
   const plain = (s) => String(s || "").replace(/<[^>]+>/g, "");
 
   // --- Неделя: сводка ------------------------------------------------------------------
@@ -103,11 +103,11 @@
         <div class="tile"><div class="big">${s.core_current} <span class="muted">/ ${s.core_best}</span></div><div class="label">в ядре сейчас / были за сезон · две недели подряд</div></div>
         <div class="tile"><div class="big">${s.reports_total}</div><div class="label">${RM.plural(s.reports_total, "отчёт", "отчёта", "отчётов")} за неделю</div></div>
       </div>
-      <div class="card"><h2>${s.week_number}. ${esc(s.week_title)}</h2>
+      <div class="card"><h2>${s.week_number}. ${esc(RM.weekName(s.week_title))}</h2>
         <h3>Сдали (${s.submitted.length})</h3>${s.submitted.length ? `<div class="chips">${s.submitted.map((x) => `<span class="chip ${x.level === "max" ? "star" : "ok"}">${x.level === "max" ? "⭐" : "✅"} ${esc(x.name)}</span>`).join("")}</div>` : `<p class="muted">Пока никто.</p>`}
         <h3>Взялись, но не прислали (${s.took_not_submitted.length})</h3>${s.took_not_submitted_names.length ? `<div class="chips">${s.took_not_submitted_names.map((n) => `<span class="chip">${esc(n)}</span>`).join("")}</div>${s.week_ended ? `<p class="note" style="margin-top:8px">Неделя прошла — напоминать уже не о чем.</p>` : `<button class="btn soft small" id="remind" style="margin-top:10px">⏰ Напомнить им сейчас</button>`}` : `<p class="muted">Таких нет.</p>`}
       </div>
-      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(s.week_title)} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
+      ${s.draft_post ? `<div class="card"><div class="row between"><h2 style="margin:0">Черновик «Привала»</h2><button class="btn soft small" id="copy">Скопировать</button></div><p class="muted small">Неделя ${s.week_number} · ${esc(RM.weekName(s.week_title))} · выложить в воскресенье в 20:00</p><pre class="draft" id="draft" style="margin-top:6px">${esc(s.draft_post)}</pre><p class="note">В квадратных скобках — что дописать руками. ${(s.draft_notes || []).length ? `Не для поста: ${s.draft_notes.map(esc).join(" · ")}` : ""}</p></div>` : `<div class="card"><h2 style="margin:0">Черновик «Привала»</h2><p class="muted" style="margin:6px 0 0">${(s.draft_notes || []).map(esc).join(" · ") || "Появится, когда неделя начнётся."}</p></div>`}`;
     if ($("remind")) $("remind").addEventListener("click", () => remindNow(s.week_number, s.week_title));
     if ($("copy")) $("copy").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(s.draft_post); RM.toast("Скопировала"); }
@@ -116,7 +116,7 @@
   }
 
   async function remindNow(weekNumber, weekTitle) {
-    const about = weekNumber ? `за неделю ${weekNumber} «${weekTitle}»` : "за текущую неделю";
+    const about = weekNumber ? `за неделю ${weekNumber} «${RM.weekName(weekTitle)}»` : "за текущую неделю";
     if (!(await RM.confirm(`Напомнить всем, кто взялся ${about} и ещё не прислал отчёт?`))) return;
     try { await RM.api("/api/admin/remind", { method: "POST", body: { week_number: weekNumber || null } }); RM.toast("Отправляю — бот напишет тебе, сколько ушло"); }
     catch (e) { RM.toast(e.status === 409 ? "Эта неделя уже прошла — напоминать не о чем" : e.message, 4000); }
@@ -169,7 +169,7 @@
         <div class="tile"><div class="big">${p.stamps} <span class="muted">/ ${p.weeks_total}</span></div><div class="label">штампов${p.stamps_max ? ` · ⭐ ${p.stamps_max}` : ""}</div></div>
         <div class="tile"><div class="big">${esc(RM.levelLabel(p.level))}</div><div class="label">статус · цепочка ${p.current_streak}/${p.best_streak}</div></div>
       </div>
-      <div class="card"><h3 style="margin-top:0">Штампы по неделям</h3><div class="stampbar">${d.weeks.map((w) => `<button data-week="${w.number}" class="${w.level || ""}" title="${esc(w.title)}">${w.number} ${w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : (RM.stateMark[w.state] || "·")}</button>`).join("")}</div>
+      <div class="card"><h3 style="margin-top:0">Штампы по неделям</h3><div class="stampbar">${d.weeks.map((w) => `<button data-week="${w.number}" class="${w.level || ""}" title="${esc(RM.weekName(w.title))}">${w.number} ${w.state === "stamped" ? (w.level === "max" ? "⭐" : "✅") : (RM.stateMark[w.state] || "·")}</button>`).join("")}</div>
         <div id="stamp-pick" hidden></div>
         <p class="note">Нажми на неделю и выбери штамп. Ручной штамп важнее автоматического: отчёты его не перебивают.</p></div>
       <div class="card"><h3 style="margin-top:0">Заморозка · осталось ${p.freezes_left} из ${p.freezes_total}</h3>
@@ -192,7 +192,7 @@
       body.querySelectorAll(".stampbar button").forEach((x) => x.classList.toggle("picked", x === b));
       const pick = $("stamp-pick");
       pick.hidden = false;
-      pick.innerHTML = `<p class="muted small" style="margin:8px 0 4px">Неделя ${week.number} · ${esc(week.title)} · сейчас ${current === "max" ? "⭐ максимум" : current === "min" ? "✅ минимум" : "без штампа"}</p>
+      pick.innerHTML = `<p class="muted small" style="margin:8px 0 4px">Неделя ${week.number} · ${esc(RM.weekName(week.title))} · сейчас ${current === "max" ? "⭐ максимум" : current === "min" ? "✅ минимум" : "без штампа"}</p>
         <div class="segment" style="margin-top:0">${[["", "Нет"], ["min", "✅ Минимум"], ["max", "⭐ Максимум"]].map(([v, l]) => `<button data-level="${v}" class="${(current || "") === v ? "active" : ""}">${l}</button>`).join("")}</div>`;
       pick.querySelectorAll("button").forEach((x) => x.addEventListener("click", async () => {
         const level = x.dataset.level || null;
@@ -202,7 +202,7 @@
       }));
     }));
     $("freeze-btn").addEventListener("click", async () => {
-      try { const r = await RM.api(`/api/admin/participants/${id}/freezes`, { method: "POST", body: { reason: $("freeze-reason").value, note: $("freeze-note").value.trim() || null } }); state.personChanged = state.personChanged || r.granted; RM.toast(r.granted ? `Выдала, всего ${r.freezes_total}. Человеку придёт сообщение в бота` : "Уже потолок — пять"); openPerson(id); } catch (e) { RM.toast(e.message); }
+      try { const r = await RM.api(`/api/admin/participants/${id}/freezes`, { method: "POST", body: { reason: $("freeze-reason").value, note: $("freeze-note").value.trim() || null } }); state.personChanged = state.personChanged || r.granted; RM.toast(r.granted ? `Выдала, всего ${r.freezes_total}. Человеку придёт сообщение в бота` : "Уже потолок — шесть"); openPerson(id); } catch (e) { RM.toast(e.message); }
     });
     $("badge-btn").addEventListener("click", async () => {
       const code = $("badge-free").value.trim() || $("badge-code").value;
@@ -250,7 +250,7 @@
 
   function renderContent() {
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Тексты недель</p><h1>Задания</h1><p class="muted">Нажми на неделю. Правки видны в боте и в приложении сразу; тексты любой недели — и прошедшей тоже — правятся; у прошедшей и идущей недели заморожены только даты.</p></header>
-      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(w.title) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
+      <ul class="list">${state.weeks.map((w) => `<li data-week="${w.id}" style="cursor:pointer"><span class="mark">${w.state === "current" ? "▶" : w.state === "locked" ? "🔒" : "✓"}</span><span class="body"><div class="title">${w.number}. ${esc(RM.weekName(w.title)) || "<span class=\"muted\">без названия</span>"}</div><div class="sub">${fmt(w.starts_on)} — ${fmt(w.ends_on)} · ${w.stale_draft ? "<b>даты уже идут, а неделя не объявлена</b>" : w.state === "current" ? "идёт сейчас" : w.state === "locked" ? "ещё закрыта" : "прошла"}${w.word ? ` · ${esc(w.word)}` : ""}${isDraft(w) && !w.stale_draft ? ` · <b>черновик</b>` : ""}</div></span></li>`).join("")}</ul>
       <button class="btn soft block" id="week-add" style="margin-top:12px">＋ Добавить неделю</button>
       <p class="note">Новая неделя — только в будущее, внутри сезона и в свободные даты. Она появляется черновиком: участники её не видят, и она не считается пропуском. Когда впишешь название и минимум — нажми «Объявить».</p>`;
     screen.querySelectorAll("li[data-week]").forEach((li) => li.addEventListener("click", () => openWeekEditor(+li.dataset.week)));
@@ -354,14 +354,14 @@
         } catch (err) { const why = calendarError(err); RM.toast(textsSaved ? "Тексты сохранила, а даты нет: " + why.charAt(0).toLowerCase() + why.slice(1) : why, 5000); }
       });
       if ($("week-announce")) $("week-announce").addEventListener("click", async () => {
-        if (!(await RM.confirm(`Объявить неделю ${w.number} «${w.title}»? Её увидят участники; назад в черновик её не вернуть.`))) return;
+        if (!(await RM.confirm(`Объявить неделю ${w.number} «${RM.weekName(w.title)}»? Её увидят участники; назад в черновик её не вернуть.`))) return;
         try {
           Object.assign(w, await RM.api(`/api/admin/weeks/${w.id}/announce`, { method: "POST" }));
           RM.haptic("success"); RM.toast("Объявила"); closeSheet(); renderContent();
         } catch (err) { RM.toast(calendarError(err), 5000); }
       });
       if ($("week-del")) $("week-del").addEventListener("click", async () => {
-        if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${w.title}»` : ""}? Это записывается в «Изменения».`))) return;
+        if (!(await RM.confirm(`Удалить неделю ${w.number}${w.title ? ` «${RM.weekName(w.title)}»` : ""}? Это записывается в «Изменения».`))) return;
         try {
           await RM.api(`/api/admin/weeks/${w.id}`, { method: "DELETE" });
           state.weeks = state.weeks.filter((x) => x.id !== w.id);
@@ -377,7 +377,15 @@
     screen.innerHTML = `<header class="screen-head"><p class="eyebrow">Что мы узнали</p><h1>Факты</h1></header><div class="card"><div class="row"><input id="fact-text" placeholder="Новый факт про страну" style="flex:1"><button class="btn small" id="fact-add">Записать</button></div><p class="note">Твои факты — общие: их видят все и они попадут в журналы всех. Факты участников — личные: видит автор, ты в его карточке и его журнал.</p></div><div id="facts-list">${loading()}</div>`;
     let facts;
     try { facts = await RM.api("/api/admin/facts"); } catch (e) { $("facts-list").innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
-    $("facts-list").innerHTML = facts.length ? `<ul class="list">${facts.map((f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`).join("")}</ul>` : `<p class="muted">Фактов пока нет.</p>`;
+    // Hers are the club's, the participants' are personal: one list would say the season has
+    // facts when the shared one is empty (critic-ui, 19.09).
+    const row = (f, i) => `<li><span class="mark">${i + 1}.</span><span class="body"><div>${esc(f.text)}</div><div class="sub">${f.author_name ? esc(f.author_name) : "Мила"} · ${fmt(f.created_at)}</div></span><button class="btn ghost small" data-del="${f.id}">убрать</button></li>`;
+    const shared = facts.filter((f) => !f.author_name), personal = facts.filter((f) => f.author_name);
+    $("facts-list").innerHTML =
+      `<h3>Общие · ${shared.length}</h3><p class="note">Их видят все в «Сезоне», и они попадут в журналы всех.</p>` +
+      (shared.length ? `<ul class="list">${shared.map(row).join("")}</ul>` : `<p class="muted">Пока пусто — у людей в «Сезоне» тоже пусто.</p>`) +
+      `<h3 style="margin-top:18px">Личные · ${personal.length}</h3><p class="note">Их видит только автор — и ты здесь и в карточке человека.</p>` +
+      (personal.length ? `<ul class="list">${personal.map(row).join("")}</ul>` : `<p class="muted">Пока никто не добавил.</p>`);
     $("fact-add").addEventListener("click", async () => { const text = $("fact-text").value.trim(); if (!text) return; try { await RM.api("/api/admin/facts", { method: "POST", body: { text } }); renderFacts(); } catch (e) { RM.toast(e.message); } });
     $("facts-list").querySelectorAll("[data-del]").forEach((b) => b.addEventListener("click", async () => { if (!(await RM.confirm("Убрать факт из списка? Он скрывается, не удаляется."))) return; try { await RM.api(`/api/admin/facts/${b.dataset.del}`, { method: "DELETE" }); renderFacts(); } catch (e) { RM.toast(e.message); } }));
   }
@@ -393,7 +401,7 @@
       <details class="card"><summary>Как всё устроено</summary><div class="content helptext">
         <b>Отчёты</b> Человек присылает боту текст или фото — или отправляет их из приложения. Текст = минимум ✅, фото или видео = максимум ⭐. Копия приходит тебе в чат с шапкой «📨 Отчёт за неделю N от…»; ответь на неё реплаем — бот передаст автору.
         <b>Штампы</b> Ставятся сами по первому отчёту недели и никогда не понижаются (кроме «это не отчёт»). Ручной штамп ставишь во вкладке «Люди»; он важнее автоматического.
-        <b>Заморозки</b> Две базовые, до пяти. Пропущенная неделя тратит одну сама. За слово в словарике и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
+        <b>Заморозки</b> Две базовые, до шести. Пропущенная неделя тратит одну сама. За слово в словарике, за свой факт про страну и за первый максимум бот выдаёт сам; за комментарий, встречу и друга — ты, во вкладке «Люди».
         <b>Задания</b> Тексты любой недели — и прошедшей тоже — правятся во вкладке «Задания» и появляются в боте сразу. У прошедшей и идущей недели заморожены только даты.
         <b>Сводка</b> Вкладка «Неделя»: кто взялся, кто сдал, ядро (две недели подряд) и черновик «Привала».
         <b>Письма</b> Вкладка «Письма»: всё, что пришло не отчётом. Ответ отсюда или реплаем в чате — одно и то же, письмо помечается отвеченным.

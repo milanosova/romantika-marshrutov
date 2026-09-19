@@ -11,10 +11,13 @@ from sqlalchemy import text
 
 from romantika.domain.tzolkin import SIGNS, TONES, tzolkin_day
 from romantika.services import achievements, content
+from romantika.texts import ru
 from romantika.web.deps import MediaStoreDep, SessionDep, SettingsDep, TodayDep
 
 router = APIRouter(tags=["public"])
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
+#: The page prints «Неделя N ·» itself, so the name drops the word Mila writes in it.
+templates.env.filters["week_name"] = ru.week_name
 
 
 def _asset_version() -> str:

@@ -6,6 +6,7 @@ Nothing here touches the database or Telegram.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from html import escape
 
@@ -32,6 +33,7 @@ JOURNAL_LEVEL_NAMES: dict[Level | None, str] = LEVEL_NAMES
 
 FREEZE_REASONS: dict[str, str] = {
     "word": "за своё слово в словарике",
+    "fact": "за свой факт про страну",
     "max": "за первый выполненный максимум",
     "comment": "за комментарий в канале",
     "meetup": "за приход на встречу",
@@ -75,6 +77,41 @@ def short_name(user: UserDTO | None, fallback: int | None = None) -> str:
     return display_name(user, fallback).split(" (@")[0]
 
 
+#: «ж ч ш щ г к х» + «а» take «и», everything else takes «ы» (Маша → Маши, Лена → Лены).
+_HUSHING = "жчшщгкх"
+
+
+def name_genitive(author: str) -> str:
+    """«Юля (@julia)» → «Юли (@julia)»: Mila's copies read «от Юли», not «от Юля».
+
+    Only the endings that are safe are declined — a name in -а/-я/-й, the shape almost every
+    name in the club has. Anything else (a consonant, a latin name, an emoji) comes back as
+    it is: a wrong case reads worse than a nominative one.
+    """
+    head, sep, tail = author.partition(" (@")
+    first, space, rest = head.partition(" ")
+    if len(first) < 3 or not first[:-1].isalpha():
+        return author
+    last, before = first[-1].lower(), first[-2].lower()
+    if last == "я":
+        declined = first[:-2] + "ии" if before == "и" else first[:-1] + "и"
+    elif last == "а":
+        declined = first[:-1] + ("и" if before in _HUSHING else "ы")
+    elif last == "й":
+        declined = first[:-1] + "я"
+    else:
+        return author
+    return f"{declined}{space}{_surname_genitive(rest)}{sep}{tail}"
+
+
+def _surname_genitive(surname: str) -> str:
+    """«Петрова» → «Петровой»; a word shaped like anything else is left alone."""
+    lowered = surname.lower()
+    if len(surname) > 4 and any(lowered.endswith(ending) for ending in ("ова", "ева", "ёва", "ина", "ына")):
+        return surname[:-1] + "ой"
+    return surname
+
+
 def date_genitive(day: date) -> str:
     return f"{day.day} {MONTHS_GENITIVE[day.month - 1]}"
 
@@ -91,6 +128,21 @@ def deadline_text(week: WeekDTO) -> str:
     """«воскресенье 06.09, 18:00» — the last day of the week by name, whatever day it falls on:
     the closing week of a season may end on a Wednesday (DOMAIN §1)."""
     return f"{WEEKDAYS_NOMINATIVE[week.ends_on.weekday()]} {week.ends_on:%d.%m}, 18:00"
+
+
+#: «Неделя rola [музыка]» — the way the channel names a week: the word, then the week's own
+#: word in Spanish. Only a latin word after «Неделя» is trimmed, so «Неделя памяти» — a name
+#: written in Russian — survives whole (critic-ui, 19.09.2026).
+_LEADING_WEEK = re.compile(r"^\s*неделя\s+(?=[a-z])", re.IGNORECASE)
+
+
+def week_name(title: str) -> str:
+    """The name without that word: «Неделя rola [музыка]» → «rola [музыка]».
+
+    Every screen that prints the number itself («Неделя 3 · …», «3. …») would otherwise say
+    it twice. The stored name is never touched — only the printing side trims (DOMAIN §7).
+    """
+    return _LEADING_WEEK.sub("", title) or title
 
 
 def deadline_short(week: WeekDTO) -> str:
@@ -187,8 +239,9 @@ _HELP_ITEMS: tuple[tuple[str, str, str | None], ...] = (
     ),
     (
         "Как заработать ещё заморозку",
-        "Всего можно накопить пять. Сверх двух базовых:\n"
+        "Всего можно накопить шесть. Сверх двух базовых:\n"
         "· +1 за своё слово в словарике — сразу, автоматически\n"
+        "· +1 за свой первый факт про страну — тоже автоматически\n"
         "· +1 за первый выполненный максимум — тоже автоматически\n"
         "· +1 от меня за комментарий в канале, приход на встречу или приведённого друга",
         None,
@@ -321,6 +374,11 @@ FACT_PROMPT_ADMIN = (
     "его увидят все в «Сезоне», и он попадёт в журналы всех.</i>"
 )
 FACT_SAVED = "Спасибо, записала ✅ Факт останется у тебя — и попадёт в твой журнал сезона."
+FACT_FREEZE_BONUS = (
+    "\n\n❄️ И тебе +1 заморозка — это право пропустить неделю так, чтобы цепочка не порвалась. "
+    "Все заморозки — в «Рюкзаке»."
+)
+"""The first own fact of a season earns a freeze too (DOMAIN §3, 19.09.2026)."""
 FACT_DUPLICATE = "такой факт у тебя уже записан"
 FACT_TOO_LONG = "факт длиннее 4000 знаков — сократи, пожалуйста"
 
@@ -361,7 +419,7 @@ def late_receipt(week: WeekDTO, *, first_of_week: bool, stamped: bool = False) -
     return LATE_RECEIPT.format(
         verb=LATE_VERB_FIRST if first_of_week else LATE_VERB_AGAIN,
         number=week.number,
-        title=escape(week.title),
+        title=escape(week_name(week.title)),
         tail=LATE_TAIL_STAMPED if stamped else LATE_TAIL_NO_STAMP,
     )
 
@@ -406,7 +464,7 @@ def word_lines(week: WeekDTO | None) -> list[str]:
 
 def task_text(week: WeekDTO) -> str:
     parts = [
-        f"<b>Неделя {week.number} · {escape(week.title)}</b>",
+        f"<b>Неделя {week.number} · {escape(week_name(week.title))}</b>",
         "",
         escape(week.intro),
         "",
@@ -473,10 +531,10 @@ def passport_text(view: PassportView, bonus_reasons: list[str]) -> str:
         if state is WeekState.STAMPED:
             level = view.stamps.get(week.number)
             mark = "⭐" if level is StampLevel.MAX else "✅"
-            lines.append(f"{mark}  {week.number}. {escape(week.title)}")  # the current title, as in the app
+            lines.append(f"{mark}  {week.number}. {escape(week_name(week.title))}")  # the current title, as in the app
             continue
         tail = {WeekState.FROZEN: " · заморозка", WeekState.BEFORE_JOIN: " · до тебя"}.get(state, "")
-        lines.append(f"{marks[state]}  {week.number}. {escape(week.title)}{tail}")
+        lines.append(f"{marks[state]}  {week.number}. {escape(week_name(week.title))}{tail}")
     if locked:
         lines.append(
             f"🔒  Дальше ещё {locked} {plural(locked, 'неделя', 'недели', 'недель')}"
@@ -514,18 +572,18 @@ def end_of_season_text(season: SeasonDTO) -> str:
         f"{date_genitive(season.ends_on)} сезон заканчивается, и каждый, кто участвовал, получит "
         "<b>журнал сезона</b> — свой собственный, не общий.\n\n"
         "Внутри будет:\n"
-        "· каждая твоя неделя — задание и твой отчёт по нему, как ты его прислала\n"
+        "· каждая твоя неделя — задание и твой отчёт по нему, слово в слово\n"
         "· фотографии из твоих отчётов\n"
         "· ачивки, которые у тебя набрались\n"
         "· словарик: слова недель и твои собственные слова\n"
         "· факты «что мы узнали» — общие на весь клуб — и твои собственные\n"
         "· несколько слов лично от меня\n\n"
-        "Это не сертификат об окончании. Это чтобы в ноябре было видно: "
+        "Это не сертификат об окончании. Это чтобы в конце было видно: "
         "три месяца прожиты, а не пролистаны."
     )
 
 
-def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
+def dictionary_text(season: SeasonDTO, view: DictionaryView, *, freeze_offer: bool = False) -> str:
     """The week words and the reader's own words — personal, so no names (DOMAIN §6)."""
     lines = [f"<b>📖 Словарик сезона · {escape(season.title)}</b>", ""]
     if view.week_words:
@@ -543,7 +601,7 @@ def dictionary_text(season: SeasonDTO, view: DictionaryView) -> str:
         for entry in view.user_words:
             lines.append(escape(entry.word) + (f" — {escape(entry.meaning)}" if entry.meaning else ""))
     tail = "Твои слова видишь только ты — и они будут в твоём журнале сезона."
-    if not view.user_words:
+    if freeze_offer:  # the service knows whether it can still be earned (DOMAIN §3)
         tail += " За первое своё слово — ❄️ +1 заморозка."
     lines += ["", RULE, "", f"<i>{tail}</i>"]
     return "\n".join(lines)
@@ -556,6 +614,7 @@ def facts_text(
     *,
     with_ids: bool = False,
     viewer_id: int | None = None,
+    freeze_offer: bool = False,
 ) -> str:
     """Mila's facts and the reader's own; another person's name appears only in the admin's list."""
     about = escape(season.title_accusative or season.title)
@@ -563,6 +622,7 @@ def facts_text(
         return (
             f"<b>💡 Что мы узнали про {about}</b>\n\n"
             "Пока пусто. Жми «➕ Добавить свой факт» — что зацепило из постов или нашлось само."
+            + (" За первый свой факт — ❄️ +1 заморозка." if freeze_offer else "")
         )
     lines = [f"<b>💡 Что мы узнали про {about}</b>", "", RULE, ""]
     for index, fact in enumerate(facts, 1):
@@ -573,9 +633,10 @@ def facts_text(
             line += f" <i>— {who}</i>"
         lines += [line, ""]
     text = "\n".join(lines).rstrip()
-    return text + (
-        "\n\n<i>Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале.</i>"
-    )
+    tail = "Общие факты — от Милы; свои видишь только ты. В конце сезона всё это будет в твоём журнале."
+    if freeze_offer:  # the caller knows whether the freeze is still to be earned (DOMAIN §3)
+        tail += " За первый свой факт — ❄️ +1 заморозка."
+    return f"{text}\n\n<i>{tail}</i>"
 
 
 def journal_text(view: JournalView, level: Level | None) -> str:
@@ -596,7 +657,7 @@ def journal_text(view: JournalView, level: Level | None) -> str:
             # The quote below is the chapter's last entry: say so when that entry came late.
             quoted_late = bool(week.entries) and week.entries[-1].late
             tail = f" · {LATE_MARK}" if week.late_only or quoted_late else ""
-            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week.title)}</b>{tail}")
+            lines.append(f"{mark} <b>Неделя {week.number} · {escape(week_name(week.title))}</b>{tail}")
             if week.quote:
                 lines.append(f"<i>«{escape(week.quote[:400])}»</i>")
     else:
@@ -630,7 +691,7 @@ def report_reply(
     goes down (DOMAIN §2), so a text sent after a photo is a minimum while the star stays —
     the receipt has to say both, or it reads as «the star is gone».
     """
-    title = escape(week.title)
+    title = escape(week_name(week.title))
     if level is StampLevel.MAX:
         text = f"⭐ Записала как <b>максимум</b> — штамп со звёздочкой за неделю «{title}»."
     elif stamp_level is StampLevel.MAX:
@@ -666,7 +727,9 @@ ADMIN_COPY_CHARS = 3500
 
 def admin_report_header(week_number: int, author: str, text: str | None, kind: str) -> str:
     body = f": {escape(clip(text, ADMIN_COPY_CHARS))}" if text else f" ({kind})"
-    return f"📨 Отчёт за неделю {week_number} от {escape(author)}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return (
+        f"📨 Отчёт за неделю {week_number} от {escape(name_genitive(author))}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    )
 
 
 def admin_edit_header(
@@ -686,20 +749,20 @@ def admin_edit_header(
         if late
         else f"Правка отчёта за неделю {week_number}"
     )
-    return f"✏️ {what} от {escape(author)}{tail}{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return f"✏️ {what} от {escape(name_genitive(author))}{tail}{body}\n\n<i>Ответь реплаем — передам.</i>"
 
 
 def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool, late: bool = False) -> str:
     """The receipt after an edit in the Mini App; names the stamp the week actually has.
     A late report has none behind it, so the receipt speaks of the journal only."""
     if late:
-        return f"✏️ Запись в журнале недели «{escape(week.title)}» обновила. Штамп это не трогает."
+        return f"✏️ Запись в журнале недели «{escape(week_name(week.title))}» обновила. Штамп это не трогает."
     if level is StampLevel.MAX:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — штамп со звёздочкой ⭐ на месте."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила — штамп со звёздочкой ⭐ на месте."
     elif level is StampLevel.MIN:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила — засчитан как <b>минимум</b> ✅."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила — засчитан как <b>минимум</b> ✅."
     else:
-        text = f"✏️ Отчёт за неделю «{escape(week.title)}» обновила."
+        text = f"✏️ Отчёт за неделю «{escape(week_name(week.title))}» обновила."
     if freeze_granted:
         text += "\n\n❄️ И тебе +1 заморозка за первый максимум."
     return text
@@ -708,19 +771,19 @@ def edit_reply(week: WeekDTO, level: StampLevel | None, *, freeze_granted: bool,
 def admin_letter_header(author: str, text: str | None, *, corrected: bool = False) -> str:
     suffix = " (сначала пришло как отчёт)" if corrected else ""
     return (
-        f"✉️ <b>Сообщение от {escape(author)}</b>{suffix}\n\n{escape(text or '(без текста)')}"
+        f"✉️ <b>Сообщение от {escape(name_genitive(author))}</b>{suffix}\n\n{escape(text or '(без текста)')}"
         "\n\n<i>Ответь реплаем — передам.</i>"
     )
 
 
 def admin_word_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
-    return f"📖 Новое слово от {escape(author)}{where}: {escape(text)}"
+    return f"📖 Новое слово от {escape(name_genitive(author))}{where}: {escape(text)}"
 
 
 def admin_fact_added(author: str, text: str, week_number: int | None = None) -> str:
     where = f" · неделя {week_number}" if week_number else ""
-    return f"💡 Новый факт от {escape(author)}{where}: {escape(text)}"
+    return f"💡 Новый факт от {escape(name_genitive(author))}{where}: {escape(text)}"
 
 
 def admin_late_header(week_number: int, author: str, text: str | None, kind: str, *, stamped: bool = False) -> str:
@@ -733,7 +796,10 @@ def admin_late_header(week_number: int, author: str, text: str | None, kind: str
 
 def admin_out_of_week_header(author: str, text: str | None, kind: str) -> str:
     body = escape(text) if text else f"({kind})"
-    return f"✉️ <b>Сообщение от {escape(author)}</b> (неделя не идёт)\n\n{body}\n\n<i>Ответь реплаем — передам.</i>"
+    return (
+        f"✉️ <b>Сообщение от {escape(name_genitive(author))}</b> (неделя не идёт)\n\n"
+        f"{body}\n\n<i>Ответь реплаем — передам.</i>"
+    )
 
 
 def reply_to_author(text: str, *, about: str = "report") -> str:
@@ -759,7 +825,7 @@ def clip(text: str, limit: int) -> str:
 
 def summary_text(summary: WeekSummary, names: dict[int, str], core: CoreView) -> str:
     lines = [
-        f"<b>Неделя {summary.week_number} · {escape(summary.week_title)}</b>",
+        f"<b>Неделя {summary.week_number} · {escape(week_name(summary.week_title))}</b>",
         f"В боте людей: {summary.members_total} · отчётов: {summary.reports_total}",
         "",
         f"<b>Взялись ({len(summary.took)})</b>",
@@ -857,13 +923,13 @@ def freeze_given(reason: str) -> str:
 
 def reminder_thursday(week: WeekDTO) -> str:
     return (
-        f"Впереди выходные — как раз время сделать задание недели «{escape(week.title)}».\n\n"
+        f"Впереди выходные — как раз время сделать задание недели «{escape(week_name(week.title))}».\n\n"
         f"Дедлайн — {deadline_text(week)}. Пришли сюда текст или фото, и всё."
     )
 
 
 def reminder_sunday(week: WeekDTO) -> str:
     return (
-        f"Сегодня до 18:00 — дедлайн по заданию «{escape(week.title)}».\n\n"
+        f"Сегодня до 18:00 — дедлайн по заданию «{escape(week_name(week.title))}».\n\n"
         "Даже минимум на пять минут считается. Вечером покажу общие итоги."
     )
