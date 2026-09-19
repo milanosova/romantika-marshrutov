@@ -329,7 +329,7 @@
           <div class="photo"></div>
           <div class="line"></div><div class="line short"></div>
         </div>
-        <p class="muted small" style="margin:8px 0 0">Так выглядит первая страница: имя, сетка недель со звёздочками за максимум, дальше глава на каждую неделю с твоим текстом и фотографиями.</p>
+        <p class="muted small" style="margin:8px 0 0">Так выглядит первая страница: имя, сетка недель теми же значками — ⭐ за максимум, ✅ за минимум, — дальше глава на каждую неделю с твоим текстом и фотографиями.</p>
       </div></div></details>`;
   }
 
@@ -351,7 +351,7 @@
       <p class="note" style="margin:8px 0 0">Видишь только ты; будут в твоём журнале сезона.${firstWord ? " За первое слово — ❄️ +1 заморозка." : ""}</p></div>
       <div class="card"><h3 style="margin-top:0">${isAdmin ? "Записать факт клуба" : "Мои факты"}</h3>
       ${isAdmin
-        ? `<p class="muted">Твои факты живут на «Карте» — здесь их можно только добавить.</p>`
+        ? ""
         : mine.length ? `<ol style="padding-left:20px;margin:0 0 6px">${mine.map((x) => `<li>${esc(x.text)}</li>`).join("")}</ol>` : `<p class="muted">Пока пусто — что зацепило из постов или нашлось само?</p>`}
       <div class="row" style="margin-top:8px"><input id="fact-text" placeholder="Что нового о стране — в одну-две фразы" style="flex:1"><button class="btn small" id="fact-send">Записать</button></div>
       <p class="note" style="margin:8px 0 0">${isAdmin ? "Твои факты — общие: их видят все на «Карте», и они попадут в журналы всех." : "Видишь только ты; будут в твоём журнале сезона. Общие факты — от Милы — на «Карте»." + (firstFact ? " За первый факт — ❄️ +1 заморозка." : "")}</p></div>`;
