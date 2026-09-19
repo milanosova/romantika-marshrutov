@@ -412,4 +412,5 @@ async def test_the_third_tab_is_labelled_karta(app: App) -> None:
     assert ">Карта<" in page and ">Сезон<" not in page
     for path in ("/app/season", "/app/map", "/app/words", "/app/more"):
         r = await app.client.get(path, headers=app.headers(ALICE))
-        assert r.status_code == 200 and 'data-tab="season"' in r.text, path
+        # The tab bar carries `data-tab="season"` on every page: the chosen tab is the app div.
+        assert r.status_code == 200 and 'id="app" class="app" data-tab="season"' in r.text, path

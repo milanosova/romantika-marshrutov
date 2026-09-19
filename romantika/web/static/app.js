@@ -1,5 +1,5 @@
 // Participant Mini App — one door, three tabs (DOMAIN §7, 14.09.2026): «Неделя» is what is
-// happening now (day, task, intent, reports), «Рюкзак» is what the person has gathered
+// happening now (day, task, intent, the form), «Рюкзак» is what the person has gathered
 // (passport, achievements, journal with PDF), «Карта» is what Mila made (weeks, words, facts,
 // about). Rules and texts come from the API (the same services and `texts/ru.py` the bot
 // uses); this file only draws. Old tab names still route (links in old messages).
