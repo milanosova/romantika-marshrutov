@@ -127,7 +127,7 @@ async def test_home_has_task_today_passport_and_texts(app: App) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["week"]["number"] == 1 and body["week"]["task_min"] and body["week"]["intent"] is None
-    assert body["week"]["reports_count"] == 0 and body["week"]["level"] is None
+    assert body["week"]["level"] is None
     assert body["today"]["tzolkin"]["sign_name"] and body["today"]["word"]["word"]
     assert body["today"]["calendar_url"] == "https://romantika.example.test/calendar"
     assert body["passport"]["weeks_total"] == len(body["weeks"]) and body["passport"]["freezes_total"] == 2
@@ -225,7 +225,7 @@ async def test_text_report_stamps_minimum_and_queues_both_messages(app: App) -> 
     assert admin_job.payload["media_ids"] == []
     assert receipt.payload["text"] == body["message"] and "link" not in receipt.payload
     home = (await app.client.get("/api/home", headers=app.headers(ALICE))).json()
-    assert home["week"]["reports_count"] == 1 and home["week"]["level"] == "min"
+    assert home["week"]["level"] == "min"
 
 
 async def test_photo_upload_lands_on_disk_hashed_and_earns_the_star(app: App) -> None:
@@ -404,3 +404,12 @@ async def test_healthz_reports_the_media_directory(app: App) -> None:
         assert r.status_code == 503 and r.json() == {"status": "degraded", "db": True, "media": False}
     finally:
         root.chmod(0o700)
+
+
+async def test_the_third_tab_is_labelled_karta(app: App) -> None:
+    """The label changed on 19.09 while the id stayed `season`: both have to keep working."""
+    page = (await app.client.get("/app", headers=app.headers(ALICE))).text
+    assert ">Карта<" in page and ">Сезон<" not in page
+    for path in ("/app/season", "/app/map", "/app/words", "/app/more"):
+        r = await app.client.get(path, headers=app.headers(ALICE))
+        assert r.status_code == 200 and 'data-tab="season"' in r.text, path

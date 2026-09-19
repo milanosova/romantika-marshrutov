@@ -213,7 +213,6 @@ async def home_out(
         week_out_ = schemas.CurrentWeekOut(
             **base.model_dump(),
             intent=choice.value if choice else None,
-            reports_count=await reports.count_for_week(session, user_id=user_id, week_id=current.id),
             deadline=ru.deadline_short(current),
         )
     upcoming = next((w for w in weeks if w.starts_on > today), None)

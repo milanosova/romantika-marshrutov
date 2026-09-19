@@ -351,7 +351,6 @@ class TodayOut(BaseModel):
 
 class CurrentWeekOut(WeekOut):
     intent: Literal["take", "try", "skip"] | None = None
-    reports_count: int = 0
     deadline: str = ""
 
 

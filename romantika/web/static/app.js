@@ -9,7 +9,7 @@
   const $ = (id) => document.getElementById(id);
   const app = $("app"), screen = $("screen"), tabbar = $("tabbar");
   const MAX_FILES = 10, MAX_BYTES = 50 * 1024 * 1024, MAX_TOTAL = 200 * 1024 * 1024; // the API's limits (routes/api.py), checked here first
-  const TAB_ALIASES = { today: "week", passport: "bag", journal: "bag", words: "season", more: "season" };
+  const TAB_ALIASES = { today: "week", passport: "bag", journal: "bag", words: "season", more: "season", map: "season" };
   const state = { tab: TAB_ALIASES[app.dataset.tab] || app.dataset.tab || "week", home: null, journal: null, files: [], clientId: null };
 
   boot();
@@ -238,8 +238,6 @@
       state.clientId = RM.uid();
       if (late) { late.done(r); return; }
       await refreshHome();
-      // /api/home may have failed silently; the report exists, so the list below must show it.
-      if (!r.out_of_week && state.home.week && !state.home.week.reports_count) state.home.week.reports_count = 1;
       renderWeek(); // the task card above changes too: the intent question gives way to the stamp
       showResult(r);
     } catch (e) {
@@ -267,7 +265,7 @@
     box.innerHTML = `<div class="row between"><h2 style="margin:0">${r.out_of_week ? "Сохранила" : "Принято"}</h2>${stampChip(w)}</div>
       <div class="result ${r.out_of_week ? "" : "ok"}"><div class="rich">${html(r.message)}</div></div>
       ${canRaise ? `<div class="row" style="margin-top:12px"><button class="btn soft small" id="fix-level">⭐ Это был максимум</button></div>` : ""}
-      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Отчёт теперь в списке ниже: там его можно поправить, пока неделя идёт, или пометить «это не отчёт»."}</p>
+      <p class="note" style="margin:8px 0 0">${r.out_of_week ? "Отвечу в чат с ботом." : "Отчёт в журнале: «Рюкзак» → «Журнал». Там его можно поправить, пока неделя идёт, или пометить «это не отчёт»."}</p>
       <button class="btn link" id="again" style="margin-top:4px">Отправить ещё один</button>`;
     if ($("fix-level")) $("fix-level").addEventListener("click", async () => {
       try {
