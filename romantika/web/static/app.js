@@ -303,6 +303,9 @@
     if (h.achievements.length) out += `<div class="card"><h3 style="margin-top:0">Ачивки</h3><div class="chips">${h.achievements.map((a) => `<span class="chip star">${esc(a)}</span>`).join("")}</div><p class="note" style="margin:8px 0 0">Не за посещаемость, а за поступок. Останутся в журнале сезона.</p></div>`;
     if (h.wish) out += `<div class="card accent"><h3 style="margin-top:0">От Милы</h3><p><i>${esc(h.wish)}</i></p></div>`;
     out += `<div id="mine-box">${loading()}</div>`; // own words and facts (DOMAIN §6)
+    // What the file looks like, right next to the button that makes it (Mila, 19.09). Drawn
+    // from the passport, so a failed /api/journal cannot take the block away.
+    out += endOfSeasonHtml(h);
     out += `<div id="journal-box">${loading()}</div>`;
     screen.innerHTML = out;
     screen.querySelectorAll(".stamp").forEach((b) => b.addEventListener("click", () => openWeek(+b.dataset.n)));
@@ -311,6 +314,28 @@
   }
 
   // A person's own words and facts: seen only by them, kept for their journal (DOMAIN §6, 15.09.2026).
+  // The sketch of the journal's first page: the same marks the real cover uses (pdf/journal.py).
+  function endOfSeasonHtml(h) {
+    const p = h.passport, weeks = h.weeks.length || p.weeks_total;
+    const marks = h.weeks.map((w) => (w.level === "max" ? "★" : w.level ? "✓" : ""));
+    const cells = Array.from({ length: weeks }, (_, i) => {
+      const mark = marks[i] || "";
+      return `<span class="${mark ? "on" : ""}">${mark}</span>`;
+    }).join("");
+    return `<details class="card"><summary>Что будет в конце сезона</summary><div class="content richtext">${html(unhead(h.texts.end_of_season))}
+      <div class="bookdemo">
+        <div class="sheet" aria-hidden="true">
+          <div class="ttl">${esc(h.season.title)}</div>
+          <div class="sub">${esc(h.user.first_name || "твоё имя")} · журнал сезона</div>
+          <div class="grid">${cells}</div>
+          <div class="line long"></div><div class="line"></div>
+          <div class="photo"></div>
+          <div class="line"></div><div class="line short"></div>
+        </div>
+        <p class="muted small" style="margin:8px 0 0">Так выглядит первая страница: имя, сетка недель со звёздочками за максимум, дальше глава на каждую неделю с твоим текстом и фотографиями.</p>
+      </div></div></details>`;
+  }
+
   async function renderMineInto(box) {
     const [dict, facts] = await Promise.allSettled([RM.api("/api/dictionary"), RM.api("/api/facts")]);
     if (!box.isConnected) return;
@@ -320,7 +345,7 @@
     const words = dict.value.user_words;
     // Mila's own facts carry no author and are the club's shared ones (DOMAIN §6): her card says so.
     const isAdmin = !!state.home.user.is_admin;
-    const mine = facts.value.facts.filter((x) => isAdmin ? !x.author : x.mine);
+    const mine = isAdmin ? [] : facts.value.facts.filter((x) => x.mine);
     const earned = state.home.passport.freeze_reasons || [];
     const firstWord = !earned.includes("word"), firstFact = !earned.includes("fact");
     box.innerHTML = `<div class="card"><h3 style="margin-top:0">Мои слова</h3>
@@ -465,22 +490,9 @@
     const byWeek = new Map();
     live.forEach((r) => { if (!byWeek.has(r.week_number)) byWeek.set(r.week_number, []); byWeek.get(r.week_number).push(r); });
     const weeksDone = [...byWeek.keys()].sort((a, b) => b - a);
-    const h = state.home;
     let out = "";
     if (weeksDone.length) out += `<div class="card accent tight"><div class="row between"><div><b>Журнал в PDF</b><div class="muted small">К концу сезона соберётся целиком. Собрать можно и сейчас — одним файлом в бота.</div></div><button class="btn small" id="pdf">Собрать</button></div><p class="muted small" id="pdf-status" style="margin:6px 0 0"></p></div>`;
-    // What the file looks like, right next to the button that makes it (Mila, 19.09).
-    out += `<details class="card"><summary>Что будет в конце сезона</summary><div class="content richtext">${html(unhead(h.texts.end_of_season))}
-      <div class="bookdemo" aria-hidden="true">
-        <div class="page">
-          <div class="ttl">${esc(h.season.title)}</div>
-          <div class="sub">${esc(h.user.first_name || "твоё имя")} · журнал сезона</div>
-          <div class="grid">${Array.from({ length: 12 }, (_, i) => `<span class="${i < weeksDone.length ? "on" : ""}">${i < weeksDone.length ? "★" : ""}</span>`).join("")}</div>
-          <div class="line long"></div><div class="line"></div>
-          <div class="photo"></div>
-          <div class="line"></div><div class="line short"></div>
-        </div>
-        <p class="muted small" style="margin:8px 0 0">Так выглядит первая страница: имя, сетка недель, дальше глава на каждую неделю с твоим текстом и фотографиями.</p>
-      </div></div></details>`;
+
     out += `<h3 style="margin:18px 0 8px">Журнал${weeksDone.length ? ` · ${weeksDone.length} ${RM.plural(weeksDone.length, "неделя", "недели", "недель")}` : ""}</h3>`;
     if (!weeksDone.length) out += `<div class="empty"><div class="big">📔</div><h2>Пока пусто</h2><p class="muted">Здесь появятся твои недели и твои же слова о них. К концу сезона это будет целый журнал.</p></div>`;
     weeksDone.forEach((n) => {

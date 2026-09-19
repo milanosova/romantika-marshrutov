@@ -283,11 +283,11 @@ table.grid td, table.grid th { padding: 8px 4px; border-bottom: 1px solid var(--
 
 /* A sketch of the journal page, shown next to the «Собрать» button: what the file looks like. */
 .bookdemo { margin-top: 12px; }
-.bookdemo .page {
+.bookdemo .sheet {
   background: var(--card); border: 1px solid var(--line); border-radius: 8px;
   padding: 14px 14px 16px; box-shadow: 0 1px 0 var(--line);
 }
-.bookdemo .ttl { font-family: var(--serif, Georgia, serif); font-size: 20px; font-weight: 700; }
+.bookdemo .ttl { font-family: Georgia, "Times New Roman", serif; font-size: 20px; font-weight: 700; }
 .bookdemo .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .bookdemo .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 10px 0 12px; }
 .bookdemo .grid span {
